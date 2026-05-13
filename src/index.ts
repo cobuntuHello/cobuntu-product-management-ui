@@ -15,6 +15,9 @@ export {
 
 // Components
 export { PriceEditModal, type PriceEditModalProps, CURRENCIES } from "./components/PriceEditModal";
+export { NameEditModal } from "./components/NameEditModal";
+export { ShareModal } from "./components/ShareModal";
+export { DeleteModal } from "./components/DeleteModal";
 
 // UI primitives — duplicated from @cobuntu/event-management-ui by design
 // (see README). Re-exported here so consumers have a single import point
