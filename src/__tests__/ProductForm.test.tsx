@@ -82,4 +82,37 @@ describe("ProductForm", () => {
     });
     expect(screen.getByText(/paid product/i)).toBeInTheDocument();
   });
+
+  it("showTiers={false}: tier toggle is NOT rendered, even when Paid", async () => {
+    const user = userEvent.setup();
+    renderWithConfig(<ProductForm {...baseProps()} />);
+    await user.click(screen.getByText(/free product/i));
+    expect(screen.queryByText(/advanced pricing/i)).not.toBeInTheDocument();
+  });
+
+  it("showTiers={true}: 'Advanced pricing' toggle is visible once Paid is selected", async () => {
+    const user = userEvent.setup();
+    renderWithConfig(<ProductForm {...baseProps({ showTiers: true })} />);
+    await user.click(screen.getByText(/free product/i));
+    await waitFor(() => expect(screen.getByText(/advanced pricing/i)).toBeInTheDocument());
+  });
+
+  it("multi-tier mode: emits a tiers array and clears parent price", async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    renderWithConfig(<ProductForm {...baseProps({ onChange, showTiers: true })} />);
+    await user.click(screen.getByText(/free product/i)); // → Paid
+    await waitFor(() => expect(screen.getByText(/advanced pricing/i)).toBeInTheDocument());
+
+    // Flip on multi-tier
+    onChange.mockClear();
+    await user.click(screen.getByText(/advanced pricing/i));
+
+    await waitFor(() => {
+      const last = onChange.mock.calls.at(-1)?.[0] as ProductFormData | undefined;
+      expect(last?.tiers?.length).toBeGreaterThanOrEqual(1);
+      expect(last?.tiers?.[0]?.name).toBe("Standard");
+      expect(last?.price).toBe(""); // parent price MUST be empty in multi-tier mode
+    });
+  });
 });

@@ -19,6 +19,15 @@ export { NameEditModal } from "./components/NameEditModal";
 export { ShareModal } from "./components/ShareModal";
 export { DeleteModal } from "./components/DeleteModal";
 export { ProductForm, type ProductFormData } from "./components/ProductForm";
+export {
+  ProductTiersAndDonations,
+  type TierDraft,
+  type DonationDraft,
+  blankTier,
+  blankDonation,
+  tierDraftsToPayload,
+  donationDraftToPayload,
+} from "./components/ProductTiersAndDonations";
 export { EditProductDrawer } from "./components/EditProductDrawer";
 
 // UI primitives — duplicated from @cobuntu/event-management-ui by design
