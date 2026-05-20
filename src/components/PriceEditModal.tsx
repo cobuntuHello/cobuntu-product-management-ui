@@ -14,6 +14,29 @@ import { ModalShell } from "../ui/modal-shell";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
 import { MemberPricingSection, type MemberPricingSectionHandle } from "./MemberPricingSection";
+import {
+  CURRENCIES as SUPPORTED_CURRENCIES,
+  type DonationDraft,
+  type DraftTier,
+  type Tier,
+} from "./PriceEditModal/types";
+import {
+  blankTier,
+  buildDonationBody,
+  buildTierBody,
+  fromSmallestUnit,
+  getSymbol,
+  isTierLocked,
+  loadDonationFromProduct,
+  toDisplay,
+  validateDonation,
+  validateTier,
+} from "./PriceEditModal/helpers";
+// Backwards-compat export — the original module exported CURRENCIES
+// directly. The constant lives on the new types module now; re-export
+// it here so admin/community-app call sites importing from
+// "@cobuntu/product-management-ui" don't break.
+export { CURRENCIES } from "./PriceEditModal/types";
 
 /**
  * Single source of truth for marketplace product pricing.
@@ -31,116 +54,11 @@ import { MemberPricingSection, type MemberPricingSectionHandle } from "./MemberP
  * "attendees" concept) — saves go straight through.
  */
 
-export const CURRENCIES = [
-  { code: "EUR", name: "Euro", symbol: "€" },
-  { code: "USD", name: "US Dollar", symbol: "$" },
-  { code: "GBP", name: "British Pound", symbol: "£" },
-  { code: "BRL", name: "Brazilian Real", symbol: "R$" },
-  { code: "CHF", name: "Swiss Franc", symbol: "CHF" },
-  { code: "CAD", name: "Canadian Dollar", symbol: "$" },
-  { code: "AUD", name: "Australian Dollar", symbol: "$" },
-  { code: "JPY", name: "Japanese Yen", symbol: "¥" },
-];
-
-function getSymbol(code: string) { return CURRENCIES.find(c => c.code === code)?.symbol || code; }
-function toDisplay(price: number, currency: string) { return currency === "JPY" ? price : price / 100; }
-function toSmallestUnit(majorAmount: number, currency: string): number {
-  return currency === "JPY" ? Math.round(majorAmount) : Math.round(majorAmount * 100);
-}
-function fromSmallestUnit(smallestAmount: number, currency: string): string {
-  if (smallestAmount == null) return "";
-  return String(currency === "JPY" ? smallestAmount : smallestAmount / 100);
-}
-
-interface Tier {
-  id: string;
-  name: string;
-  capacity: number | null;
-  priceMode?: "fixed" | "pwyw" | null;
-  pwywMinAmount?: number | null;
-  /** Non-refunded sales for this tier (backend joins via product_snapshots). */
-  salesCount?: number;
-  products: {
-    id: string; price: number; currency: string;
-    isRecurring: boolean; recurringInterval: string | null;
-    // Installment plan — backend returns these on every GET /tiers since
-    // the member-pricing + installments umbrella shipped. Four-or-none
-    // for marketplace tiers: total + count + interval + accessDuration
-    // (months of access after signup). Distinct from events, where
-    // accessDuration is always null (event date bounds access).
-    installmentTotalPrice?: number | null;
-    installmentCount?: number | null;
-    installmentIntervalMonths?: number | null;
-    accessDurationMonths?: number | null;
-  };
-}
-
-interface DraftTier {
-  /** Stable client-side key for DnD + react reconciliation. Survives reorder
-   *  (whereas `id` only exists once persisted, and index changes on drag). */
-  localId: string;
-  id?: string;
-  name: string;
-  price: string;
-  currency: string;
-  capacity: string;
-  isRecurring: boolean;
-  recurringInterval: string;
-  priceMode: "fixed" | "pwyw";
-  pwywMin: string;
-  /** Non-refunded sales count. > 0 → price/currency/priceMode locked. */
-  salesCount: number;
-  // Installment plan — four-or-none. Enabled iff all four numeric values
-  // are non-empty valid numbers. Display-unit (e.g. "300", "3", "1",
-  // "12") for consistency with the price field; converted on save.
-  // Marketplace tiers persist accessDuration; events skip it (event
-  // date bounds access).
-  installmentEnabled: boolean;
-  installmentTotal: string;          // display unit (e.g. "300" = €300 total)
-  installmentCount: string;            // integer (e.g. "3" = 3 charges)
-  installmentInterval: string;         // integer (e.g. "1" = monthly)
-  installmentAccessMonths: string;     // integer (e.g. "12" = 12 months of access)
-  // Per-tier registration form metadata. The form lives on tier_forms
-  // (one-to-one with product_tiers / event tiers) and is independent of
-  // any approval flag — buyers fill it during checkout. These flags
-  // drive the per-tier "Registration form" footer badge; the actual
-  // builder is mounted on a separate page (admin: /marketplace/:id/form,
-  // community-app: /marketplace/:sku/manage/form).
-  hasForm: boolean;
-  formFieldCount: number;
-  deleted?: boolean;
-}
-
-function genLocalId(): string {
-  return typeof crypto !== "undefined" && (crypto as any).randomUUID
-    ? (crypto as any).randomUUID()
-    : `local-${Math.random().toString(36).slice(2)}`;
-}
-
-interface DonationDraft {
-  enabled: boolean;
-  mode: "fixed" | "pwyw";
-  amounts: string[];
-  minAmount: string;
-  currency: string;
-  label: string;
-}
-
-function blankDonation(currency = "EUR"): DonationDraft {
-  return { enabled: false, mode: "fixed", amounts: ["5", "10", "25"], minAmount: "", currency, label: "" };
-}
-
-function loadDonationFromProduct(product: any): DonationDraft {
-  const cfg = product?.donationConfig;
-  if (!cfg || typeof cfg !== "object") return blankDonation((product?.currency || "EUR").toUpperCase());
-  const currency: string = cfg.currency || product?.currency || "EUR";
-  const mode: "fixed" | "pwyw" = cfg.mode === "pwyw" ? "pwyw" : "fixed";
-  const amounts: string[] = Array.isArray(cfg.amounts) && cfg.amounts.length > 0
-    ? cfg.amounts.map((a: number) => fromSmallestUnit(a, currency))
-    : ["5", "10", "25"];
-  const minAmount: string = cfg.minAmount != null ? fromSmallestUnit(cfg.minAmount, currency) : "";
-  return { enabled: !!cfg.enabled, mode, amounts, minAmount, currency, label: cfg.label || "" };
-}
+// Currency table, currency conversion helpers, and the Tier /
+// DraftTier / DonationDraft shapes live in ./PriceEditModal/types.ts +
+// ./PriceEditModal/helpers.ts. Imported above. The standalone helper
+// tests exercise them in isolation — see
+// src/__tests__/PriceEditModal.helpers.test.ts.
 
 export interface PriceEditModalProps {
   product: any;
@@ -218,26 +136,15 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         const res = await fetch(`${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/tiers`, { headers: authHeaders() });
         const tiers: Tier[] = res.ok ? await res.json() : [];
         if (tiers.length === 0) {
-          // Pre-fill with parent product's existing price if set
+          // Pre-fill with parent product's existing price if set.
           const parentPrice = product.price ? toDisplay(product.price, product.currency || "EUR") : "";
           setDrafts([{
-            localId: genLocalId(),
-            name: "Standard",
+            ...blankTier({
+              currency: product.currency || "EUR",
+              isRecurring: !!product.isRecurring,
+              recurringInterval: product.recurringInterval || "monthly",
+            }),
             price: parentPrice ? String(parentPrice) : "",
-            currency: product.currency || "EUR",
-            capacity: "",
-            isRecurring: !!product.isRecurring,
-            recurringInterval: product.recurringInterval || "monthly",
-            priceMode: "fixed",
-            pwywMin: "",
-            salesCount: 0,
-            installmentEnabled: false,
-            installmentTotal: "",
-            installmentCount: "",
-            installmentInterval: "1",
-            installmentAccessMonths: "",
-            hasForm: false,
-            formFieldCount: 0,
           }]);
         } else {
           // Probe each tier's form in parallel — there's no batch endpoint,
@@ -277,7 +184,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
           }));
         }
       } catch {
-        setDrafts([{ localId: genLocalId(), name: "Standard", price: "", currency: "EUR", capacity: "", isRecurring: false, recurringInterval: "monthly", priceMode: "fixed", pwywMin: "", salesCount: 0, installmentEnabled: false, installmentTotal: "", installmentCount: "", installmentInterval: "1", installmentAccessMonths: "", hasForm: false, formFieldCount: 0 }]);
+        setDrafts([blankTier()]);
       } finally { setLoading(false); }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -288,25 +195,15 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   }
   function addTier() {
     const base = drafts[0];
-    setDrafts(d => [...d, {
-      localId: genLocalId(),
-      name: `Tier ${d.filter(x => !x.deleted).length + 1}`,
-      price: "",
-      currency: base?.currency || "EUR",
-      capacity: "",
-      isRecurring: !!base?.isRecurring,
-      recurringInterval: base?.recurringInterval || "monthly",
-      priceMode: "fixed",
-      pwywMin: "",
-      salesCount: 0,
-      installmentEnabled: false,
-      installmentTotal: "",
-      installmentCount: "",
-      installmentInterval: "1",
-      installmentAccessMonths: "",
-      hasForm: false,
-      formFieldCount: 0,
-    }]);
+    setDrafts(d => [
+      ...d,
+      blankTier({
+        currency: base?.currency || "EUR",
+        isRecurring: !!base?.isRecurring,
+        recurringInterval: base?.recurringInterval || "monthly",
+        indexHint: d.filter(x => !x.deleted).length + 1,
+      }),
+    ]);
   }
   function removeTier(idx: number) {
     setDrafts(d => {
@@ -411,82 +308,20 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   async function save() {
     setSaving(true);
     try {
+      // Validate tiers — pure helper returns the first failure message,
+      // or null when the draft is valid. Four-of-none installment rules
+      // + pwyw min bounds live in helpers.ts so they're test-covered in
+      // isolation (PriceEditModal.helpers.test.ts).
       for (const t of drafts.filter(x => !x.deleted)) {
-        if (!t.name.trim()) throw new Error("Tier name is required");
-        if (t.price === "" || isNaN(parseFloat(t.price))) throw new Error(`Price required for "${t.name}"`);
-        if (t.priceMode === "pwyw" && t.pwywMin.trim()) {
-          const min = parseFloat(t.pwywMin);
-          if (isNaN(min) || min < 0) throw new Error(`Minimum amount for "${t.name}" must be a non-negative number.`);
-        }
-        // Installment plan — four-or-none + same range bounds as the
-        // backend validator (totalPrice > 0, count >= 2, interval >= 1,
-        // accessDuration >= 1). Catching it client-side gives the host
-        // an inline message instead of a generic 400 toast.
-        if (t.installmentEnabled) {
-          const total = parseFloat(t.installmentTotal);
-          const count = parseInt(t.installmentCount, 10);
-          const interval = parseInt(t.installmentInterval, 10);
-          const access = parseInt(t.installmentAccessMonths, 10);
-          if (isNaN(total) || total <= 0) {
-            throw new Error(`Installment total for "${t.name}" must be a positive number.`);
-          }
-          if (isNaN(count) || count < 2) {
-            throw new Error(`Installment count for "${t.name}" must be at least 2.`);
-          }
-          if (isNaN(interval) || interval < 1) {
-            throw new Error(`Installment interval for "${t.name}" must be at least 1 month.`);
-          }
-          if (isNaN(access) || access < 1) {
-            throw new Error(`Access duration for "${t.name}" must be at least 1 month.`);
-          }
-        }
+        const err = validateTier(t);
+        if (err) throw new Error(err);
       }
-      if (donation.enabled) {
-        if (donation.mode === "fixed") {
-          const trimmed = donation.amounts.map(a => a.trim());
-          if (trimmed.some(a => a === "")) throw new Error("Fill in or remove blank donation amounts.");
-          const invalid = trimmed.find(a => { const n = parseFloat(a); return isNaN(n) || n <= 0; });
-          if (invalid !== undefined) throw new Error(`Donation amount "${invalid}" must be a positive number.`);
-          if (trimmed.length === 0) throw new Error("At least one donation amount is required when fixed mode is enabled.");
-        }
-        if (donation.mode === "pwyw" && donation.minAmount.trim()) {
-          const n = parseFloat(donation.minAmount);
-          if (isNaN(n) || n < 0) throw new Error("Minimum donation must be a non-negative number.");
-        }
-      }
+      const donationErr = validateDonation(donation);
+      if (donationErr) throw new Error(donationErr);
 
       // Tier writes
       for (const t of drafts) {
-        const pwywMinSmallest = t.priceMode === "pwyw" && t.pwywMin.trim()
-          ? toSmallestUnit(parseFloat(t.pwywMin), t.currency)
-          : null;
-        // Installment plan — four-or-none. Marketplace tiers persist
-        // accessDurationMonths (distinct from events). The backend's
-        // PUT lock-when-sold guard rejects changes once a sale exists.
-        const installmentBody = t.installmentEnabled
-          ? {
-              installmentTotalPrice: toSmallestUnit(parseFloat(t.installmentTotal), t.currency),
-              installmentCount: parseInt(t.installmentCount, 10),
-              installmentIntervalMonths: parseInt(t.installmentInterval, 10),
-              accessDurationMonths: parseInt(t.installmentAccessMonths, 10),
-            }
-          : {
-              installmentTotalPrice: null,
-              installmentCount: null,
-              installmentIntervalMonths: null,
-              accessDurationMonths: null,
-            };
-        const body = {
-          name: t.name,
-          price: parseFloat(t.price || "0"),
-          currency: t.currency,
-          capacity: t.capacity ? parseInt(t.capacity, 10) : null,
-          isRecurring: t.isRecurring,
-          recurringInterval: t.isRecurring ? t.recurringInterval : null,
-          priceMode: t.priceMode,
-          pwywMinAmount: pwywMinSmallest,
-          ...installmentBody,
-        };
+        const body = buildTierBody(t);
         if (t.deleted && t.id) {
           const res = await fetch(`${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/tiers/${t.id}`, { method: "DELETE", headers: authHeaders() });
           if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Failed to delete "${t.name}"`); }
@@ -514,9 +349,10 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         }
       }
 
-      // Donation sidecar
+      // Donation sidecar. PUT receives null when disabled so the
+      // backend clears server state.
       if (donationDirty) {
-        const donationBody = donation.enabled ? buildDonationBody() : null;
+        const donationBody = buildDonationBody(donation, drafts[0]?.currency || "EUR");
         const res = await fetch(`${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/donations`, {
           method: "PUT",
           headers: jsonHeaders(),
@@ -532,24 +368,6 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
       onSaved();
     } catch (e: any) { showToast(e.message || "Failed to save"); }
     finally { setSaving(false); }
-  }
-
-  function buildDonationBody(): Record<string, unknown> {
-    const currency = donation.currency || drafts[0]?.currency || "EUR";
-    const base: Record<string, unknown> = { enabled: donation.enabled, mode: donation.mode, currency };
-    if (donation.mode === "fixed") {
-      base.amounts = donation.amounts
-        .map(a => parseFloat(a))
-        .filter(a => !isNaN(a) && a > 0)
-        .map(a => toSmallestUnit(a, currency));
-    } else if (donation.mode === "pwyw") {
-      const minRaw = donation.minAmount ? parseFloat(donation.minAmount) : null;
-      if (minRaw != null && !isNaN(minRaw)) {
-        base.minAmount = toSmallestUnit(minRaw, currency);
-      }
-    }
-    if (donation.label.trim()) base.label = donation.label.trim();
-    return base;
   }
 
   const title = visible.length === 0 ? "Add pricing" : visible.length === 1 ? "Edit pricing" : "Pricing tiers";
@@ -672,7 +490,7 @@ function SortableTierRow(props: SortableTierRowProps) {
 function TierCard({
   t, communityTag, canRemove, onUpdate, onRemove, onDuplicate, showMemberPricing, showToast, onOpenForm, registerMemberPricingRef, dragAttributes, dragListeners,
 }: SortableTierRowProps & { dragAttributes?: any; dragListeners?: any }) {
-  const locked = (t.salesCount || 0) > 0;
+  const locked = isTierLocked(t);
   return (
     <div className="border border-zinc-200 rounded-lg bg-white overflow-hidden">
       <div className="p-3 space-y-2.5">
@@ -758,7 +576,7 @@ function TierCard({
           <Select value={t.currency} onValueChange={v => onUpdate({ currency: v })} disabled={locked}>
             <SelectTrigger className="h-[34px] text-[13px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {CURRENCIES.map(c => <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>)}
+              {SUPPORTED_CURRENCIES.map(c => <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
