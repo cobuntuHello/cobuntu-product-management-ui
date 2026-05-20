@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Trash2, Plus, Copy, GripVertical, Lock } from "lucide-react";
+import { Trash2, Plus, Copy, GripVertical, Lock, FileText } from "lucide-react";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
   type DragEndEvent,
@@ -100,6 +100,14 @@ interface DraftTier {
   installmentCount: string;            // integer (e.g. "3" = 3 charges)
   installmentInterval: string;         // integer (e.g. "1" = monthly)
   installmentAccessMonths: string;     // integer (e.g. "12" = 12 months of access)
+  // Per-tier registration form metadata. The form lives on tier_forms
+  // (one-to-one with product_tiers / event tiers) and is independent of
+  // any approval flag — buyers fill it during checkout. These flags
+  // drive the per-tier "Registration form" footer badge; the actual
+  // builder is mounted on a separate page (admin: /marketplace/:id/form,
+  // community-app: /marketplace/:sku/manage/form).
+  hasForm: boolean;
+  formFieldCount: number;
   deleted?: boolean;
 }
 
@@ -160,9 +168,21 @@ export interface PriceEditModalProps {
    * hidden for unsaved drafts (no `id`).
    */
   showMemberPricing?: boolean;
+  /**
+   * Optional. When provided, each saved tier card renders a "Registration
+   * form" footer that calls this with the tier id. The consumer is
+   * responsible for navigating to its form-builder route — the modal
+   * itself stays presentation-only. Mirrors the event package's hook
+   * exactly, so a tier can declare a buyer form independently of any
+   * approval gate (the two axes are not interdependent).
+   *
+   * When omitted, the footer is hidden — useful for surfaces that don't
+   * yet have a builder route wired up.
+   */
+  onOpenTierForm?: (tierId: string) => void;
 }
 
-export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing }: PriceEditModalProps) {
+export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing, onOpenTierForm }: PriceEditModalProps) {
   const { apiBaseUrl, authHeaders } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
   const [loading, setLoading] = useState(true);
@@ -200,31 +220,48 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             installmentCount: "",
             installmentInterval: "1",
             installmentAccessMonths: "",
+            hasForm: false,
+            formFieldCount: 0,
           }]);
         } else {
-          setDrafts(tiers.map(t => ({
-            // Saved tiers reuse their backend id as the dnd key. Stable
-            // across renders + survives reorder (unlike array index).
-            localId: t.id,
-            id: t.id,
-            name: t.name,
-            price: String(toDisplay(t.products.price, t.products.currency)),
-            currency: t.products.currency,
-            capacity: t.capacity != null ? String(t.capacity) : "",
-            isRecurring: !!t.products.isRecurring,
-            recurringInterval: t.products.recurringInterval || "monthly",
-            priceMode: t.priceMode === "pwyw" ? "pwyw" : "fixed",
-            pwywMin: t.pwywMinAmount != null ? fromSmallestUnit(t.pwywMinAmount, t.products.currency) : "",
-            salesCount: typeof t.salesCount === "number" ? t.salesCount : 0,
-            installmentEnabled: t.products.installmentTotalPrice != null,
-            installmentTotal: t.products.installmentTotalPrice != null ? fromSmallestUnit(t.products.installmentTotalPrice, t.products.currency) : "",
-            installmentCount: t.products.installmentCount != null ? String(t.products.installmentCount) : "",
-            installmentInterval: t.products.installmentIntervalMonths != null ? String(t.products.installmentIntervalMonths) : "1",
-            installmentAccessMonths: t.products.accessDurationMonths != null ? String(t.products.accessDurationMonths) : "",
-          })));
+          // Probe each tier's form in parallel — there's no batch endpoint,
+          // so we fetch /tiers/:id/form individually. 200 with a body =
+          // linked, 200 with null body = no form. Mirrors the event
+          // package's load flow exactly so the footer badge says the same
+          // thing on both surfaces.
+          const formChecks = await Promise.all(
+            tiers.map(t => fetch(`${apiBaseUrl}/api/communities/${communityTag}/tiers/${t.id}/form`, { headers: authHeaders() })
+              .then(async r => r.ok ? await r.json().catch(() => null) : null)
+              .catch(() => null)),
+          );
+          setDrafts(tiers.map((t, i) => {
+            const fields = formChecks[i]?.formData?.fields || formChecks[i]?.fields || [];
+            return {
+              // Saved tiers reuse their backend id as the dnd key. Stable
+              // across renders + survives reorder (unlike array index).
+              localId: t.id,
+              id: t.id,
+              name: t.name,
+              price: String(toDisplay(t.products.price, t.products.currency)),
+              currency: t.products.currency,
+              capacity: t.capacity != null ? String(t.capacity) : "",
+              isRecurring: !!t.products.isRecurring,
+              recurringInterval: t.products.recurringInterval || "monthly",
+              priceMode: t.priceMode === "pwyw" ? "pwyw" : "fixed",
+              pwywMin: t.pwywMinAmount != null ? fromSmallestUnit(t.pwywMinAmount, t.products.currency) : "",
+              salesCount: typeof t.salesCount === "number" ? t.salesCount : 0,
+              installmentEnabled: t.products.installmentTotalPrice != null,
+              installmentTotal: t.products.installmentTotalPrice != null ? fromSmallestUnit(t.products.installmentTotalPrice, t.products.currency) : "",
+              installmentCount: t.products.installmentCount != null ? String(t.products.installmentCount) : "",
+              installmentInterval: t.products.installmentIntervalMonths != null ? String(t.products.installmentIntervalMonths) : "1",
+              installmentAccessMonths: t.products.accessDurationMonths != null ? String(t.products.accessDurationMonths) : "",
+              hasForm: fields.length > 0,
+              formFieldCount: fields.length,
+            };
+          }));
         }
       } catch {
-        setDrafts([{ localId: genLocalId(), name: "Standard", price: "", currency: "EUR", capacity: "", isRecurring: false, recurringInterval: "monthly", priceMode: "fixed", pwywMin: "", salesCount: 0, installmentEnabled: false, installmentTotal: "", installmentCount: "", installmentInterval: "1", installmentAccessMonths: "" }]);
+        setDrafts([{ localId: genLocalId(), name: "Standard", price: "", currency: "EUR", capacity: "", isRecurring: false, recurringInterval: "monthly", priceMode: "fixed", pwywMin: "", salesCount: 0, installmentEnabled: false, installmentTotal: "", installmentCount: "", installmentInterval: "1", installmentAccessMonths: "", hasForm: false, formFieldCount: 0 }]);
       } finally { setLoading(false); }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -251,6 +288,8 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
       installmentCount: "",
       installmentInterval: "1",
       installmentAccessMonths: "",
+      hasForm: false,
+      formFieldCount: 0,
     }]);
   }
   function removeTier(idx: number) {
@@ -303,6 +342,11 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         installmentCount: newTier.products.installmentCount != null ? String(newTier.products.installmentCount) : "",
         installmentInterval: newTier.products.installmentIntervalMonths != null ? String(newTier.products.installmentIntervalMonths) : "1",
         installmentAccessMonths: newTier.products.accessDurationMonths != null ? String(newTier.products.accessDurationMonths) : "",
+        // Backend's clone doesn't carry tier_forms across — the new tier
+        // starts blank. Footer renders the "Add →" state until the seller
+        // builds one.
+        hasForm: false,
+        formFieldCount: 0,
       }]);
     } catch (e: any) {
       showToast(e.message || "Failed to duplicate tier");
@@ -503,6 +547,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
                   onDuplicate={() => duplicateTier(t._idx)}
                   showMemberPricing={!!showMemberPricing}
                   showToast={showToast}
+                  onOpenForm={onOpenTierForm && t.id ? () => onOpenTierForm(t.id!) : undefined}
                 />
               ))}
             </SortableContext>
@@ -551,6 +596,10 @@ interface SortableTierRowProps {
    *  only — admin sets true, community-app /manage omits. */
   showMemberPricing: boolean;
   showToast: (msg: string) => void;
+  /** When provided, the tier card renders a "Registration form" footer
+   *  that invokes this callback. Undefined ⇒ footer hidden (also used for
+   *  unsaved drafts where the backend has no tier id to attach a form to). */
+  onOpenForm?: () => void;
 }
 
 /**
@@ -584,11 +633,12 @@ function SortableTierRow(props: SortableTierRowProps) {
  * cue.
  */
 function TierCard({
-  t, communityTag, canRemove, onUpdate, onRemove, onDuplicate, showMemberPricing, showToast, dragAttributes, dragListeners,
+  t, communityTag, canRemove, onUpdate, onRemove, onDuplicate, showMemberPricing, showToast, onOpenForm, dragAttributes, dragListeners,
 }: SortableTierRowProps & { dragAttributes?: any; dragListeners?: any }) {
   const locked = (t.salesCount || 0) > 0;
   return (
-    <div className="border border-zinc-200 rounded-lg p-3 space-y-2.5 bg-white">
+    <div className="border border-zinc-200 rounded-lg bg-white overflow-hidden">
+      <div className="p-3 space-y-2.5">
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -812,6 +862,42 @@ function TierCard({
           isRecurringTier={t.isRecurring}
           showToast={showToast}
         />
+      )}
+      </div>
+
+      {/* Registration-form footer. Mirrors the event package's tier card
+          so the marketplace and events surfaces feel like the same product.
+          Hidden entirely when the consumer didn't wire onOpenTierForm
+          (older callers that haven't adopted the form route yet). Disabled
+          for unsaved drafts since the backend keys forms by tier id. */}
+      {onOpenForm && (
+        <button
+          type="button"
+          onClick={onOpenForm}
+          className="w-full flex items-center gap-2.5 px-4 py-2.5 border-t border-zinc-100 bg-zinc-50/60 text-left hover:bg-zinc-100 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={!t.id}
+          title={!t.id ? "Save this tier first to add a form" : undefined}
+        >
+          <FileText className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[12px] font-medium text-zinc-700">
+              Registration form
+              {t.hasForm && (
+                <span className="ml-1.5 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                  {t.formFieldCount} field{t.formFieldCount !== 1 ? "s" : ""} · Linked
+                </span>
+              )}
+            </p>
+            <p className="text-[11px] text-zinc-400 truncate">
+              {t.hasForm
+                ? "Edit the questions buyers fill out at this tier"
+                : t.id
+                  ? "Add custom questions for buyers at this tier"
+                  : "Save tier to add a form"}
+            </p>
+          </div>
+          <span className="text-[11px] font-medium text-zinc-500 shrink-0">{t.hasForm ? "Manage →" : "Add →"}</span>
+        </button>
       )}
     </div>
   );
