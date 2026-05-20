@@ -8,7 +8,7 @@ import { renderWithConfig, mockFetch } from "./test-utils";
 
 function makeTier(overrides: Partial<DraftTier> = {}): DraftTier {
   return {
-    ...blankTier("EUR", 1),
+    ...blankTier({ currency: "EUR", indexHint: 1 }),
     id: "tier-1",
     name: "GA",
     price: "10",

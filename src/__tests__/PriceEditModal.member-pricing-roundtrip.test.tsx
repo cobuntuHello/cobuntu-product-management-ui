@@ -174,4 +174,57 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     );
     expect(vipsAfter).toBeChecked();
   });
+
+  it("collapsing the tier card mid-edit no longer drops the dirty rows (papercut #1 fix)", async () => {
+    // Mirrors the events package's regression test. State lifted to
+    // PriceEditModal level means dirty rows survive card collapse.
+    const user = userEvent.setup();
+    const fetchFn = mockFetch([
+      ...stubLoadRoutes(),
+      { method: "PUT", url: /\/products\/p-1\/tiers\/tier-1$/, body: tier },
+      {
+        method: "POST",
+        url: /\/api\/communities\/orbis\/tiers\/tier-1\/member-pricing$/,
+        body: { id: "ov-new" },
+      },
+    ]);
+
+    renderWithConfig(<PriceEditModal {...baseProps()} />);
+    await screen.findByDisplayValue("Pro");
+    await user.click(screen.getAllByLabelText(/expand|collapse/i)[0]);
+    const editButtons = await screen.findAllByRole("button", { name: /^Edit/ });
+    await user.click(editButtons[2]);
+
+    await user.click(
+      await screen.findByLabelText(/Offer member pricing for VIPs/),
+    );
+    const valueInput = (screen
+      .getAllByPlaceholderText(/20|10|—/)
+      .find((el) => (el as HTMLInputElement).type === "number") as HTMLInputElement);
+    fireEvent.change(valueInput, { target: { value: "20" } });
+    expect(await screen.findByText(/unsaved/i)).toBeInTheDocument();
+
+    // Return to hub, then COLLAPSE the tier card.
+    await user.click(screen.getByRole("button", { name: /Done/i }));
+    await user.click(screen.getAllByLabelText(/expand|collapse/i)[0]);
+
+    // Save without re-expanding — dirty row should still commit
+    // because the state lives at the modal level.
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => {
+      const post = fetchFn.mock.calls.find(
+        ([url, init]: any) =>
+          /\/tiers\/tier-1\/member-pricing$/.test(url.toString()) &&
+          (init?.method || "GET") === "POST",
+      );
+      expect(post).toBeTruthy();
+      const body = JSON.parse((post![1] as RequestInit).body as string);
+      expect(body).toMatchObject({
+        segmentId: "seg-1",
+        mode: "PERCENT_OFF",
+        value: 20,
+      });
+    });
+  });
 });

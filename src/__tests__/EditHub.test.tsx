@@ -105,7 +105,9 @@ describe("EditHub (product) — step navigation", () => {
     renderHub();
     await user.click(screen.getAllByRole("button", { name: /^Edit/ })[0]);
     expect(screen.getByRole("heading", { name: "Basics", level: 4 })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("Standard, Pro, Enterprise…")).toBeInTheDocument();
+    // Tier name moved to TierCard's inline header; the Basics step's
+    // first visible input is now the price.
+    expect(screen.getByPlaceholderText("0.00")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Done/i }));
     expect(screen.queryByRole("heading", { name: "Basics", level: 4 })).not.toBeInTheDocument();
   });
