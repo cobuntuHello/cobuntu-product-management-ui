@@ -69,6 +69,8 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       isRecurring: product.isRecurring || false,
       recurringInterval: product.recurringInterval || "monthly",
       ctaText: product.ctaText || "",
+      viewability: product.viewability || "PUBLIC",
+      accessibility: product.accessibility || "PUBLIC",
     };
   }, [product]);
 
@@ -93,6 +95,11 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       }
 
       if (data.ctaText.trim()) formData.append("ctaText", data.ctaText.trim());
+
+      // 2-axis visibility — backend processUpdateJob forwards both to
+      // updateProduct (PR feat/update-path-product-visibility 2026-05-20).
+      formData.append("viewability", data.viewability);
+      formData.append("accessibility", data.accessibility);
 
       formData.append("tags", JSON.stringify(data.tags.map(t => t.id)));
 

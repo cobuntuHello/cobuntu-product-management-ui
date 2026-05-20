@@ -26,6 +26,7 @@ import {
 import {
   Pencil, FileText, Tag as TagIcon, Image as ImageIcon, Package,
   DollarSign, MousePointerClick, ChevronRight, RefreshCw,
+  Eye, EyeOff, UserCheck, Lock,
 } from "lucide-react";
 
 // ─── Currencies ────────────────────────────────────────────────
@@ -61,6 +62,15 @@ export interface ProductFormData {
   isRecurring: boolean;
   recurringInterval: "monthly" | "yearly";
   ctaText: string;
+  // View gate — who can see the product detail page. MEMBERS_ONLY hides
+  // the product from non-members entirely (404). Backend column added
+  // 2026-05-20 by feat/visibility-overrides; backend defaults to the
+  // community's effective MARKETPLACE visibility when omitted on create.
+  viewability: "PUBLIC" | "MEMBERS_ONLY";
+  // Action gate — who can purchase. MEMBERS_ONLY blocks non-member
+  // checkout (finances service rejects with 403). Same default
+  // resolution as viewability.
+  accessibility: "PUBLIC" | "MEMBERS_ONLY";
   /**
    * Tier list — populated only when the consumer renders this form with
    * `showTiers={true}` AND the user has flipped on multi-tier mode.
@@ -75,6 +85,7 @@ export interface ProductFormData {
    * `null` for disabled donations.
    */
   donation: DonationDraft;
+  // (viewability + accessibility declared above — both default PUBLIC.)
 }
 
 interface ProductFormProps {
@@ -105,6 +116,8 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const [isRecurring, setIsRecurring] = useState(initialData?.isRecurring || false);
   const [recurringInterval, setRecurringInterval] = useState<"monthly" | "yearly">(initialData?.recurringInterval || "monthly");
   const [ctaText, setCtaText] = useState(initialData?.ctaText || "");
+  const [viewability, setViewability] = useState<"PUBLIC" | "MEMBERS_ONLY">(initialData?.viewability || "PUBLIC");
+  const [accessibility, setAccessibility] = useState<"PUBLIC" | "MEMBERS_ONLY">(initialData?.accessibility || "PUBLIC");
 
   // Multi-tier mode — opt-in even when `showTiers` is true. Single-price
   // stays the default so the simple "I just want one price" path doesn't
@@ -128,10 +141,11 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       isPaid, price: emittedPrice, currency,
       isRecurring: multiTier ? false : isRecurring,
       recurringInterval, ctaText,
+      viewability, accessibility,
       tiers: emittedTiers,
       donation,
     });
-  }, [name, description, tags, mediaItems, productFiles, isPaid, price, currency, isRecurring, recurringInterval, ctaText, multiTier, tiers, donation]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [name, description, tags, mediaItems, productFiles, isPaid, price, currency, isRecurring, recurringInterval, ctaText, viewability, accessibility, multiTier, tiers, donation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-6">
@@ -285,6 +299,55 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 />
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* ─── Visibility ─── */}
+      {/* 2-axis visibility (PR feat/visibility-overrides 2026-05-20):
+          - viewability: who can SEE the listing
+          - accessibility: who can PURCHASE
+          Defaults are PUBLIC for both; backend createProduct stamps from
+          the community's effective default when these fields aren't sent. */}
+      <div className="space-y-2">
+        <h3 className="text-sm font-medium text-zinc-700 flex items-center gap-2">
+          <Eye className="h-4 w-4" />
+          Visibility
+        </h3>
+        <div className="rounded-xl border border-zinc-200 divide-y divide-zinc-100 overflow-hidden">
+          <div
+            onClick={() => setViewability(viewability === "PUBLIC" ? "MEMBERS_ONLY" : "PUBLIC")}
+            className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-50/50 transition-colors"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              {viewability === "PUBLIC" ? <Eye className="h-[18px] w-[18px] text-zinc-400 shrink-0" /> : <EyeOff className="h-[18px] w-[18px] text-zinc-400 shrink-0" />}
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-zinc-800">Visibility: {viewability === "PUBLIC" ? "Public" : "Members only"}</span>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Who can see this product listing</p>
+              </div>
+            </div>
+            <Switch
+              checked={viewability === "MEMBERS_ONLY"}
+              onCheckedChange={v => setViewability(v ? "MEMBERS_ONLY" : "PUBLIC")}
+              onClick={e => e.stopPropagation()}
+            />
+          </div>
+          <div
+            onClick={() => setAccessibility(accessibility === "PUBLIC" ? "MEMBERS_ONLY" : "PUBLIC")}
+            className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-50/50 transition-colors"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              {accessibility === "PUBLIC" ? <UserCheck className="h-[18px] w-[18px] text-zinc-400 shrink-0" /> : <Lock className="h-[18px] w-[18px] text-zinc-400 shrink-0" />}
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-zinc-800">Purchase: {accessibility === "PUBLIC" ? "Public" : "Members only"}</span>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Who can buy this product</p>
+              </div>
+            </div>
+            <Switch
+              checked={accessibility === "MEMBERS_ONLY"}
+              onCheckedChange={v => setAccessibility(v ? "MEMBERS_ONLY" : "PUBLIC")}
+              onClick={e => e.stopPropagation()}
+            />
           </div>
         </div>
       </div>

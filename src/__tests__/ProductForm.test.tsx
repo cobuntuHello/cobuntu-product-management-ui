@@ -97,6 +97,66 @@ describe("ProductForm", () => {
     await waitFor(() => expect(screen.getByText(/advanced pricing/i)).toBeInTheDocument());
   });
 
+  it("emits viewability + accessibility defaulting to PUBLIC", async () => {
+    const onChange = vi.fn();
+    renderWithConfig(<ProductForm {...baseProps({ onChange })} />);
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    const emitted = onChange.mock.calls.at(-1)?.[0] as ProductFormData;
+    expect(emitted.viewability).toBe("PUBLIC");
+    expect(emitted.accessibility).toBe("PUBLIC");
+  });
+
+  it("toggling Visibility flips viewability to MEMBERS_ONLY (action gate stays untouched)", async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    renderWithConfig(<ProductForm {...baseProps({ onChange })} />);
+    onChange.mockClear();
+
+    // Click the Visibility row label to toggle.
+    await user.click(screen.getByText(/Visibility: Public/i));
+
+    await waitFor(() => {
+      const last = onChange.mock.calls.at(-1)?.[0] as ProductFormData;
+      expect(last.viewability).toBe("MEMBERS_ONLY");
+      expect(last.accessibility).toBe("PUBLIC");
+    });
+  });
+
+  it("toggling Purchase flips accessibility independently", async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    renderWithConfig(<ProductForm {...baseProps({ onChange })} />);
+    onChange.mockClear();
+
+    await user.click(screen.getByText(/Purchase: Public/i));
+
+    await waitFor(() => {
+      const last = onChange.mock.calls.at(-1)?.[0] as ProductFormData;
+      expect(last.accessibility).toBe("MEMBERS_ONLY");
+      expect(last.viewability).toBe("PUBLIC");
+    });
+  });
+
+  it("initialData honors caller-supplied viewability/accessibility", async () => {
+    const onChange = vi.fn();
+    renderWithConfig(
+      <ProductForm
+        {...baseProps({
+          onChange,
+          initialData: {
+            ...(baseProps().initialData),
+            viewability: "MEMBERS_ONLY" as const,
+            accessibility: "MEMBERS_ONLY" as const,
+          },
+        })}
+      />
+    );
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    const emitted = onChange.mock.calls.at(-1)?.[0] as ProductFormData;
+    expect(emitted.viewability).toBe("MEMBERS_ONLY");
+    expect(emitted.accessibility).toBe("MEMBERS_ONLY");
+  });
+
   it("multi-tier mode: emits a tiers array and clears parent price", async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
