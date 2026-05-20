@@ -26,8 +26,6 @@ export interface TierCardProps {
    *  global Save loop. Called on mount with the handle, on unmount
    *  with null. */
   registerMemberPricingRef?: (tierId: string, handle: MemberPricingSectionHandle | null) => void;
-  /** Each consumer app injects its own form-builder URL. */
-  onOpenForm?: (tierId: string) => void;
   dragAttributes?: any;
   dragListeners?: any;
 }
@@ -75,7 +73,6 @@ export function TierCard({
   showMemberPricing,
   showToast,
   registerMemberPricingRef,
-  onOpenForm,
   dragAttributes,
   dragListeners,
 }: TierCardProps) {
@@ -173,7 +170,6 @@ export function TierCard({
           onUpdate={onUpdate}
           showMemberPricing={showMemberPricing}
           registerMemberPricingRef={registerMemberPricingRef}
-          onOpenForm={onOpenForm}
           showToast={showToast}
         />
       </Collapse>

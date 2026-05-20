@@ -84,20 +84,17 @@ export interface PriceEditModalProps {
    */
   showMemberPricing?: boolean;
   /**
-   * Optional. When provided, each saved tier card renders a "Registration
-   * form" footer that calls this with the tier id. The consumer is
-   * responsible for navigating to its form-builder route — the modal
-   * itself stays presentation-only. Mirrors the event package's hook
-   * exactly, so a tier can declare a buyer form independently of any
-   * approval gate (the two axes are not interdependent).
-   *
-   * When omitted, the footer is hidden — useful for surfaces that don't
-   * yet have a builder route wired up.
+   * @deprecated As of slice 4 the form builder is inlined into the
+   * EditHub's Form step (see ./PriceEditModal/steps/FormStep.tsx).
+   * This prop is retained for backwards compatibility with admin /
+   * community-app call sites that still pass it; the value is ignored.
+   * Phase C (admin SHA bump) deletes the standalone /form pages and
+   * removes this prop from the call sites entirely.
    */
   onOpenTierForm?: (tierId: string) => void;
 }
 
-export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing, onOpenTierForm }: PriceEditModalProps) {
+export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing }: PriceEditModalProps) {
   const { apiBaseUrl, authHeaders } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
   const [loading, setLoading] = useState(true);
@@ -393,7 +390,6 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
                   onDuplicate={() => duplicateTier(t._idx)}
                   showMemberPricing={!!showMemberPricing}
                   showToast={showToast}
-                  onOpenForm={onOpenTierForm}
                   registerMemberPricingRef={registerMemberPricingRef}
                 />
               ))}

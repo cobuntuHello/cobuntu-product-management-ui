@@ -23,9 +23,6 @@ export interface EditHubProps {
    *  commit()/isDirty() on this tier's MemberPricingSection during its
    *  global Save loop. */
   registerMemberPricingRef?: (tierId: string, handle: MemberPricingSectionHandle | null) => void;
-  /** Each consumer app injects its own form-builder URL. Pass-through
-   *  to FormStep's onOpenForm. */
-  onOpenForm?: (tierId: string) => void;
   showToast: (msg: string) => void;
 }
 
@@ -61,7 +58,6 @@ export function EditHub({
   onUpdate,
   showMemberPricing,
   registerMemberPricingRef,
-  onOpenForm,
   showToast,
 }: EditHubProps) {
   const [activeStep, setActiveStep] = useState<StepId | null>(null);
@@ -213,7 +209,7 @@ export function EditHub({
         )}
         {formAlwaysMounted && (
           <div className={activeStep === "form" ? "" : "hidden"}>
-            <FormStep t={t} onOpenForm={onOpenForm} showToast={showToast} />
+            <FormStep t={t} communityTag={communityTag} showToast={showToast} />
           </div>
         )}
       </div>
