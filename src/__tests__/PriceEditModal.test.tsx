@@ -107,4 +107,67 @@ describe("PriceEditModal", () => {
     await waitFor(() => expect(props.showToast).toHaveBeenCalledWith("Tier name is required"));
     expect(props.onSaved).not.toHaveBeenCalled();
   });
+
+  it("tier with salesCount > 0: shows 'X sold' badge + disables price input", async () => {
+    mockFetch([
+      {
+        method: "GET", url: "/products/p-1/tiers", body: [
+          {
+            id: "t-1", name: "Pro", capacity: 50, priceMode: "fixed", pwywMinAmount: null,
+            salesCount: 7,
+            products: { id: "tp-1", price: 5000, currency: "EUR", isRecurring: false, recurringInterval: null },
+          },
+        ],
+      },
+    ]);
+    renderWithConfig(<PriceEditModal {...baseProps()} />);
+
+    await waitFor(() => expect(screen.getByText(/7 sold/i)).toBeInTheDocument());
+    // Price input is disabled. Both price (50) and capacity (50) share the
+    // display value "50"; grab the price one via its placeholder "0.00".
+    const priceInput = screen.getByPlaceholderText("0.00") as HTMLInputElement;
+    expect(priceInput.value).toBe("50");
+    expect(priceInput.disabled).toBe(true);
+  });
+
+  it("Duplicate button on saved tier: POSTs copyFromTierId, appends the new tier", async () => {
+    const fetchMock = mockFetch([
+      {
+        method: "GET", url: "/products/p-1/tiers", body: [
+          {
+            id: "t-1", name: "Pro", capacity: null, priceMode: "fixed", pwywMinAmount: null,
+            products: { id: "tp-1", price: 5000, currency: "EUR", isRecurring: false, recurringInterval: null },
+          },
+        ],
+      },
+      {
+        method: "POST", url: "/products/p-1/tiers", body: {
+          id: "t-2", name: "Pro (copy)", capacity: null, priceMode: "fixed", pwywMinAmount: null,
+          products: { id: "tp-2", price: 5000, currency: "EUR", isRecurring: false, recurringInterval: null },
+        },
+      },
+    ]);
+    const user = userEvent.setup();
+    renderWithConfig(<PriceEditModal {...baseProps()} />);
+
+    await waitFor(() => expect(screen.getByDisplayValue("Pro")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /duplicate tier/i }));
+
+    await waitFor(() => expect(screen.getByDisplayValue("Pro (copy)")).toBeInTheDocument());
+
+    const postCall = fetchMock.mock.calls.find(c => (c[1] as RequestInit | undefined)?.method === "POST");
+    expect(postCall).toBeDefined();
+    const body = JSON.parse((postCall![1] as RequestInit).body as string);
+    expect(body).toEqual({ copyFromTierId: "t-1" });
+  });
+
+  it("unsaved tier: Duplicate button is NOT rendered (it'd 404 — no backend id yet)", async () => {
+    mockFetch([
+      { method: "GET", url: "/products/p-1/tiers", body: [] },
+    ]);
+    renderWithConfig(<PriceEditModal {...baseProps()} />);
+
+    await waitFor(() => expect(screen.getByDisplayValue("Standard")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /duplicate tier/i })).not.toBeInTheDocument();
+  });
 });

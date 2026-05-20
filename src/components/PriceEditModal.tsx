@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, Copy, GripVertical, Lock } from "lucide-react";
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy, arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { ModalShell } from "../ui/modal-shell";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
@@ -49,10 +57,15 @@ interface Tier {
   capacity: number | null;
   priceMode?: "fixed" | "pwyw" | null;
   pwywMinAmount?: number | null;
+  /** Non-refunded sales for this tier (backend joins via product_snapshots). */
+  salesCount?: number;
   products: { id: string; price: number; currency: string; isRecurring: boolean; recurringInterval: string | null };
 }
 
 interface DraftTier {
+  /** Stable client-side key for DnD + react reconciliation. Survives reorder
+   *  (whereas `id` only exists once persisted, and index changes on drag). */
+  localId: string;
   id?: string;
   name: string;
   price: string;
@@ -62,7 +75,15 @@ interface DraftTier {
   recurringInterval: string;
   priceMode: "fixed" | "pwyw";
   pwywMin: string;
+  /** Non-refunded sales count. > 0 → price/currency/priceMode locked. */
+  salesCount: number;
   deleted?: boolean;
+}
+
+function genLocalId(): string {
+  return typeof crypto !== "undefined" && (crypto as any).randomUUID
+    ? (crypto as any).randomUUID()
+    : `local-${Math.random().toString(36).slice(2)}`;
 }
 
 interface DonationDraft {
@@ -129,6 +150,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
           // Pre-fill with parent product's existing price if set
           const parentPrice = product.price ? toDisplay(product.price, product.currency || "EUR") : "";
           setDrafts([{
+            localId: genLocalId(),
             name: "Standard",
             price: parentPrice ? String(parentPrice) : "",
             currency: product.currency || "EUR",
@@ -137,9 +159,13 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             recurringInterval: product.recurringInterval || "monthly",
             priceMode: "fixed",
             pwywMin: "",
+            salesCount: 0,
           }]);
         } else {
           setDrafts(tiers.map(t => ({
+            // Saved tiers reuse their backend id as the dnd key. Stable
+            // across renders + survives reorder (unlike array index).
+            localId: t.id,
             id: t.id,
             name: t.name,
             price: String(toDisplay(t.products.price, t.products.currency)),
@@ -149,10 +175,11 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             recurringInterval: t.products.recurringInterval || "monthly",
             priceMode: t.priceMode === "pwyw" ? "pwyw" : "fixed",
             pwywMin: t.pwywMinAmount != null ? fromSmallestUnit(t.pwywMinAmount, t.products.currency) : "",
+            salesCount: typeof t.salesCount === "number" ? t.salesCount : 0,
           })));
         }
       } catch {
-        setDrafts([{ name: "Standard", price: "", currency: "EUR", capacity: "", isRecurring: false, recurringInterval: "monthly", priceMode: "fixed", pwywMin: "" }]);
+        setDrafts([{ localId: genLocalId(), name: "Standard", price: "", currency: "EUR", capacity: "", isRecurring: false, recurringInterval: "monthly", priceMode: "fixed", pwywMin: "", salesCount: 0 }]);
       } finally { setLoading(false); }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,7 +190,18 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   }
   function addTier() {
     const base = drafts[0];
-    setDrafts(d => [...d, { name: `Tier ${d.filter(x => !x.deleted).length + 1}`, price: "", currency: base?.currency || "EUR", capacity: "", isRecurring: !!base?.isRecurring, recurringInterval: base?.recurringInterval || "monthly", priceMode: "fixed", pwywMin: "" }]);
+    setDrafts(d => [...d, {
+      localId: genLocalId(),
+      name: `Tier ${d.filter(x => !x.deleted).length + 1}`,
+      price: "",
+      currency: base?.currency || "EUR",
+      capacity: "",
+      isRecurring: !!base?.isRecurring,
+      recurringInterval: base?.recurringInterval || "monthly",
+      priceMode: "fixed",
+      pwywMin: "",
+      salesCount: 0,
+    }]);
   }
   function removeTier(idx: number) {
     setDrafts(d => {
@@ -171,6 +209,83 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
       if (!t.id) return d.filter((_, i) => i !== idx);
       return d.map((x, i) => i === idx ? { ...x, deleted: true } : x);
     });
+  }
+
+  /**
+   * Duplicate an existing (persisted) tier via the backend's
+   * `copyFromTierId` shortcut. The backend clones name/price/currency/
+   * recurring config under the same parent product, fresh sku, capacity
+   * reset. Refreshes the local list with the new tier returned.
+   */
+  async function duplicateTier(idx: number) {
+    const src = drafts[idx];
+    if (!src?.id) {
+      showToast("Save the tier before duplicating it");
+      return;
+    }
+    try {
+      const res = await fetch(
+        `${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/tiers`,
+        { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ copyFromTierId: src.id }) },
+      );
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || "Failed to duplicate tier");
+      }
+      const newTier: Tier = await res.json();
+      setDrafts(d => [...d, {
+        localId: newTier.id,
+        id: newTier.id,
+        name: newTier.name,
+        price: String(toDisplay(newTier.products.price, newTier.products.currency)),
+        currency: newTier.products.currency,
+        capacity: newTier.capacity != null ? String(newTier.capacity) : "",
+        isRecurring: !!newTier.products.isRecurring,
+        recurringInterval: newTier.products.recurringInterval || "monthly",
+        priceMode: newTier.priceMode === "pwyw" ? "pwyw" : "fixed",
+        pwywMin: newTier.pwywMinAmount != null ? fromSmallestUnit(newTier.pwywMinAmount, newTier.products.currency) : "",
+        salesCount: 0,
+      }]);
+    } catch (e: any) {
+      showToast(e.message || "Failed to duplicate tier");
+    }
+  }
+
+  /**
+   * DnD reorder. On drag-end we shuffle `drafts` locally for instant
+   * feedback, then PUT /tiers/reorder with the new id order to
+   * persist. Only saved tiers can be reordered server-side; unsaved
+   * drafts keep their local order until they're created.
+   */
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  async function onDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const visibleIds = drafts.filter(d => !d.deleted).map(d => d.localId);
+    const oldIndex = visibleIds.indexOf(String(active.id));
+    const newIndex = visibleIds.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    const reorderedVisible = arrayMove(
+      drafts.filter(d => !d.deleted),
+      oldIndex, newIndex,
+    );
+    // Merge reordered visible drafts back with any soft-deleted ones (kept
+    // out of view but still tracked so DELETE fires on save).
+    const deleted = drafts.filter(d => d.deleted);
+    setDrafts([...reorderedVisible, ...deleted]);
+
+    // Persist the new order if all the reordered tiers are saved already.
+    const ids = reorderedVisible.map(t => t.id).filter((id): id is string => !!id);
+    if (ids.length === reorderedVisible.length) {
+      try {
+        await fetch(`${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/tiers/reorder`, {
+          method: "PUT", headers: jsonHeaders(), body: JSON.stringify({ tierIds: ids }),
+        });
+      } catch { /* non-fatal — next save will retry */ }
+    }
   }
 
   const visible = drafts.map((t, idx) => ({ ...t, _idx: idx })).filter(t => !t.deleted);
@@ -278,97 +393,20 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         <div className="py-8 text-center text-[12px] text-zinc-400">Loading…</div>
       ) : (
         <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-          {visible.map(t => (
-            <div key={t._idx} className="border border-zinc-200 rounded-lg p-3 space-y-2.5">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text" value={t.name}
-                  onChange={e => updateDraft(t._idx, { name: e.target.value })}
-                  placeholder="Tier name"
-                  className="flex-1 px-2.5 py-1.5 text-[13px] font-medium text-zinc-900 border border-zinc-200 rounded focus:outline-none focus:border-zinc-400"
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <SortableContext items={visible.map(t => t.localId)} strategy={verticalListSortingStrategy}>
+              {visible.map(t => (
+                <SortableTierRow
+                  key={t.localId}
+                  t={t}
+                  canRemove={visible.length > 1}
+                  onUpdate={patch => updateDraft(t._idx, patch)}
+                  onRemove={() => removeTier(t._idx)}
+                  onDuplicate={() => duplicateTier(t._idx)}
                 />
-                {visible.length > 1 && (
-                  <button onClick={() => removeTier(t._idx)} className="p-1.5 text-zinc-400 hover:text-red-600 cursor-pointer" title="Remove tier">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-              <div>
-                <label className="text-[11px] text-zinc-500 block mb-1">Pricing model</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => updateDraft(t._idx, { priceMode: "fixed" })}
-                    className={`px-3 py-1.5 text-[12px] rounded border cursor-pointer transition-colors ${t.priceMode === "fixed" ? "border-zinc-900 bg-zinc-50 text-zinc-900 font-medium" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"}`}
-                  >Fixed price</button>
-                  <button type="button" onClick={() => updateDraft(t._idx, { priceMode: "pwyw" })}
-                    className={`px-3 py-1.5 text-[12px] rounded border cursor-pointer transition-colors ${t.priceMode === "pwyw" ? "border-zinc-900 bg-zinc-50 text-zinc-900 font-medium" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"}`}
-                  >Pay what you want</button>
-                </div>
-                {t.priceMode === "pwyw" && (
-                  <p className="text-[11px] text-zinc-500 mt-1">Buyer chooses the amount at checkout. The price below acts as a suggested default.</p>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <label className="text-[11px] text-zinc-500 block mb-1">{t.priceMode === "pwyw" ? "Suggested" : "Price"} ({getSymbol(t.currency)})</label>
-                  <input
-                    type="number" min="0" step="0.01" value={t.price}
-                    onChange={e => updateDraft(t._idx, { price: e.target.value })}
-                    placeholder="0.00"
-                    className="w-full px-2.5 py-1.5 text-[13px] text-zinc-900 border border-zinc-200 rounded focus:outline-none focus:border-zinc-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
-                <div className="w-[100px]">
-                  <label className="text-[11px] text-zinc-500 block mb-1">Currency</label>
-                  <Select value={t.currency} onValueChange={v => updateDraft(t._idx, { currency: v })}>
-                    <SelectTrigger className="h-[34px] text-[13px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {CURRENCIES.map(c => <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="w-[80px]">
-                  <label className="text-[11px] text-zinc-500 block mb-1">Capacity</label>
-                  <input
-                    type="number" min="0" step="1" value={t.capacity}
-                    onChange={e => updateDraft(t._idx, { capacity: e.target.value })}
-                    placeholder="∞"
-                    className="w-full px-2.5 py-1.5 text-[13px] text-zinc-900 border border-zinc-200 rounded focus:outline-none focus:border-zinc-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-1.5 text-[12px] text-zinc-700 cursor-pointer">
-                  <input type="checkbox" checked={t.isRecurring} onChange={e => updateDraft(t._idx, { isRecurring: e.target.checked })} className="w-3.5 h-3.5" />
-                  Recurring
-                </label>
-                {t.isRecurring && (
-                  <Select value={t.recurringInterval} onValueChange={v => updateDraft(t._idx, { recurringInterval: v })}>
-                    <SelectTrigger className="h-[28px] text-[12px] w-[100px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="yearly">Yearly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              {t.priceMode === "pwyw" && (
-                <div>
-                  <label className="text-[11px] text-zinc-500 block mb-1">Minimum amount (optional)</label>
-                  <div className="relative max-w-[180px]">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[13px] text-zinc-400 pointer-events-none">{getSymbol(t.currency)}</span>
-                    <input
-                      type="number" min="0" step="0.01" value={t.pwywMin}
-                      onChange={e => updateDraft(t._idx, { pwywMin: e.target.value })}
-                      placeholder="No minimum"
-                      className="w-full pl-7 pr-3 py-1.5 text-[13px] text-zinc-900 placeholder:text-zinc-400 border border-zinc-200 rounded focus:outline-none focus:border-zinc-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+              ))}
+            </SortableContext>
+          </DndContext>
 
           <div className="flex items-center justify-between pt-1">
             <button onClick={addTier} className="flex items-center gap-1.5 text-[12px] font-medium text-zinc-700 hover:text-zinc-900 cursor-pointer">
@@ -397,6 +435,183 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         </button>
       </div>
     </ModalShell>
+  );
+}
+
+// ─── Sortable tier row ───────────────────────────────────────────────
+
+interface SortableTierRowProps {
+  t: DraftTier & { _idx: number };
+  canRemove: boolean;
+  onUpdate: (patch: Partial<DraftTier>) => void;
+  onRemove: () => void;
+  onDuplicate: () => void;
+}
+
+/**
+ * DnD-kit wrapper for a tier card. Keeps the card itself presentation-only
+ * — it just knows there's a drag handle to render. Mirrors the events
+ * package's SortableTierCard so any future refactor that pulls the two
+ * implementations together has a clean seam.
+ */
+function SortableTierRow(props: SortableTierRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.t.localId });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 10 : undefined,
+    position: "relative",
+  };
+  return (
+    <div ref={setNodeRef} style={style}>
+      <TierCard {...props} dragAttributes={attributes} dragListeners={listeners} />
+    </div>
+  );
+}
+
+/**
+ * Pure tier card render. Locked-when-sold disables price/currency/priceMode
+ * inputs once `salesCount > 0` — silently allowing those edits would
+ * retroactively change what existing buyers paid (the backend's
+ * product_snapshot price-sync rewrites the snapshot whenever the
+ * linked product changes). The lock + "X sold" badge are the visual
+ * cue.
+ */
+function TierCard({
+  t, canRemove, onUpdate, onRemove, onDuplicate, dragAttributes, dragListeners,
+}: SortableTierRowProps & { dragAttributes?: any; dragListeners?: any }) {
+  const locked = (t.salesCount || 0) > 0;
+  return (
+    <div className="border border-zinc-200 rounded-lg p-3 space-y-2.5 bg-white">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          {...dragAttributes} {...dragListeners}
+          className="p-1 text-zinc-300 hover:text-zinc-500 cursor-grab active:cursor-grabbing shrink-0"
+          aria-label="Drag to reorder"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+        <input
+          type="text" value={t.name}
+          onChange={e => onUpdate({ name: e.target.value })}
+          placeholder="Tier name"
+          className="flex-1 px-2.5 py-1.5 text-[13px] font-medium text-zinc-900 border border-zinc-200 rounded focus:outline-none focus:border-zinc-400"
+        />
+        {locked && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-emerald-700 bg-emerald-50 rounded">
+            {t.salesCount} sold
+          </span>
+        )}
+        {t.id && (
+          <button
+            onClick={onDuplicate}
+            className="p-1.5 text-zinc-400 hover:text-zinc-700 cursor-pointer"
+            title="Duplicate tier"
+            aria-label="Duplicate tier"
+          >
+            <Copy className="w-4 h-4" />
+          </button>
+        )}
+        {canRemove && (
+          <button
+            onClick={onRemove}
+            disabled={locked}
+            className="p-1.5 text-zinc-400 hover:text-red-600 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+            title={locked ? "Refund all sales before deleting" : "Remove tier"}
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+      <div>
+        <label className="text-[11px] text-zinc-500 block mb-1 flex items-center gap-1">
+          Pricing model
+          {locked && <Lock className="w-3 h-3 text-zinc-400" />}
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => !locked && onUpdate({ priceMode: "fixed" })}
+            disabled={locked}
+            className={`px-3 py-1.5 text-[12px] rounded border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${t.priceMode === "fixed" ? "border-zinc-900 bg-zinc-50 text-zinc-900 font-medium" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"} ${locked ? "" : "cursor-pointer"}`}
+          >Fixed price</button>
+          <button type="button" onClick={() => !locked && onUpdate({ priceMode: "pwyw" })}
+            disabled={locked}
+            className={`px-3 py-1.5 text-[12px] rounded border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${t.priceMode === "pwyw" ? "border-zinc-900 bg-zinc-50 text-zinc-900 font-medium" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"} ${locked ? "" : "cursor-pointer"}`}
+          >Pay what you want</button>
+        </div>
+        {t.priceMode === "pwyw" && (
+          <p className="text-[11px] text-zinc-500 mt-1">Buyer chooses the amount at checkout. The price below acts as a suggested default.</p>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <label className="text-[11px] text-zinc-500 block mb-1 flex items-center gap-1">
+            {t.priceMode === "pwyw" ? "Suggested" : "Price"} ({getSymbol(t.currency)})
+            {locked && <Lock className="w-3 h-3 text-zinc-400" />}
+          </label>
+          <input
+            type="number" min="0" step="0.01" value={t.price}
+            onChange={e => onUpdate({ price: e.target.value })}
+            placeholder="0.00"
+            disabled={locked}
+            className="w-full px-2.5 py-1.5 text-[13px] text-zinc-900 border border-zinc-200 rounded focus:outline-none focus:border-zinc-400 disabled:bg-zinc-50 disabled:text-zinc-400 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+        </div>
+        <div className="w-[100px]">
+          <label className="text-[11px] text-zinc-500 block mb-1 flex items-center gap-1">
+            Currency
+            {locked && <Lock className="w-3 h-3 text-zinc-400" />}
+          </label>
+          <Select value={t.currency} onValueChange={v => onUpdate({ currency: v })} disabled={locked}>
+            <SelectTrigger className="h-[34px] text-[13px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {CURRENCIES.map(c => <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="w-[80px]">
+          <label className="text-[11px] text-zinc-500 block mb-1">Capacity</label>
+          <input
+            type="number" min={locked ? t.salesCount : 0} step="1" value={t.capacity}
+            onChange={e => onUpdate({ capacity: e.target.value })}
+            placeholder="∞"
+            className="w-full px-2.5 py-1.5 text-[13px] text-zinc-900 border border-zinc-200 rounded focus:outline-none focus:border-zinc-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <label className="flex items-center gap-1.5 text-[12px] text-zinc-700 cursor-pointer">
+          <input type="checkbox" checked={t.isRecurring} onChange={e => onUpdate({ isRecurring: e.target.checked })} className="w-3.5 h-3.5" />
+          Recurring
+        </label>
+        {t.isRecurring && (
+          <Select value={t.recurringInterval} onValueChange={v => onUpdate({ recurringInterval: v })}>
+            <SelectTrigger className="h-[28px] text-[12px] w-[100px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="weekly">Weekly</SelectItem>
+              <SelectItem value="monthly">Monthly</SelectItem>
+              <SelectItem value="yearly">Yearly</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      {t.priceMode === "pwyw" && (
+        <div>
+          <label className="text-[11px] text-zinc-500 block mb-1">Minimum amount (optional)</label>
+          <div className="relative max-w-[180px]">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[13px] text-zinc-400 pointer-events-none">{getSymbol(t.currency)}</span>
+            <input
+              type="number" min="0" step="0.01" value={t.pwywMin}
+              onChange={e => onUpdate({ pwywMin: e.target.value })}
+              placeholder="No minimum"
+              className="w-full pl-7 pr-3 py-1.5 text-[13px] text-zinc-900 placeholder:text-zinc-400 border border-zinc-200 rounded focus:outline-none focus:border-zinc-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
