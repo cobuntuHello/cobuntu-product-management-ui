@@ -5,15 +5,16 @@ import { PriceEditModal } from "../components/PriceEditModal";
 import { renderWithConfig, mockFetch } from "./test-utils";
 
 /**
- * Mirror of the events PR #8 slice 7 round-trip test, adapted for
- * marketplace product semantics:
+ * Mirror of the events package round-trip test, adapted for marketplace
+ * product semantics:
  *   - Tier endpoint is /products/:id/tiers (events: /events/:id/tiers)
  *   - No Stripe gate
  *   - tier.products carries isRecurring + recurringInterval
  *
- * Pins the "MembersStep stays mounted across hub↔step transitions"
- * contract that lets dirty member-pricing rows survive the user
- * clicking Done on the step.
+ * Pins the "MembersStep stays mounted across hub↔step transitions" and
+ * "rows survive L1↔L2 navigation" contracts that let dirty
+ * member-pricing rows survive the user backing out of the step OR the
+ * tier itself.
  */
 
 const product = {
@@ -95,14 +96,14 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
 
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    await screen.findByDisplayValue("Pro");
-    await user.click(screen.getAllByLabelText(/expand|collapse/i)[0]);
+    // L1 → click tier row → L2 (per-tier hub).
+    await user.click(await screen.findByRole("button", { name: /Pro/ }));
 
-    // Edit buttons order: Basics / Options / Member pricing / Form.
+    // L2 → Edit on Member pricing card (index 2: Basics/Options/Members/Form).
     const editButtons = await screen.findAllByRole("button", { name: /^Edit/ });
     await user.click(editButtons[2]);
 
-    // Toggle VIPs override
+    // Toggle VIPs override + set value.
     const vipsCheckbox = await screen.findByLabelText(
       /Offer member pricing for VIPs/,
     );
@@ -115,9 +116,9 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
 
     expect(await screen.findByText(/unsaved/i)).toBeInTheDocument();
 
-    // Done returns to the hub. MembersStep stays mounted (slice 7
-    // invariant) so the dirty rows survive.
-    await user.click(screen.getByRole("button", { name: /Done/i }));
+    // Back to L2 hub. MembersStep is the same instance — modal-level
+    // state map keeps the dirty row.
+    await user.click(screen.getByRole("button", { name: /Back to/ }));
     await waitFor(() =>
       expect(
         screen.getAllByRole("button", { name: /^Edit/ }).length,
@@ -150,8 +151,8 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     mockFetch(stubLoadRoutes());
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    await screen.findByDisplayValue("Pro");
-    await user.click(screen.getAllByLabelText(/expand|collapse/i)[0]);
+    // L1 → row → L2 → Edit Members → L3.
+    await user.click(await screen.findByRole("button", { name: /Pro/ }));
     const editButtons = await screen.findAllByRole("button", { name: /^Edit/ });
     await user.click(editButtons[2]);
 
@@ -161,7 +162,8 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     await user.click(vipsCheckbox);
     expect(vipsCheckbox).toBeChecked();
 
-    await user.click(screen.getByRole("button", { name: /Done/i }));
+    // Back to L2, then re-enter Members step.
+    await user.click(screen.getByRole("button", { name: /Back to/ }));
     await waitFor(() =>
       expect(
         screen.getAllByRole("button", { name: /^Edit/ }).length,
@@ -175,9 +177,11 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     expect(vipsAfter).toBeChecked();
   });
 
-  it("collapsing the tier card mid-edit no longer drops the dirty rows (papercut #1 fix)", async () => {
-    // Mirrors the events package's regression test. State lifted to
-    // PriceEditModal level means dirty rows survive card collapse.
+  it("leaving the tier (back to tiers) mid-edit no longer drops the dirty rows (papercut #1 fix)", async () => {
+    // Pre-state-lift: rows lived inside MemberPricingSection. Leaving
+    // the tier (back-arrow up to L1) unmounted the section + dropped
+    // any pending dirty rows. Post-lift: rows live in PriceEditModal's
+    // state map and survive Level 1 ↔ Level 2 navigation.
     const user = userEvent.setup();
     const fetchFn = mockFetch([
       ...stubLoadRoutes(),
@@ -190,8 +194,9 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     ]);
 
     renderWithConfig(<PriceEditModal {...baseProps()} />);
-    await screen.findByDisplayValue("Pro");
-    await user.click(screen.getAllByLabelText(/expand|collapse/i)[0]);
+
+    // L1 → row → L2 → Members → L3 → dirty.
+    await user.click(await screen.findByRole("button", { name: /Pro/ }));
     const editButtons = await screen.findAllByRole("button", { name: /^Edit/ });
     await user.click(editButtons[2]);
 
@@ -204,12 +209,11 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     fireEvent.change(valueInput, { target: { value: "20" } });
     expect(await screen.findByText(/unsaved/i)).toBeInTheDocument();
 
-    // Return to hub, then COLLAPSE the tier card.
-    await user.click(screen.getByRole("button", { name: /Done/i }));
-    await user.click(screen.getAllByLabelText(/expand|collapse/i)[0]);
+    // Back to L2, then back to L1 (tiers).
+    await user.click(screen.getByRole("button", { name: /Back to Pro/ }));
+    await user.click(screen.getByRole("button", { name: /Back to tiers/ }));
 
-    // Save without re-expanding — dirty row should still commit
-    // because the state lives at the modal level.
+    // Save from L1 — the dirty member-pricing row should commit.
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => {

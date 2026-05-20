@@ -32,12 +32,13 @@ describe("PriceEditModal", () => {
     ]);
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    // Name input is in the tier-card header — visible without expanding.
-    await waitFor(() => expect(screen.getByDisplayValue("Standard")).toBeInTheDocument());
-    // Price input lives inside BasicsStep now (new UX). Expand the
-    // card → click Edit on Basics → assert the prefilled price.
-    await user.click(screen.getAllByLabelText(/expand|collapse/i)[0]);
+    // L1: pre-filled Standard tier visible as a row.
+    await screen.findByRole("button", { name: /Standard/ });
+    // Click row → L2 hub.
+    await user.click(screen.getByRole("button", { name: /Standard/ }));
+    // Click Basics Edit → L3.
     await user.click(screen.getAllByRole("button", { name: /^Edit/ })[0]);
+    // BasicsStep mounted; price prefilled from product.price (2500 → 25).
     expect(screen.getByDisplayValue("25")).toBeInTheDocument();
   });
 
@@ -59,9 +60,8 @@ describe("PriceEditModal", () => {
     ]);
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    await waitFor(() => expect(screen.getByDisplayValue("Pro")).toBeInTheDocument());
-    // Price input lives inside BasicsStep — expand + enter step.
-    await user.click(screen.getAllByLabelText(/expand|collapse/i)[0]);
+    // L1 → row → L2 → Basics → L3 for the price input.
+    await user.click(await screen.findByRole("button", { name: /Pro/ }));
     await user.click(screen.getAllByRole("button", { name: /^Edit/ })[0]);
     expect(screen.getByDisplayValue("50")).toBeInTheDocument();
   });
@@ -82,7 +82,8 @@ describe("PriceEditModal", () => {
     const props = baseProps();
     renderWithConfig(<PriceEditModal {...props} />);
 
-    await waitFor(() => expect(screen.getByDisplayValue("Pro")).toBeInTheDocument());
+    // Wait for L1 row, then save without entering the hub — Save is on the modal footer.
+    await screen.findByRole("button", { name: /Pro/ });
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => expect(props.onSaved).toHaveBeenCalled());
@@ -109,7 +110,11 @@ describe("PriceEditModal", () => {
     const props = baseProps();
     renderWithConfig(<PriceEditModal {...props} />);
 
-    const input = await screen.findByDisplayValue("Pro");
+    // L1 → click tier row → L2: name input lives at top of hub.
+    await user.click(await screen.findByRole("button", { name: /Pro/ }));
+    const input = (await screen.findByPlaceholderText(
+      "Standard, VIP, Early-bird…",
+    )) as HTMLInputElement;
     await user.clear(input);
 
     await user.click(screen.getByRole("button", { name: /^save$/i }));
@@ -133,15 +138,12 @@ describe("PriceEditModal", () => {
     ]);
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    // "7 sold" badge appears both in the tier-card header AND inside
-    // the EditHub's locked banner (EditHub is rendered inside a
-    // Collapse — DOM-present but visually collapsed). Either match is
-    // fine for proving the badge logic fires.
+    // L1 row shows the sold count as "7/50".
     await waitFor(() =>
-      expect(screen.getAllByText(/7 sold/i).length).toBeGreaterThanOrEqual(1),
+      expect(screen.getAllByText(/7\/50/).length).toBeGreaterThanOrEqual(1),
     );
-    // Price input lives inside BasicsStep — expand + enter step.
-    await user.click(screen.getAllByLabelText(/expand|collapse/i)[0]);
+    // L1 → click row → L2 → click Basics Edit → L3 where price lives.
+    await user.click(screen.getByRole("button", { name: /Pro/ }));
     await user.click(screen.getAllByRole("button", { name: /^Edit/ })[0]);
     const priceInput = screen.getByPlaceholderText("0.00") as HTMLInputElement;
     expect(priceInput.value).toBe("50");
@@ -168,10 +170,14 @@ describe("PriceEditModal", () => {
     const user = userEvent.setup();
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    await waitFor(() => expect(screen.getByDisplayValue("Pro")).toBeInTheDocument());
+    // Duplicate button lives on the L1 row itself.
+    await screen.findByRole("button", { name: /Pro/ });
     await user.click(screen.getByRole("button", { name: /duplicate tier/i }));
 
-    await waitFor(() => expect(screen.getByDisplayValue("Pro (copy)")).toBeInTheDocument());
+    // Copy appears in the list — L1 still shows both tiers as rows.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Pro \(copy\)/ })).toBeInTheDocument(),
+    );
 
     const postCall = fetchMock.mock.calls.find(c => (c[1] as RequestInit | undefined)?.method === "POST");
     expect(postCall).toBeDefined();
@@ -185,7 +191,9 @@ describe("PriceEditModal", () => {
     ]);
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    await waitFor(() => expect(screen.getByDisplayValue("Standard")).toBeInTheDocument());
+    // L1: pre-filled "Standard" row is visible.
+    await screen.findByRole("button", { name: /Standard/ });
+    // No Duplicate button on the unsaved tier's row.
     expect(screen.queryByRole("button", { name: /duplicate tier/i })).not.toBeInTheDocument();
   });
 });
