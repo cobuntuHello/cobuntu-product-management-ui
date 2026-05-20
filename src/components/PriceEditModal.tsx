@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
@@ -11,7 +11,16 @@ import {
 } from "@dnd-kit/sortable";
 import { ModalShell } from "../ui/modal-shell";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
-import { type MemberPricingSectionHandle } from "./MemberPricingSection";
+import {
+  buildRowsFromOverrides,
+  buildUpsertBody,
+  findFirstValidationError,
+  resetRowsBaseline,
+  rowIsDirty,
+  type CommunitySegment,
+  type MemberPricingRow,
+  type MemberPricingTierState,
+} from "./PriceEditModal/member-pricing";
 import {
   type DonationDraft,
   type DraftTier,
@@ -83,15 +92,6 @@ export interface PriceEditModalProps {
    * hidden for unsaved drafts (no `id`).
    */
   showMemberPricing?: boolean;
-  /**
-   * @deprecated As of slice 4 the form builder is inlined into the
-   * EditHub's Form step (see ./PriceEditModal/steps/FormStep.tsx).
-   * This prop is retained for backwards compatibility with admin /
-   * community-app call sites that still pass it; the value is ignored.
-   * Phase C (admin SHA bump) deletes the standalone /form pages and
-   * removes this prop from the call sites entirely.
-   */
-  onOpenTierForm?: (tierId: string) => void;
 }
 
 export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing }: PriceEditModalProps) {
@@ -102,19 +102,24 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   const [saving, setSaving] = useState(false);
   const [donation, setDonation] = useState<DonationDraft>(() => loadDonationFromProduct(product));
   const [donationDirty, setDonationDirty] = useState(false);
-  // Imperative refs to each mounted MemberPricingSection (keyed by
-  // tier id). The global save() walks these after tier writes succeed
-  // so member-pricing overrides commit under the same Save button.
-  // Replaces the nested per-section Save button the UX redesign
-  // flagged as dual-Save confusion. Mirrors the events package.
-  const memberPricingRefs = useRef<Map<string, MemberPricingSectionHandle | null>>(new Map());
+  // Member-pricing state — lifted out of MemberPricingSection so it
+  // survives tier-card collapse / hub↔step navigation / any unmount.
+  // Tied to the modal's lifetime, not the section's. Segments are
+  // community-wide (fetched once); per-tier overrides live in the
+  // map below keyed by tier id.
+  const [memberPricingSegments, setMemberPricingSegments] = useState<CommunitySegment[]>([]);
+  const [memberPricingByTier, setMemberPricingByTier] = useState<Map<string, MemberPricingTierState>>(new Map());
 
-  // Stable ref callback so React doesn't detach/reattach the
-  // MemberPricingSection handle on every render of the tier list.
-  const registerMemberPricingRef = useCallback(
-    (tierId: string, handle: MemberPricingSectionHandle | null) => {
-      if (handle) memberPricingRefs.current.set(tierId, handle);
-      else memberPricingRefs.current.delete(tierId);
+  const updateMemberPricingRow = useCallback(
+    (tierId: string, idx: number, patch: Partial<MemberPricingRow>) => {
+      setMemberPricingByTier((prev) => {
+        const tierState = prev.get(tierId);
+        if (!tierState || tierState.loading || tierState.error) return prev;
+        const newRows = tierState.rows.map((r, i) => (i === idx ? { ...r, ...patch } : r));
+        const next = new Map(prev);
+        next.set(tierId, { loading: false, error: null, rows: newRows });
+        return next;
+      });
     },
     [],
   );
@@ -183,6 +188,66 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId, communityTag, apiBaseUrl, product.price, product.currency, product.isRecurring, product.recurringInterval]);
+
+  // Fetch community segments once when the modal opens with
+  // showMemberPricing on. Mirrors the events package's effect.
+  useEffect(() => {
+    if (!showMemberPricing) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `${apiBaseUrl}/api/communities/${communityTag}/segments`,
+          { headers: authHeaders() },
+        );
+        if (cancelled || !res.ok) return;
+        const segments: CommunitySegment[] = await res.json();
+        setMemberPricingSegments(segments);
+      } catch { /* silent — sections will show "No segments yet" */ }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMemberPricing, communityTag, apiBaseUrl]);
+
+  // Lazy per-tier override fetch once segments are loaded.
+  useEffect(() => {
+    if (!showMemberPricing || memberPricingSegments.length === 0) return;
+    const savedTierIds = drafts
+      .filter((d) => d.id && !d.deleted)
+      .map((d) => d.id!) as string[];
+    for (const tierId of savedTierIds) {
+      if (memberPricingByTier.has(tierId)) continue;
+      setMemberPricingByTier((prev) => {
+        const next = new Map(prev);
+        next.set(tierId, { loading: true, error: null, rows: [] as never[] });
+        return next;
+      });
+      const tier = drafts.find((d) => d.id === tierId);
+      const currency = tier?.currency ?? "EUR";
+      (async () => {
+        try {
+          const res = await fetch(
+            `${apiBaseUrl}/api/communities/${communityTag}/tiers/${tierId}/member-pricing`,
+            { headers: authHeaders() },
+          );
+          const overrides: any[] = res.ok ? await res.json() : [];
+          const rows = buildRowsFromOverrides(memberPricingSegments, overrides, currency);
+          setMemberPricingByTier((prev) => {
+            const next = new Map(prev);
+            next.set(tierId, { loading: false, error: null, rows });
+            return next;
+          });
+        } catch (e: any) {
+          setMemberPricingByTier((prev) => {
+            const next = new Map(prev);
+            next.set(tierId, { loading: false, error: e?.message || "Failed to load", rows: [] as never[] });
+            return next;
+          });
+        }
+      })();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMemberPricing, memberPricingSegments, drafts.map((d) => d.id).join(",")]);
 
   function updateDraft(idx: number, patch: Partial<DraftTier>) {
     setDrafts(d => d.map((t, i) => i === idx ? { ...t, ...patch } : t));
@@ -328,19 +393,59 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         }
       }
 
-      // Commit member-pricing overrides via the imperative refs the
-      // tier cards register on mount. Each mounted section writes its
-      // own dirty rows; the parent never threads the override payloads
-      // through the tier save loop (the backend exposes them as a
-      // separate sub-resource). Done AFTER tier writes so brand-new
-      // tiers — which can't have overrides until their POST returns a
-      // tier id — aren't a concern (the section unmounts/remounts on
-      // re-fetch). Failures bubble up into the same catch as tier
-      // failures.
-      for (const [, handle] of memberPricingRefs.current) {
-        if (handle && handle.isDirty()) {
-          await handle.commit();
+      // Commit member-pricing overrides from the modal-level state
+      // map. The map outlives any tier-card unmount, so dirty rows
+      // survive the user collapsing a tier between edit and Save.
+      // Done AFTER tier writes so brand-new tiers — which can't have
+      // overrides until their POST returns a tier id — aren't a
+      // concern (we iterate by tierId; new tiers without an id don't
+      // appear in the map). Product-specific delta vs events: the
+      // upsert body carries recurringScope for subscription tiers.
+      const memberPricingResets: Array<[string, MemberPricingRow[]]> = [];
+      for (const [tierId, tierState] of memberPricingByTier) {
+        if (tierState.loading || tierState.error) continue;
+        const valErr = findFirstValidationError(tierState.rows);
+        if (valErr) throw new Error(valErr);
+        const dirtyRows = tierState.rows.filter(rowIsDirty);
+        if (dirtyRows.length === 0) continue;
+
+        const tier = drafts.find((d) => d.id === tierId);
+        const currency = tier?.currency ?? "EUR";
+        const isRecurringTier = !!tier?.isRecurring;
+        for (const r of dirtyRows) {
+          if (r.initial?.enabled && !r.enabled && r.initial.id) {
+            const res = await fetch(
+              `${apiBaseUrl}/api/communities/${communityTag}/tiers/${tierId}/member-pricing/${r.initial.id}`,
+              { method: "DELETE", headers: authHeaders() },
+            );
+            if (!res.ok) {
+              const e = await res.json().catch(() => ({}));
+              throw new Error(e.error || `Failed to remove override for ${r.segmentName}`);
+            }
+            continue;
+          }
+          if (r.enabled) {
+            const body = buildUpsertBody(r, currency, isRecurringTier);
+            const res = await fetch(
+              `${apiBaseUrl}/api/communities/${communityTag}/tiers/${tierId}/member-pricing`,
+              { method: "POST", headers: jsonHeaders(), body: JSON.stringify(body) },
+            );
+            if (!res.ok) {
+              const e = await res.json().catch(() => ({}));
+              throw new Error(e.error || `Failed to save override for ${r.segmentName}`);
+            }
+          }
         }
+        memberPricingResets.push([tierId, resetRowsBaseline(tierState.rows)]);
+      }
+      if (memberPricingResets.length > 0) {
+        setMemberPricingByTier((prev) => {
+          const next = new Map(prev);
+          for (const [tierId, rows] of memberPricingResets) {
+            next.set(tierId, { loading: false, error: null, rows });
+          }
+          return next;
+        });
       }
 
       // Donation sidecar. PUT receives null when disabled so the
@@ -390,7 +495,8 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
                   onDuplicate={() => duplicateTier(t._idx)}
                   showMemberPricing={!!showMemberPricing}
                   showToast={showToast}
-                  registerMemberPricingRef={registerMemberPricingRef}
+                  memberPricingState={t.id ? memberPricingByTier.get(t.id) : undefined}
+                  onMemberPricingRowChange={(idx, patch) => t.id && updateMemberPricingRow(t.id, idx, patch)}
                 />
               ))}
             </SortableContext>
