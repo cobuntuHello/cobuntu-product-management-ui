@@ -36,7 +36,9 @@ import {
   validateDonation,
   validateTier,
 } from "./PriceEditModal/helpers";
-import { SortableTierRow } from "./PriceEditModal/TierCard";
+import { SortableTierRow } from "./PriceEditModal/TierRow";
+import { TierHubView, type StepId } from "./PriceEditModal/TierHubView";
+import { StepView } from "./PriceEditModal/StepView";
 import { DonationsSection } from "./PriceEditModal/DonationsSection";
 // Backwards-compat export — the original module exported CURRENCIES
 // directly. The constant lives on the new types module now; re-export
@@ -102,6 +104,16 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   const [saving, setSaving] = useState(false);
   const [donation, setDonation] = useState<DonationDraft>(() => loadDonationFromProduct(product));
   const [donationDirty, setDonationDirty] = useState(false);
+
+  // Three-level navigation state. Each non-null value escalates the
+  // modal body to a "takeover" view:
+  //   activeTier=null, activeStep=null      → Level 1 (tier list)
+  //   activeTier=localId, activeStep=null   → Level 2 (per-tier hub)
+  //   activeTier=localId, activeStep=basics → Level 3 (focused step)
+  // State lives at the modal level so siblings, Add Tier, and
+  // Donations actually disappear when the user steps into a tier.
+  const [activeTier, setActiveTier] = useState<string | null>(null);
+  const [activeStep, setActiveStep] = useState<StepId | null>(null);
   // Member-pricing state — lifted out of MemberPricingSection so it
   // survives tier-card collapse / hub↔step navigation / any unmount.
   // Tied to the modal's lifetime, not the section's. Segments are
@@ -469,41 +481,120 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
     finally { setSaving(false); }
   }
 
-  const title = visible.length === 0 ? "Add pricing" : visible.length === 1 ? "Edit pricing" : "Pricing tiers";
+  // Active draft for L2 / L3 takeover views. Keyed by tier.localId
+  // (NOT tier.id) so brand-new unsaved tiers work the same way.
+  const activeDraft = activeTier
+    ? drafts.find(d => d.localId === activeTier && !d.deleted)
+    : null;
+
+  function activeIdx(): number | null {
+    if (!activeDraft) return null;
+    const idx = drafts.findIndex(d => d.localId === activeDraft.localId);
+    return idx >= 0 ? idx : null;
+  }
+
+  const title = activeDraft
+    ? `Editing ${activeDraft.name || "tier"}`
+    : visible.length === 0
+      ? "Add pricing"
+      : visible.length === 1
+        ? "Edit pricing"
+        : "Pricing tiers";
+  const subtitle = activeDraft
+    ? null
+    : visible.length <= 1
+      ? "Set a price, or add multiple tiers."
+      : "Manage pricing tiers.";
 
   return (
     <ModalShell onClose={onClose} width="w-[500px]">
       <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">{title}</h3>
-      <p className="text-[12px] text-zinc-500 mb-4">
-        {visible.length <= 1 ? "Set a price, or add multiple tiers." : "Manage pricing tiers."}
-      </p>
+      {subtitle && (
+        <p className="text-[12px] text-zinc-500 mb-4">{subtitle}</p>
+      )}
+      {activeDraft && <div className="mb-4" />}
 
       {loading ? (
         <div className="py-8 text-center text-[12px] text-zinc-400">Loading…</div>
+      ) : activeDraft && activeStep ? (
+        // L3: step takeover. Hides siblings + Add Tier + Donations.
+        <StepView
+          t={activeDraft}
+          step={activeStep}
+          communityTag={communityTag}
+          onUpdate={(patch) => {
+            const idx = activeIdx();
+            if (idx != null) updateDraft(idx, patch);
+          }}
+          onBack={() => setActiveStep(null)}
+          memberPricingState={activeDraft.id ? memberPricingByTier.get(activeDraft.id) : undefined}
+          onMemberPricingRowChange={
+            activeDraft.id
+              ? (idx, patch) => updateMemberPricingRow(activeDraft.id!, idx, patch)
+              : undefined
+          }
+          showToast={showToast}
+        />
+      ) : activeDraft ? (
+        // L2: per-tier hub takeover.
+        <TierHubView
+          t={activeDraft}
+          showMemberPricing={!!showMemberPricing}
+          canDuplicate={!!activeDraft.id}
+          canDelete={visible.length > 1}
+          onUpdate={(patch) => {
+            const idx = activeIdx();
+            if (idx != null) updateDraft(idx, patch);
+          }}
+          onEnterStep={(step) => setActiveStep(step)}
+          onDuplicate={() => {
+            const idx = activeIdx();
+            if (idx != null) duplicateTier(idx);
+          }}
+          onRemove={() => {
+            const idx = activeIdx();
+            if (idx != null) {
+              removeTier(idx);
+              setActiveTier(null);
+            }
+          }}
+          onBack={() => setActiveTier(null)}
+        />
       ) : (
-        <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+        // L1: default tier list.
+        <div className="space-y-3">
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext items={visible.map(t => t.localId)} strategy={verticalListSortingStrategy}>
               {visible.map(t => (
                 <SortableTierRow
                   key={t.localId}
                   t={t}
-                  communityTag={communityTag}
-                  canRemove={visible.length > 1}
-                  onUpdate={patch => updateDraft(t._idx, patch)}
+                  canDelete={visible.length > 1}
+                  canDuplicate={!!t.id}
+                  onSelect={() => setActiveTier(t.localId)}
                   onRemove={() => removeTier(t._idx)}
                   onDuplicate={() => duplicateTier(t._idx)}
-                  showMemberPricing={!!showMemberPricing}
-                  showToast={showToast}
-                  memberPricingState={t.id ? memberPricingByTier.get(t.id) : undefined}
-                  onMemberPricingRowChange={(idx, patch) => t.id && updateMemberPricingRow(t.id, idx, patch)}
                 />
               ))}
             </SortableContext>
           </DndContext>
 
           <div className="flex items-center justify-between pt-1">
-            <button onClick={addTier} className="flex items-center gap-1.5 text-[12px] font-medium text-zinc-700 hover:text-zinc-900 cursor-pointer">
+            <button
+              onClick={() => {
+                addTier();
+                // Auto-navigate into the new tier's hub after the
+                // setDrafts state update settles.
+                setTimeout(() => {
+                  setDrafts((curr) => {
+                    const last = curr[curr.length - 1];
+                    if (last) setActiveTier(last.localId);
+                    return curr;
+                  });
+                }, 0);
+              }}
+              className="flex items-center gap-1.5 text-[12px] font-medium text-zinc-700 hover:text-zinc-900 cursor-pointer"
+            >
               <Plus className="w-3.5 h-3.5" /> Add tier
             </button>
             {manageDetailsUrl && (

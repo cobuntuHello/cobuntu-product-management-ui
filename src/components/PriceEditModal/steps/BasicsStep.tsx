@@ -49,8 +49,7 @@ export function BasicsStep({ t, onUpdate }: BasicsStepProps) {
 
   return (
     <div className="space-y-4">
-      {/* Tier name lives in the row header (TierCard's inline input) —
-          renaming from the row is the quickest path. Editing here would
+      {/* Tier name lives in the L2 hub header — editing here would
           duplicate that affordance without adding new capability. */}
 
       {/* Price + Currency */}
