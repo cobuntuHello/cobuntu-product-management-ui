@@ -35,6 +35,37 @@ export { EditProductDrawer } from "./components/EditProductDrawer";
 // for the package's surface.
 export { ModalShell } from "./ui/modal-shell";
 export { Select, SelectGroup, SelectValue, SelectTrigger, SelectContent, SelectItem } from "./ui/select";
+
+// New shared primitives — exposed for consumers building the redesigned
+// PriceEditModal (Phase A2 of the price-modal-redesign feature). The
+// existing `ModalShell` above stays put as a thin wrapper around the
+// shared shell so call-sites that bring their own close affordance keep
+// working unchanged. Components adopting the wizard/hub layout should
+// import these directly from "@cobuntu/management-ui-shared" — they're
+// re-exported here only for surface symmetry with the existing UI block.
+export {
+  ModalShell as SharedModalShell,
+  TextField,
+  NumberField,
+  SectionCard,
+  WizardProgress,
+  DiscardPrompt,
+  BillingRadio,
+  DiscountModeRadio,
+  type ModalShellProps as SharedModalShellProps,
+  type TextFieldProps,
+  type NumberFieldProps,
+  type SectionCardProps,
+  type WizardProgressProps,
+  type WizardStep,
+  type DiscardPromptProps,
+  type BillingRadioProps,
+  type BillingMode,
+  type BillingOption,
+  type DiscountModeRadioProps,
+  type DiscountMode,
+  type DiscountOption,
+} from "@cobuntu/management-ui-shared";
 export { Input, type InputProps } from "./ui/input";
 export { Button, buttonVariants, type ButtonProps } from "./ui/button";
 export { Label } from "./ui/label";
