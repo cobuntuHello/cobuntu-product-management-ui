@@ -26,16 +26,23 @@ const baseProps = (overrides: Record<string, unknown> = {}) => ({
 
 describe("PriceEditModal", () => {
   it("when no tiers exist: pre-fills a Standard tier with the parent product price", async () => {
+    const user = userEvent.setup();
     mockFetch([
       { method: "GET", url: "/products/p-1/tiers", body: [] },
     ]);
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
+    // Name input is in the tier-card header — visible without expanding.
     await waitFor(() => expect(screen.getByDisplayValue("Standard")).toBeInTheDocument());
+    // Price input lives inside BasicsStep now (new UX). Expand the
+    // card → click Edit on Basics → assert the prefilled price.
+    await user.click(screen.getAllByLabelText(/expand|collapse/i)[0]);
+    await user.click(screen.getAllByRole("button", { name: /^Edit/ })[0]);
     expect(screen.getByDisplayValue("25")).toBeInTheDocument();
   });
 
   it("when tiers exist: renders them from the API", async () => {
+    const user = userEvent.setup();
     mockFetch([
       {
         method: "GET", url: "/products/p-1/tiers", body: [
@@ -53,6 +60,9 @@ describe("PriceEditModal", () => {
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
     await waitFor(() => expect(screen.getByDisplayValue("Pro")).toBeInTheDocument());
+    // Price input lives inside BasicsStep — expand + enter step.
+    await user.click(screen.getAllByLabelText(/expand|collapse/i)[0]);
+    await user.click(screen.getAllByRole("button", { name: /^Edit/ })[0]);
     expect(screen.getByDisplayValue("50")).toBeInTheDocument();
   });
 
@@ -109,6 +119,7 @@ describe("PriceEditModal", () => {
   });
 
   it("tier with salesCount > 0: shows 'X sold' badge + disables price input", async () => {
+    const user = userEvent.setup();
     mockFetch([
       {
         method: "GET", url: "/products/p-1/tiers", body: [
@@ -122,9 +133,16 @@ describe("PriceEditModal", () => {
     ]);
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    await waitFor(() => expect(screen.getByText(/7 sold/i)).toBeInTheDocument());
-    // Price input is disabled. Both price (50) and capacity (50) share the
-    // display value "50"; grab the price one via its placeholder "0.00".
+    // "7 sold" badge appears both in the tier-card header AND inside
+    // the EditHub's locked banner (EditHub is rendered inside a
+    // Collapse — DOM-present but visually collapsed). Either match is
+    // fine for proving the badge logic fires.
+    await waitFor(() =>
+      expect(screen.getAllByText(/7 sold/i).length).toBeGreaterThanOrEqual(1),
+    );
+    // Price input lives inside BasicsStep — expand + enter step.
+    await user.click(screen.getAllByLabelText(/expand|collapse/i)[0]);
+    await user.click(screen.getAllByRole("button", { name: /^Edit/ })[0]);
     const priceInput = screen.getByPlaceholderText("0.00") as HTMLInputElement;
     expect(priceInput.value).toBe("50");
     expect(priceInput.disabled).toBe(true);
