@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Trash2, Plus, Copy, GripVertical, Lock, FileText } from "lucide-react";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
@@ -13,7 +13,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { ModalShell } from "../ui/modal-shell";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
-import { MemberPricingSection } from "./MemberPricingSection";
+import { MemberPricingSection, type MemberPricingSectionHandle } from "./MemberPricingSection";
 
 /**
  * Single source of truth for marketplace product pricing.
@@ -190,6 +190,22 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   const [saving, setSaving] = useState(false);
   const [donation, setDonation] = useState<DonationDraft>(() => loadDonationFromProduct(product));
   const [donationDirty, setDonationDirty] = useState(false);
+  // Imperative refs to each mounted MemberPricingSection (keyed by
+  // tier id). The global save() walks these after tier writes succeed
+  // so member-pricing overrides commit under the same Save button.
+  // Replaces the nested per-section Save button the UX redesign
+  // flagged as dual-Save confusion. Mirrors the events package.
+  const memberPricingRefs = useRef<Map<string, MemberPricingSectionHandle | null>>(new Map());
+
+  // Stable ref callback so React doesn't detach/reattach the
+  // MemberPricingSection handle on every render of the tier list.
+  const registerMemberPricingRef = useCallback(
+    (tierId: string, handle: MemberPricingSectionHandle | null) => {
+      if (handle) memberPricingRefs.current.set(tierId, handle);
+      else memberPricingRefs.current.delete(tierId);
+    },
+    [],
+  );
 
   function updateDonation(patch: Partial<DonationDraft>) {
     setDonationDirty(true);
@@ -483,6 +499,21 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         }
       }
 
+      // Commit member-pricing overrides via the imperative refs the
+      // tier cards register on mount. Each mounted section writes its
+      // own dirty rows; the parent never threads the override payloads
+      // through the tier save loop (the backend exposes them as a
+      // separate sub-resource). Done AFTER tier writes so brand-new
+      // tiers — which can't have overrides until their POST returns a
+      // tier id — aren't a concern (the section unmounts/remounts on
+      // re-fetch). Failures bubble up into the same catch as tier
+      // failures.
+      for (const [, handle] of memberPricingRefs.current) {
+        if (handle && handle.isDirty()) {
+          await handle.commit();
+        }
+      }
+
       // Donation sidecar
       if (donationDirty) {
         const donationBody = donation.enabled ? buildDonationBody() : null;
@@ -548,6 +579,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
                   showMemberPricing={!!showMemberPricing}
                   showToast={showToast}
                   onOpenForm={onOpenTierForm && t.id ? () => onOpenTierForm(t.id!) : undefined}
+                  registerMemberPricingRef={registerMemberPricingRef}
                 />
               ))}
             </SortableContext>
@@ -600,6 +632,11 @@ interface SortableTierRowProps {
    *  that invokes this callback. Undefined ⇒ footer hidden (also used for
    *  unsaved drafts where the backend has no tier id to attach a form to). */
   onOpenForm?: () => void;
+  /** Imperative ref registration so the outer modal can call
+   *  commit()/isDirty() on this tier's MemberPricingSection during its
+   *  global Save loop. Called on mount with the handle, on unmount
+   *  with null. */
+  registerMemberPricingRef?: (tierId: string, handle: MemberPricingSectionHandle | null) => void;
 }
 
 /**
@@ -633,7 +670,7 @@ function SortableTierRow(props: SortableTierRowProps) {
  * cue.
  */
 function TierCard({
-  t, communityTag, canRemove, onUpdate, onRemove, onDuplicate, showMemberPricing, showToast, onOpenForm, dragAttributes, dragListeners,
+  t, communityTag, canRemove, onUpdate, onRemove, onDuplicate, showMemberPricing, showToast, onOpenForm, registerMemberPricingRef, dragAttributes, dragListeners,
 }: SortableTierRowProps & { dragAttributes?: any; dragListeners?: any }) {
   const locked = (t.salesCount || 0) > 0;
   return (
@@ -855,6 +892,13 @@ function TierCard({
           Unsaved drafts skip it (backend needs a real tier id). */}
       {showMemberPricing && t.id && (
         <MemberPricingSection
+          ref={(handle) => {
+            // Only saved tiers mount this — id is stable for the
+            // section's lifetime. Register on mount, unregister on
+            // unmount so the outer modal's ref map doesn't pin a
+            // stale handle after a tier delete.
+            registerMemberPricingRef?.(t.id!, handle);
+          }}
           communityTag={communityTag}
           tierId={t.id}
           currencyCode={t.currency}
