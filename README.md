@@ -16,12 +16,15 @@ Both apps add this as a **git dependency** in their `package.json`:
 }
 ```
 
-And tell Next.js to transpile it (the package ships TypeScript source directly):
+And tell Next.js to transpile it (the package ships TypeScript source directly). As of v0.0.2 this package depends on `@cobuntu/management-ui-shared` for cross-package primitives, so consumers must transpile both:
 
 ```js
 // next.config.js
 module.exports = {
-  transpilePackages: ['@cobuntu/product-management-ui'],
+  transpilePackages: [
+    '@cobuntu/product-management-ui',
+    '@cobuntu/management-ui-shared',
+  ],
   // ...
 };
 ```
@@ -52,14 +55,11 @@ Peer dependencies:
 
 The package ships TypeScript source directly. Consumers' Next.js build (via `transpilePackages`) compiles it — no build step in this repo.
 
-## Why duplicate the primitives instead of sharing with event-management-ui?
+## Shared primitives with event-management-ui
 
-Each package is **self-contained**. Primitives (`ModalShell`, `Select`, `cn`) are duplicated rather than depended on across packages, so:
-- Each package owns what it ships
-- No coupling between events and products — changes to one don't bump the other
-- Future developers reading either package see everything in one place
+As of v0.0.2, modal/form primitives that previously lived in both this package and `@cobuntu/event-management-ui` have been extracted into [`@cobuntu/management-ui-shared`](https://github.com/cobuntuHello/cobuntu-management-ui-shared) — the cross-cutting bits like `ModalShell`, `TextField`, `WizardProgress`, `BillingRadio`. Both packages depend on it.
 
-If the primitives drift between the two packages over time, extract them into a third package then.
+Domain-specific primitives (e.g. `BannerCropModal`, `StockPhotoPicker`, `FileUploadZone` in this package) stay local — they're product-specific and don't belong in the shared package.
 
 ## Migration progress
 
