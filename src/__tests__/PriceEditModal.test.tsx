@@ -37,7 +37,7 @@ describe("PriceEditModal", () => {
     // Click row → L2 hub.
     await user.click(screen.getByRole("button", { name: /Standard/ }));
     // Click Basics Edit → L3.
-    await user.click(screen.getAllByRole("button", { name: /^Edit/ })[0]);
+    await user.click(await screen.findByRole("button", { name: /Basics/ }));
     // BasicsStep mounted; price prefilled from product.price (2500 → 25).
     expect(screen.getByDisplayValue("25")).toBeInTheDocument();
   });
@@ -62,7 +62,7 @@ describe("PriceEditModal", () => {
 
     // L1 → row → L2 → Basics → L3 for the price input.
     await user.click(await screen.findByRole("button", { name: /Pro/ }));
-    await user.click(screen.getAllByRole("button", { name: /^Edit/ })[0]);
+    await user.click(await screen.findByRole("button", { name: /Basics/ }));
     expect(screen.getByDisplayValue("50")).toBeInTheDocument();
   });
 
@@ -144,7 +144,7 @@ describe("PriceEditModal", () => {
     );
     // L1 → click row → L2 → click Basics Edit → L3 where price lives.
     await user.click(screen.getByRole("button", { name: /Pro/ }));
-    await user.click(screen.getAllByRole("button", { name: /^Edit/ })[0]);
+    await user.click(await screen.findByRole("button", { name: /Basics/ }));
     const priceInput = screen.getByPlaceholderText("0.00") as HTMLInputElement;
     expect(priceInput.value).toBe("50");
     expect(priceInput.disabled).toBe(true);
