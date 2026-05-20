@@ -13,6 +13,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { ModalShell } from "../ui/modal-shell";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
+import { MemberPricingSection } from "./MemberPricingSection";
 
 /**
  * Single source of truth for marketplace product pricing.
@@ -147,9 +148,21 @@ export interface PriceEditModalProps {
    * differs. If omitted, the link is hidden.
    */
   manageDetailsUrl?: string;
+  /**
+   * When true, the MemberPricingSection is rendered inside each tier
+   * card's expanded body — letting community admins configure per-
+   * segment discount overrides for this tier. Community-only feature;
+   * admin app passes true (admin only edits community-owned products),
+   * community-app `/manage` omits / passes false (user-owned products
+   * don't get the section).
+   *
+   * Default: false. The section requires saved-tier ids; rows are
+   * hidden for unsaved drafts (no `id`).
+   */
+  showMemberPricing?: boolean;
 }
 
-export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl }: PriceEditModalProps) {
+export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing }: PriceEditModalProps) {
   const { apiBaseUrl, authHeaders } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
   const [loading, setLoading] = useState(true);
@@ -483,10 +496,13 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
                 <SortableTierRow
                   key={t.localId}
                   t={t}
+                  communityTag={communityTag}
                   canRemove={visible.length > 1}
                   onUpdate={patch => updateDraft(t._idx, patch)}
                   onRemove={() => removeTier(t._idx)}
                   onDuplicate={() => duplicateTier(t._idx)}
+                  showMemberPricing={!!showMemberPricing}
+                  showToast={showToast}
                 />
               ))}
             </SortableContext>
@@ -526,10 +542,15 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
 
 interface SortableTierRowProps {
   t: DraftTier & { _idx: number };
+  communityTag: string;
   canRemove: boolean;
   onUpdate: (patch: Partial<DraftTier>) => void;
   onRemove: () => void;
   onDuplicate: () => void;
+  /** Render MemberPricingSection inside the expanded body. Community-
+   *  only — admin sets true, community-app /manage omits. */
+  showMemberPricing: boolean;
+  showToast: (msg: string) => void;
 }
 
 /**
@@ -563,7 +584,7 @@ function SortableTierRow(props: SortableTierRowProps) {
  * cue.
  */
 function TierCard({
-  t, canRemove, onUpdate, onRemove, onDuplicate, dragAttributes, dragListeners,
+  t, communityTag, canRemove, onUpdate, onRemove, onDuplicate, showMemberPricing, showToast, dragAttributes, dragListeners,
 }: SortableTierRowProps & { dragAttributes?: any; dragListeners?: any }) {
   const locked = (t.salesCount || 0) > 0;
   return (
@@ -777,6 +798,21 @@ function TierCard({
           </>
         )}
       </div>
+
+      {/* Member pricing — community-only, saved-tiers only. The section
+          fetches its own data + commits per-row on its own Save button,
+          so it doesn't thread through the outer modal save loop.
+          Unsaved drafts skip it (backend needs a real tier id). */}
+      {showMemberPricing && t.id && (
+        <MemberPricingSection
+          communityTag={communityTag}
+          tierId={t.id}
+          currencyCode={t.currency}
+          currencySymbol={getSymbol(t.currency)}
+          isRecurringTier={t.isRecurring}
+          showToast={showToast}
+        />
+      )}
     </div>
   );
 }
