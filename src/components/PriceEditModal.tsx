@@ -59,7 +59,19 @@ interface Tier {
   pwywMinAmount?: number | null;
   /** Non-refunded sales for this tier (backend joins via product_snapshots). */
   salesCount?: number;
-  products: { id: string; price: number; currency: string; isRecurring: boolean; recurringInterval: string | null };
+  products: {
+    id: string; price: number; currency: string;
+    isRecurring: boolean; recurringInterval: string | null;
+    // Installment plan — backend returns these on every GET /tiers since
+    // the member-pricing + installments umbrella shipped. Four-or-none
+    // for marketplace tiers: total + count + interval + accessDuration
+    // (months of access after signup). Distinct from events, where
+    // accessDuration is always null (event date bounds access).
+    installmentTotalPrice?: number | null;
+    installmentCount?: number | null;
+    installmentIntervalMonths?: number | null;
+    accessDurationMonths?: number | null;
+  };
 }
 
 interface DraftTier {
@@ -77,6 +89,16 @@ interface DraftTier {
   pwywMin: string;
   /** Non-refunded sales count. > 0 → price/currency/priceMode locked. */
   salesCount: number;
+  // Installment plan — four-or-none. Enabled iff all four numeric values
+  // are non-empty valid numbers. Display-unit (e.g. "300", "3", "1",
+  // "12") for consistency with the price field; converted on save.
+  // Marketplace tiers persist accessDuration; events skip it (event
+  // date bounds access).
+  installmentEnabled: boolean;
+  installmentTotal: string;          // display unit (e.g. "300" = €300 total)
+  installmentCount: string;            // integer (e.g. "3" = 3 charges)
+  installmentInterval: string;         // integer (e.g. "1" = monthly)
+  installmentAccessMonths: string;     // integer (e.g. "12" = 12 months of access)
   deleted?: boolean;
 }
 
@@ -160,6 +182,11 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             priceMode: "fixed",
             pwywMin: "",
             salesCount: 0,
+            installmentEnabled: false,
+            installmentTotal: "",
+            installmentCount: "",
+            installmentInterval: "1",
+            installmentAccessMonths: "",
           }]);
         } else {
           setDrafts(tiers.map(t => ({
@@ -176,10 +203,15 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             priceMode: t.priceMode === "pwyw" ? "pwyw" : "fixed",
             pwywMin: t.pwywMinAmount != null ? fromSmallestUnit(t.pwywMinAmount, t.products.currency) : "",
             salesCount: typeof t.salesCount === "number" ? t.salesCount : 0,
+            installmentEnabled: t.products.installmentTotalPrice != null,
+            installmentTotal: t.products.installmentTotalPrice != null ? fromSmallestUnit(t.products.installmentTotalPrice, t.products.currency) : "",
+            installmentCount: t.products.installmentCount != null ? String(t.products.installmentCount) : "",
+            installmentInterval: t.products.installmentIntervalMonths != null ? String(t.products.installmentIntervalMonths) : "1",
+            installmentAccessMonths: t.products.accessDurationMonths != null ? String(t.products.accessDurationMonths) : "",
           })));
         }
       } catch {
-        setDrafts([{ localId: genLocalId(), name: "Standard", price: "", currency: "EUR", capacity: "", isRecurring: false, recurringInterval: "monthly", priceMode: "fixed", pwywMin: "", salesCount: 0 }]);
+        setDrafts([{ localId: genLocalId(), name: "Standard", price: "", currency: "EUR", capacity: "", isRecurring: false, recurringInterval: "monthly", priceMode: "fixed", pwywMin: "", salesCount: 0, installmentEnabled: false, installmentTotal: "", installmentCount: "", installmentInterval: "1", installmentAccessMonths: "" }]);
       } finally { setLoading(false); }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -201,6 +233,11 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
       priceMode: "fixed",
       pwywMin: "",
       salesCount: 0,
+      installmentEnabled: false,
+      installmentTotal: "",
+      installmentCount: "",
+      installmentInterval: "1",
+      installmentAccessMonths: "",
     }]);
   }
   function removeTier(idx: number) {
@@ -245,6 +282,14 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         priceMode: newTier.priceMode === "pwyw" ? "pwyw" : "fixed",
         pwywMin: newTier.pwywMinAmount != null ? fromSmallestUnit(newTier.pwywMinAmount, newTier.products.currency) : "",
         salesCount: 0,
+        // Backend's cloneTier carries the installment plan over, so
+        // hydrate from the cloned response (admin's intuition is that
+        // "Duplicate" gives a fully-configured copy).
+        installmentEnabled: newTier.products.installmentTotalPrice != null,
+        installmentTotal: newTier.products.installmentTotalPrice != null ? fromSmallestUnit(newTier.products.installmentTotalPrice, newTier.products.currency) : "",
+        installmentCount: newTier.products.installmentCount != null ? String(newTier.products.installmentCount) : "",
+        installmentInterval: newTier.products.installmentIntervalMonths != null ? String(newTier.products.installmentIntervalMonths) : "1",
+        installmentAccessMonths: newTier.products.accessDurationMonths != null ? String(newTier.products.accessDurationMonths) : "",
       }]);
     } catch (e: any) {
       showToast(e.message || "Failed to duplicate tier");
@@ -300,6 +345,28 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
           const min = parseFloat(t.pwywMin);
           if (isNaN(min) || min < 0) throw new Error(`Minimum amount for "${t.name}" must be a non-negative number.`);
         }
+        // Installment plan — four-or-none + same range bounds as the
+        // backend validator (totalPrice > 0, count >= 2, interval >= 1,
+        // accessDuration >= 1). Catching it client-side gives the host
+        // an inline message instead of a generic 400 toast.
+        if (t.installmentEnabled) {
+          const total = parseFloat(t.installmentTotal);
+          const count = parseInt(t.installmentCount, 10);
+          const interval = parseInt(t.installmentInterval, 10);
+          const access = parseInt(t.installmentAccessMonths, 10);
+          if (isNaN(total) || total <= 0) {
+            throw new Error(`Installment total for "${t.name}" must be a positive number.`);
+          }
+          if (isNaN(count) || count < 2) {
+            throw new Error(`Installment count for "${t.name}" must be at least 2.`);
+          }
+          if (isNaN(interval) || interval < 1) {
+            throw new Error(`Installment interval for "${t.name}" must be at least 1 month.`);
+          }
+          if (isNaN(access) || access < 1) {
+            throw new Error(`Access duration for "${t.name}" must be at least 1 month.`);
+          }
+        }
       }
       if (donation.enabled) {
         if (donation.mode === "fixed") {
@@ -320,6 +387,22 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         const pwywMinSmallest = t.priceMode === "pwyw" && t.pwywMin.trim()
           ? toSmallestUnit(parseFloat(t.pwywMin), t.currency)
           : null;
+        // Installment plan — four-or-none. Marketplace tiers persist
+        // accessDurationMonths (distinct from events). The backend's
+        // PUT lock-when-sold guard rejects changes once a sale exists.
+        const installmentBody = t.installmentEnabled
+          ? {
+              installmentTotalPrice: toSmallestUnit(parseFloat(t.installmentTotal), t.currency),
+              installmentCount: parseInt(t.installmentCount, 10),
+              installmentIntervalMonths: parseInt(t.installmentInterval, 10),
+              accessDurationMonths: parseInt(t.installmentAccessMonths, 10),
+            }
+          : {
+              installmentTotalPrice: null,
+              installmentCount: null,
+              installmentIntervalMonths: null,
+              accessDurationMonths: null,
+            };
         const body = {
           name: t.name,
           price: parseFloat(t.price || "0"),
@@ -329,6 +412,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
           recurringInterval: t.isRecurring ? t.recurringInterval : null,
           priceMode: t.priceMode,
           pwywMinAmount: pwywMinSmallest,
+          ...installmentBody,
         };
         if (t.deleted && t.id) {
           const res = await fetch(`${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/tiers/${t.id}`, { method: "DELETE", headers: authHeaders() });
@@ -611,6 +695,88 @@ function TierCard({
           </div>
         </div>
       )}
+
+      {/* Installment plan — opt-in toggle + 4 inputs. Backend enforces
+          four-or-none + range bounds (totalPrice > 0, count >= 2,
+          interval >= 1, accessDuration >= 1) + lock-when-sold; the
+          same checks run client-side in save() so the host sees inline
+          errors instead of a generic 400 toast. */}
+      <div className="pt-2 border-t border-zinc-100">
+        <label className={`flex items-center gap-2 ${locked ? "cursor-not-allowed" : "cursor-pointer"}`}>
+          <input
+            type="checkbox"
+            checked={t.installmentEnabled}
+            disabled={locked}
+            onChange={e => onUpdate({ installmentEnabled: e.target.checked })}
+            className="w-3.5 h-3.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-400 disabled:cursor-not-allowed"
+          />
+          <span className={`text-[12px] font-medium ${locked ? "text-zinc-400" : "text-zinc-700"}`}>
+            Offer an installment plan
+          </span>
+          {locked && <Lock className="w-3 h-3 text-zinc-400" />}
+        </label>
+        <p className="text-[11px] text-zinc-500 mt-1">
+          Let buyers pay this tier in equal monthly charges instead of one upfront payment. Access is granted for the duration you set, even if the buyer cancels billing early.
+        </p>
+        {t.installmentEnabled && (
+          <>
+            <div className="grid grid-cols-2 gap-2 mt-2">
+              <div>
+                <label className="text-[11px] text-zinc-500 block mb-1">Total ({getSymbol(t.currency)})</label>
+                <input
+                  type="number" min="0" step="0.01" value={t.installmentTotal}
+                  onChange={e => onUpdate({ installmentTotal: e.target.value })}
+                  placeholder="300"
+                  disabled={locked}
+                  className="w-full px-2.5 py-1.5 text-[13px] text-zinc-900 border border-zinc-200 rounded focus:outline-none focus:border-zinc-400 disabled:bg-zinc-50 disabled:text-zinc-400 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-zinc-500 block mb-1">Charges</label>
+                <input
+                  type="number" min="2" step="1" value={t.installmentCount}
+                  onChange={e => onUpdate({ installmentCount: e.target.value })}
+                  placeholder="3"
+                  disabled={locked}
+                  className="w-full px-2.5 py-1.5 text-[13px] text-zinc-900 border border-zinc-200 rounded focus:outline-none focus:border-zinc-400 disabled:bg-zinc-50 disabled:text-zinc-400 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-zinc-500 block mb-1">Every (months)</label>
+                <input
+                  type="number" min="1" step="1" value={t.installmentInterval}
+                  onChange={e => onUpdate({ installmentInterval: e.target.value })}
+                  placeholder="1"
+                  disabled={locked}
+                  className="w-full px-2.5 py-1.5 text-[13px] text-zinc-900 border border-zinc-200 rounded focus:outline-none focus:border-zinc-400 disabled:bg-zinc-50 disabled:text-zinc-400 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-zinc-500 block mb-1">Access (months)</label>
+                <input
+                  type="number" min="1" step="1" value={t.installmentAccessMonths}
+                  onChange={e => onUpdate({ installmentAccessMonths: e.target.value })}
+                  placeholder="12"
+                  disabled={locked}
+                  className="w-full px-2.5 py-1.5 text-[13px] text-zinc-900 border border-zinc-200 rounded focus:outline-none focus:border-zinc-400 disabled:bg-zinc-50 disabled:text-zinc-400 disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+            </div>
+            {t.installmentTotal
+              && t.installmentCount
+              && parseInt(t.installmentCount, 10) >= 2 && (
+              <p className="text-[11px] text-zinc-500 mt-1.5">
+                Buyer pays {getSymbol(t.currency)}{(parseFloat(t.installmentTotal) / parseInt(t.installmentCount, 10)).toFixed(2)} every {t.installmentInterval || "1"} month{(t.installmentInterval || "1") !== "1" ? "s" : ""} for {t.installmentCount} charges. {t.installmentAccessMonths ? `Access granted for ${t.installmentAccessMonths} month${t.installmentAccessMonths !== "1" ? "s" : ""}.` : ""}
+              </p>
+            )}
+            {locked && (
+              <p className="text-[10px] text-amber-600 mt-1">
+                Installment plan is locked while sales exist. Refund all sales first to change.
+              </p>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
