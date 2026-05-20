@@ -7,13 +7,17 @@ import type { DraftTier } from "../components/PriceEditModal/types";
 import { renderWithConfig } from "./test-utils";
 
 /**
- * TierHubView — Level 2 of the 3-level takeover modal (product variant).
- * Pure prop-driven render: shows tier name + duplicate + delete at top,
- * 4 SectionCards below. Mirrors the events package test, with product
- * deltas:
- *   - billingSummary handles recurring vs installment vs one-time
- *   - Options summary surfaces installment access months
- *   - Form card uses product copy ("Registration form")
+ * TierHubView (product) — Level 2 of the 3-level takeover modal.
+ *
+ * Prop-driven: shows tier-name input + 4 fully-clickable SectionCards.
+ * Back / Duplicate / Delete / Save live in the outer modal footer, NOT
+ * in this view — so this test surface is minimal: input, summaries,
+ * card click → onEnterStep.
+ *
+ * Product deltas vs events:
+ *  - billingSummary handles recurring vs installment vs one-time
+ *  - Options summary surfaces installment access months
+ *  - Form card uses product copy ("Registration form")
  */
 
 function newTier(overrides: Partial<DraftTier> = {}): DraftTier {
@@ -32,13 +36,8 @@ function renderHub(props: Partial<React.ComponentProps<typeof TierHubView>> = {}
     <TierHubView
       t={newTier()}
       showMemberPricing={false}
-      canDuplicate={true}
-      canDelete={true}
       onUpdate={() => {}}
       onEnterStep={() => {}}
-      onDuplicate={() => {}}
-      onRemove={() => {}}
-      onBack={() => {}}
       {...props}
     />,
   );
@@ -109,46 +108,20 @@ describe("TierHubView (product) — landing summary", () => {
     expect(screen.getByText(/3 tickets sold/)).toBeInTheDocument();
   });
 
-  it("disables Members + Form Edit buttons on unsaved tier", () => {
-    renderHub({ t: newTier({ id: undefined }), showMemberPricing: true });
-    const editButtons = screen.getAllByRole("button", { name: /^Edit/ });
-    // Order: Basics / Options / Members / Form
-    expect(editButtons[0]).not.toBeDisabled();
-    expect(editButtons[1]).not.toBeDisabled();
-    expect(editButtons[2]).toBeDisabled();
-    expect(editButtons[3]).toBeDisabled();
-  });
-
-  it("clicking Edit on a card calls onEnterStep with the step id", async () => {
+  it("each SectionCard is fully clickable — clicking the row fires onEnterStep", async () => {
     const onEnterStep = vi.fn();
     renderHub({ onEnterStep });
-    await userEvent.click(screen.getAllByRole("button", { name: /^Edit/ })[0]);
+    await userEvent.click(screen.getByRole("button", { name: /Basics/ }));
     expect(onEnterStep).toHaveBeenCalledWith("basics");
   });
 
-  it("clicking 'Back to tiers' calls onBack", async () => {
-    const onBack = vi.fn();
-    renderHub({ onBack });
-    await userEvent.click(screen.getByRole("button", { name: /Back to tiers/ }));
-    expect(onBack).toHaveBeenCalled();
-  });
-
-  it("clicking Duplicate calls onDuplicate (only when canDuplicate)", async () => {
-    const onDuplicate = vi.fn();
-    renderHub({ onDuplicate });
-    await userEvent.click(screen.getByRole("button", { name: /^Duplicate$/ }));
-    expect(onDuplicate).toHaveBeenCalled();
-  });
-
-  it("clicking Delete calls onRemove (only when canDelete and unlocked)", async () => {
-    const onRemove = vi.fn();
-    renderHub({ onRemove });
-    await userEvent.click(screen.getByRole("button", { name: /^Delete$/ }));
-    expect(onRemove).toHaveBeenCalled();
-  });
-
-  it("Delete button is disabled when tier is locked (salesCount > 0)", () => {
-    renderHub({ t: newTier({ salesCount: 1 }) });
-    expect(screen.getByRole("button", { name: /^Delete$/ })).toBeDisabled();
+  it("Members + Form cards are disabled (non-button) on unsaved tier", () => {
+    renderHub({ t: newTier({ id: undefined }), showMemberPricing: true });
+    expect(screen.getByRole("button", { name: /Basics/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Options/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Member pricing/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Registration form/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Member pricing" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Registration form" })).toBeInTheDocument();
   });
 });

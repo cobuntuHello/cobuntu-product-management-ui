@@ -31,6 +31,7 @@ import {
   buildDonationBody,
   buildTierBody,
   fromSmallestUnit,
+  isTierLocked,
   loadDonationFromProduct,
   toDisplay,
   validateDonation,
@@ -518,6 +519,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         <div className="py-8 text-center text-[12px] text-zinc-400">Loading…</div>
       ) : activeDraft && activeStep ? (
         // L3: step takeover. Hides siblings + Add Tier + Donations.
+        // Footer Back returns to L2.
         <StepView
           t={activeDraft}
           step={activeStep}
@@ -526,7 +528,6 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             const idx = activeIdx();
             if (idx != null) updateDraft(idx, patch);
           }}
-          onBack={() => setActiveStep(null)}
           memberPricingState={activeDraft.id ? memberPricingByTier.get(activeDraft.id) : undefined}
           onMemberPricingRowChange={
             activeDraft.id
@@ -536,29 +537,17 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
           showToast={showToast}
         />
       ) : activeDraft ? (
-        // L2: per-tier hub takeover.
+        // L2: per-tier hub takeover. Tier name editor + clickable
+        // SectionCards. Back / Duplicate / Delete / Save all live in
+        // the modal footer below — no inline pill-shaped affordances.
         <TierHubView
           t={activeDraft}
           showMemberPricing={!!showMemberPricing}
-          canDuplicate={!!activeDraft.id}
-          canDelete={visible.length > 1}
           onUpdate={(patch) => {
             const idx = activeIdx();
             if (idx != null) updateDraft(idx, patch);
           }}
           onEnterStep={(step) => setActiveStep(step)}
-          onDuplicate={() => {
-            const idx = activeIdx();
-            if (idx != null) duplicateTier(idx);
-          }}
-          onRemove={() => {
-            const idx = activeIdx();
-            if (idx != null) {
-              removeTier(idx);
-              setActiveTier(null);
-            }
-          }}
-          onBack={() => setActiveTier(null)}
         />
       ) : (
         // L1: default tier list.
@@ -612,10 +601,78 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         </div>
       )}
 
-      <div className="flex justify-end gap-2 mt-5">
-        <button onClick={onClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">Cancel</button>
-        <button onClick={save} disabled={saving || loading}
-          className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer">
+      {/* ─── Footer ─── Modal-level navigation + Save.
+          L1 (tier list):   [Cancel]                           [Save]
+          L2 (per-tier hub): [Back] [Delete] [Duplicate]       [Save]
+          L3 (step):        [Back]                             [Save]
+          Save always commits everything regardless of level.
+          Back / Cancel / Delete / Duplicate live here so the action
+          surface stays predictable across levels — no inline pill-shaped
+          affordances inside the body. */}
+      <div className="flex items-center gap-2 mt-5">
+        {activeDraft && activeStep ? (
+          <button
+            type="button"
+            onClick={() => setActiveStep(null)}
+            className="px-4 py-2 text-[13px] font-medium text-zinc-600 border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
+          >
+            Back
+          </button>
+        ) : activeDraft ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setActiveTier(null)}
+              className="px-4 py-2 text-[13px] font-medium text-zinc-600 border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
+            >
+              Back
+            </button>
+            {visible.length > 1 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const idx = activeIdx();
+                  if (idx != null) {
+                    removeTier(idx);
+                    setActiveTier(null);
+                  }
+                }}
+                disabled={isTierLocked(activeDraft)}
+                className="px-4 py-2 text-[13px] font-medium text-red-600 border border-red-100 rounded-lg hover:bg-red-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                title={isTierLocked(activeDraft) ? "Refund sales before deleting" : "Delete tier"}
+              >
+                Delete
+              </button>
+            )}
+            {activeDraft.id && (
+              <button
+                type="button"
+                onClick={() => {
+                  const idx = activeIdx();
+                  if (idx != null) duplicateTier(idx);
+                }}
+                className="px-4 py-2 text-[13px] font-medium text-zinc-700 border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
+              >
+                Duplicate
+              </button>
+            )}
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer"
+          >
+            Cancel
+          </button>
+        )}
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving || loading}
+          className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer"
+        >
           {saving ? "Saving…" : "Save"}
         </button>
       </div>

@@ -99,9 +99,9 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     // L1 → click tier row → L2 (per-tier hub).
     await user.click(await screen.findByRole("button", { name: /Pro/ }));
 
-    // L2 → Edit on Member pricing card (index 2: Basics/Options/Members/Form).
-    const editButtons = await screen.findAllByRole("button", { name: /^Edit/ });
-    await user.click(editButtons[2]);
+    // L2 → click Member pricing SectionCard → L3 (whole card is the
+    // click target in the new UX).
+    await user.click(await screen.findByRole("button", { name: /Member pricing/ }));
 
     // Toggle VIPs override + set value.
     const vipsCheckbox = await screen.findByLabelText(
@@ -116,13 +116,11 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
 
     expect(await screen.findByText(/unsaved/i)).toBeInTheDocument();
 
-    // Back to L2 hub. MembersStep is the same instance — modal-level
-    // state map keeps the dirty row.
-    await user.click(screen.getByRole("button", { name: /Back to/ }));
+    // Back to L2 hub via the footer Back button. MembersStep is the
+    // same instance — modal-level state map keeps the dirty row.
+    await user.click(screen.getByRole("button", { name: /^Back$/ }));
     await waitFor(() =>
-      expect(
-        screen.getAllByRole("button", { name: /^Edit/ }).length,
-      ).toBeGreaterThanOrEqual(4),
+      expect(screen.getByRole("button", { name: /Member pricing/ })).toBeInTheDocument(),
     );
 
     // Outer Save commits both the tier PUT AND the member-pricing POST.
@@ -151,10 +149,9 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     mockFetch(stubLoadRoutes());
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    // L1 → row → L2 → Edit Members → L3.
+    // L1 → row → L2 → click Member pricing card → L3.
     await user.click(await screen.findByRole("button", { name: /Pro/ }));
-    const editButtons = await screen.findAllByRole("button", { name: /^Edit/ });
-    await user.click(editButtons[2]);
+    await user.click(await screen.findByRole("button", { name: /Member pricing/ }));
 
     const vipsCheckbox = await screen.findByLabelText(
       /Offer member pricing for VIPs/,
@@ -162,14 +159,9 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     await user.click(vipsCheckbox);
     expect(vipsCheckbox).toBeChecked();
 
-    // Back to L2, then re-enter Members step.
-    await user.click(screen.getByRole("button", { name: /Back to/ }));
-    await waitFor(() =>
-      expect(
-        screen.getAllByRole("button", { name: /^Edit/ }).length,
-      ).toBeGreaterThanOrEqual(4),
-    );
-    await user.click(screen.getAllByRole("button", { name: /^Edit/ })[2]);
+    // Footer Back → L2, then re-enter Member pricing.
+    await user.click(screen.getByRole("button", { name: /^Back$/ }));
+    await user.click(await screen.findByRole("button", { name: /Member pricing/ }));
 
     const vipsAfter = await screen.findByLabelText(
       /Offer member pricing for VIPs/,
@@ -195,10 +187,9 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
 
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    // L1 → row → L2 → Members → L3 → dirty.
+    // L1 → row → L2 → Member pricing card → L3 → dirty.
     await user.click(await screen.findByRole("button", { name: /Pro/ }));
-    const editButtons = await screen.findAllByRole("button", { name: /^Edit/ });
-    await user.click(editButtons[2]);
+    await user.click(await screen.findByRole("button", { name: /Member pricing/ }));
 
     await user.click(
       await screen.findByLabelText(/Offer member pricing for VIPs/),
@@ -209,9 +200,9 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     fireEvent.change(valueInput, { target: { value: "20" } });
     expect(await screen.findByText(/unsaved/i)).toBeInTheDocument();
 
-    // Back to L2, then back to L1 (tiers).
-    await user.click(screen.getByRole("button", { name: /Back to Pro/ }));
-    await user.click(screen.getByRole("button", { name: /Back to tiers/ }));
+    // Back to L2, then back to L1 (tiers) via the footer Back button.
+    await user.click(screen.getByRole("button", { name: /^Back$/ }));
+    await user.click(screen.getByRole("button", { name: /^Back$/ }));
 
     // Save from L1 — the dirty member-pricing row should commit.
     await user.click(screen.getByRole("button", { name: /^save$/i }));
