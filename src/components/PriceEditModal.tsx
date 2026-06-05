@@ -38,8 +38,10 @@ import {
   validateTier,
 } from "./PriceEditModal/helpers";
 import { SortableTierRow } from "./PriceEditModal/TierRow";
-import { TierHubView, type StepId } from "./PriceEditModal/TierHubView";
+import { Switch, StepFade } from "./PriceEditModal/_primitives";
+import { TierHubView, STEP_TITLES, STEP_SUBTITLES, type StepId } from "./PriceEditModal/TierHubView";
 import { StepView } from "./PriceEditModal/StepView";
+import { FooterSlotContext } from "./PriceEditModal/footer-slot";
 import { DonationsSection } from "./PriceEditModal/DonationsSection";
 // Backwards-compat export — the original module exported CURRENCIES
 // directly. The constant lives on the new types module now; re-export
@@ -57,10 +59,23 @@ export { CURRENCIES } from "./PriceEditModal/types";
  *   - Multi-tier pricing with capacity per tier
  *   - PWYW (pay-what-you-want) per tier with optional minimum
  *   - Recurring (subscription) tiers with weekly/monthly/yearly intervals
+ *   - Installment plans (4-field: total / count / interval / access months)
  *   - Donations sidecar (separately persisted) — suggested amounts or PWYW
+ *
+ * UI is the redesigned three-level navigation shared with the events
+ * package: Level 1 tier list → Level 2 per-tier hub → Level 3 focused
+ * step. The single modal header owns the breadcrumb + ONE title + ONE
+ * subtitle; steps render body-only. The footer is the modal's single
+ * action bar (a `display:contents` slot lets a step portal its own
+ * primary actions in, e.g. the form builder's "+ Question").
  *
  * Unlike events, products do NOT have a notify-attendees prompt (no
  * "attendees" concept) — saves go straight through.
+ *
+ * Per-tier publish/draft toggle (Level 2 footer) is included for parity
+ * with the events redesign. NOTE: the product backend tier route
+ * currently ignores publishedAt + the auto-schedule window (a separate
+ * BE track will wire it); the PUT is a harmless no-op until then.
  */
 
 // Currency table, currency conversion helpers, and the Tier /
@@ -103,6 +118,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<DraftTier[]>([]);
   const [saving, setSaving] = useState(false);
+  const [publishToggling, setPublishToggling] = useState(false);
   const [donation, setDonation] = useState<DonationDraft>(() => loadDonationFromProduct(product));
   const [donationDirty, setDonationDirty] = useState(false);
 
@@ -115,6 +131,13 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   // Donations actually disappear when the user steps into a tier.
   const [activeTier, setActiveTier] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState<StepId | null>(null);
+
+  // Footer "step actions" slot. A step that owns primary actions (the
+  // form builder's "+ Question" etc.) portals its buttons into this DOM
+  // node so the footer stays the modal's single action bar — no buttons
+  // scattered through the body. Null until the footer mounts.
+  const [footerSlot, setFooterSlot] = useState<HTMLElement | null>(null);
+
   // Member-pricing state — lifted out of MemberPricingSection so it
   // survives tier-card collapse / hub↔step navigation / any unmount.
   // Tied to the modal's lifetime, not the section's. Segments are
@@ -177,6 +200,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               localId: t.id,
               id: t.id,
               name: t.name,
+              description: t.description ?? "",
               price: String(toDisplay(t.products.price, t.products.currency)),
               currency: t.products.currency,
               capacity: t.capacity != null ? String(t.capacity) : "",
@@ -192,6 +216,18 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               installmentAccessMonths: t.products.accessDurationMonths != null ? String(t.products.accessDurationMonths) : "",
               hasForm: fields.length > 0,
               formFieldCount: fields.length,
+              expanded: false,
+              // Publish + auto-schedule. Saved tiers preserve their existing
+              // publishedAt timestamp so unrelated edits don't overwrite the
+              // original publish moment. Window bounds map straight to the
+              // datetime-local-compatible ISO strings. The product tier
+              // backend currently ignores these (BE track pending), so the
+              // fallbacks keep the toggles in a sane "always available"
+              // default for existing rows.
+              publishedAt: t.publishedAt ?? null,
+              autoScheduleEnabled: !!t.autoScheduleEnabled,
+              salesStartAt: t.salesStartAt ?? "",
+              salesEndAt: t.salesEndAt ?? "",
             };
           }));
         }
@@ -265,6 +301,46 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   function updateDraft(idx: number, patch: Partial<DraftTier>) {
     setDrafts(d => d.map((t, i) => i === idx ? { ...t, ...patch } : t));
   }
+
+  /**
+   * Per-tier publish toggle for the L2 (tier-hub) footer. Publishing is a
+   * top-level rollout action, so the Switch hits the backend IMMEDIATELY
+   * (no Save): a saved tier PUTs { publishedAt } — an ISO string to
+   * publish, null to unpublish. The draft flips optimistically and
+   * reverts if the request fails. A brand-new (unsaved) tier has no id to
+   * PUT against, so the toggle just stages publishedAt on the draft; it
+   * persists on the tier's first save.
+   *
+   * NOTE: the product tier route currently ignores publishedAt (a
+   * separate BE track will wire it), so the PUT is a harmless no-op for
+   * now — the optimistic flip + toast still give the right UX for parity.
+   */
+  async function togglePublish(idx: number) {
+    const tier = drafts[idx];
+    if (!tier) return;
+    const prevPublishedAt = tier.publishedAt;
+    const nextPublishedAt = tier.publishedAt ? null : new Date().toISOString();
+    updateDraft(idx, { publishedAt: nextPublishedAt });
+    if (!tier.id) return; // unsaved → persists when the tier is first saved
+    setPublishToggling(true);
+    try {
+      const res = await fetch(
+        `${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/tiers/${tier.id}`,
+        { method: "PUT", headers: jsonHeaders(), body: JSON.stringify({ publishedAt: nextPublishedAt }) },
+      );
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || "Failed to update publish state");
+      }
+      showToast(nextPublishedAt ? "Tier published" : "Tier unpublished");
+    } catch (e: any) {
+      updateDraft(idx, { publishedAt: prevPublishedAt }); // revert optimistic flip
+      showToast(e.message || "Failed to update publish state");
+    } finally {
+      setPublishToggling(false);
+    }
+  }
+
   function addTier() {
     const base = drafts[0];
     setDrafts(d => [
@@ -311,6 +387,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         localId: newTier.id,
         id: newTier.id,
         name: newTier.name,
+        description: newTier.description ?? "",
         price: String(toDisplay(newTier.products.price, newTier.products.currency)),
         currency: newTier.products.currency,
         capacity: newTier.capacity != null ? String(newTier.capacity) : "",
@@ -332,6 +409,12 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         // builds one.
         hasForm: false,
         formFieldCount: 0,
+        expanded: false,
+        // Scheduling defaults for the cloned row (BE track pending).
+        publishedAt: newTier.publishedAt ?? null,
+        autoScheduleEnabled: !!newTier.autoScheduleEnabled,
+        salesStartAt: newTier.salesStartAt ?? "",
+        salesEndAt: newTier.salesEndAt ?? "",
       }]);
     } catch (e: any) {
       showToast(e.message || "Failed to duplicate tier");
@@ -376,6 +459,18 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   }
 
   const visible = drafts.map((t, idx) => ({ ...t, _idx: idx })).filter(t => !t.deleted);
+
+  // Member-pricing fetches are async per saved tier. If the seller clicks
+  // Save before any of them resolve, the save loop iterates an incomplete
+  // map and silently omits per-tier overrides. Block Save until every
+  // saved tier either has its rows loaded or has errored (errored slots
+  // are skipped by the save loop, so they're safe to allow). Only matters
+  // when showMemberPricing is on.
+  const memberPricingPending = !!showMemberPricing && drafts.some((d) => {
+    if (!d.id || d.deleted) return false;
+    const state = memberPricingByTier.get(d.id);
+    return !state || state.loading;
+  });
 
   async function save() {
     setSaving(true);
@@ -482,6 +577,8 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
     finally { setSaving(false); }
   }
 
+  const isEmpty = drafts.every(t => t.deleted) || (drafts.length === 1 && !drafts[0].id && !drafts[0].price);
+
   // Active draft for L2 / L3 takeover views. Keyed by tier.localId
   // (NOT tier.id) so brand-new unsaved tiers work the same way.
   const activeDraft = activeTier
@@ -494,29 +591,87 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
     return idx >= 0 ? idx : null;
   }
 
-  const title = activeDraft
-    ? `Editing ${activeDraft.name || "tier"}`
-    : visible.length === 0
-      ? "Add pricing"
-      : visible.length === 1
-        ? "Edit pricing"
-        : "Pricing tiers";
-  const subtitle = activeDraft
-    ? null
-    : visible.length <= 1
-      ? "Set a price, or add multiple tiers."
-      : "Manage pricing tiers.";
+  // ─── Header model — ONE title + ONE subtitle per level, plus a
+  // breadcrumb trail so the user always knows where they are and can hop
+  // back. Previously each surface rendered its own heading; now the modal
+  // owns the single source of truth and the steps render body-only.
+  //
+  //   L1 (tier list): no breadcrumb · title "Pricing tiers" / "Edit
+  //                   pricing" / "Add pricing" · descriptive subtitle.
+  //   L2 (tier hub):  breadcrumb [Pricing tiers] · title = tier name ·
+  //                   subtitle "Choose what to configure".
+  //   L3 (step):      breadcrumb [Pricing tiers › {tier}] · title =
+  //                   STEP_TITLES[step] · subtitle = STEP_SUBTITLES[step].
+  const tierName = activeDraft?.name?.trim() || "Untitled tier";
+  const title =
+    activeDraft && activeStep
+      ? STEP_TITLES[activeStep]
+      : activeDraft
+        ? tierName
+        : isEmpty
+          ? "Add pricing"
+          : visible.length === 1
+            ? "Edit pricing"
+            : "Pricing tiers";
+  const subtitle =
+    activeDraft && activeStep
+      ? STEP_SUBTITLES[activeStep]
+      : activeDraft
+        ? "Choose what to configure for this tier."
+        : "Tiers, donations, and per-tier registration forms.";
+
+  // Breadcrumb segments — each is clickable except the last (current
+  // level). L1 has none. Clicking a crumb pops navigation back to it.
+  const crumbs: Array<{ label: string; onClick?: () => void }> = [];
+  if (activeDraft) {
+    crumbs.push({
+      label: "Pricing tiers",
+      onClick: () => {
+        setActiveStep(null);
+        setActiveTier(null);
+      },
+    });
+    if (activeStep) {
+      crumbs.push({ label: tierName, onClick: () => setActiveStep(null) });
+    }
+  }
 
   return (
-    <ModalShell onClose={onClose} width="w-[500px]">
-      <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">{title}</h3>
-      {subtitle && (
-        <p className="text-[12px] text-zinc-500 mb-4">{subtitle}</p>
-      )}
-      {activeDraft && <div className="mb-4" />}
+    <ModalShell onClose={onClose} width="w-[600px]">
+      <FooterSlotContext.Provider value={footerSlot}>
+      <div className="flex flex-col max-h-[78vh]">
+      {/* ─── Header ─── ONE breadcrumb + ONE title + ONE subtitle. */}
+      <div className="shrink-0 mb-4">
+        {crumbs.length > 0 && (
+          <nav className="flex items-center flex-wrap gap-1 mb-1.5 text-[12px]" aria-label="Breadcrumb">
+            {crumbs.map((c, i) => (
+              <span key={i} className="flex items-center gap-1">
+                {i > 0 && <span className="text-zinc-300" aria-hidden>›</span>}
+                <button
+                  type="button"
+                  onClick={c.onClick}
+                  className="text-zinc-500 hover:text-zinc-900 hover:underline cursor-pointer transition-colors"
+                >
+                  {c.label}
+                </button>
+              </span>
+            ))}
+          </nav>
+        )}
+        <h3 className="text-[16px] font-semibold text-zinc-900">{title}</h3>
+        {subtitle && (
+          <p className="text-[12px] text-zinc-500 mt-0.5">{subtitle}</p>
+        )}
+      </div>
 
+      {/* Body — the sole flexible region; scrolls when a level's content
+          is taller than the fixed column. */}
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+      {/* Cross-fade between levels/steps. Keyed on the current view so
+          each navigation re-mounts and animates in (see StepFade). */}
+      <StepFade stepKey={`${activeTier ?? "list"}:${activeStep ?? "hub"}:${loading ? "loading" : "ready"}`}>
       {loading ? (
-        <div className="py-8 text-center text-[12px] text-zinc-400">Loading…</div>
+        <div className="py-12 text-center text-[13px] text-zinc-400">Loading…</div>
       ) : activeDraft && activeStep ? (
         // L3: step takeover. Hides siblings + Add Tier + Donations.
         // Footer Back returns to L2.
@@ -528,6 +683,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             const idx = activeIdx();
             if (idx != null) updateDraft(idx, patch);
           }}
+          showMemberPricing={!!showMemberPricing}
           memberPricingState={activeDraft.id ? memberPricingByTier.get(activeDraft.id) : undefined}
           onMemberPricingRowChange={
             activeDraft.id
@@ -537,20 +693,13 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
           showToast={showToast}
         />
       ) : activeDraft ? (
-        // L2: per-tier hub takeover. Tier name editor + clickable
-        // SectionCards. Back / Duplicate / Delete / Save all live in
-        // the modal footer below — no inline pill-shaped affordances.
+        // L2: per-tier hub takeover — a pure navigation menu of tiles.
         <TierHubView
           t={activeDraft}
-          showMemberPricing={!!showMemberPricing}
-          onUpdate={(patch) => {
-            const idx = activeIdx();
-            if (idx != null) updateDraft(idx, patch);
-          }}
           onEnterStep={(step) => setActiveStep(step)}
         />
       ) : (
-        // L1: default tier list.
+        // L1: default tier list. Add tier + Donations + Save.
         <div className="space-y-3">
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext items={visible.map(t => t.localId)} strategy={verticalListSortingStrategy}>
@@ -558,22 +707,20 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
                 <SortableTierRow
                   key={t.localId}
                   t={t}
-                  canDelete={visible.length > 1}
-                  canDuplicate={!!t.id}
                   onSelect={() => setActiveTier(t.localId)}
-                  onRemove={() => removeTier(t._idx)}
-                  onDuplicate={() => duplicateTier(t._idx)}
                 />
               ))}
             </SortableContext>
           </DndContext>
 
           <div className="flex items-center justify-between pt-1">
+            {/* Add tier — appends a draft AND auto-navigates into its
+                hub view, matching the user's intent of "create + edit". */}
             <button
               onClick={() => {
                 addTier();
-                // Auto-navigate into the new tier's hub after the
-                // setDrafts state update settles.
+                // After addTier updates drafts, the new tier sits at the
+                // end. Use a microtask to read the next-state localId.
                 setTimeout(() => {
                   setDrafts((curr) => {
                     const last = curr[curr.length - 1];
@@ -593,6 +740,8 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             )}
           </div>
 
+          {/* Donations sidecar — independent of tiers. Saved via PUT
+              /donations alongside tier writes when changed. */}
           <DonationsSection
             donation={donation}
             onUpdate={updateDonation}
@@ -600,21 +749,23 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
           />
         </div>
       )}
+      </StepFade>
+      </div>
 
       {/* ─── Footer ─── Modal-level navigation + Save.
           L1 (tier list):   [Cancel]                           [Save]
-          L2 (per-tier hub): [Back] [Delete] [Duplicate]       [Save]
+          L2 (per-tier hub): [Back] [Delete] [Duplicate] [Pub]
           L3 (step):        [Back]                             [Save]
           Save always commits everything regardless of level.
           Back / Cancel / Delete / Duplicate live here so the action
           surface stays predictable across levels — no inline pill-shaped
           affordances inside the body. */}
-      <div className="flex items-center gap-2 mt-5">
+      <div className="shrink-0 flex items-center gap-2 mt-4 pt-4 border-t border-zinc-100">
         {activeDraft && activeStep ? (
           <button
             type="button"
             onClick={() => setActiveStep(null)}
-            className="px-4 py-2 text-[13px] font-medium text-zinc-600 border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
+            className="px-4 py-2 text-[13px] font-medium text-zinc-600 rounded-lg hover:bg-zinc-100 cursor-pointer"
           >
             Back
           </button>
@@ -623,27 +774,36 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             <button
               type="button"
               onClick={() => setActiveTier(null)}
-              className="px-4 py-2 text-[13px] font-medium text-zinc-600 border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
+              className="px-4 py-2 text-[13px] font-medium text-zinc-600 rounded-lg hover:bg-zinc-100 cursor-pointer"
             >
               Back
             </button>
-            {visible.length > 1 && (
-              <button
-                type="button"
-                onClick={() => {
-                  const idx = activeIdx();
-                  if (idx != null) {
-                    removeTier(idx);
-                    setActiveTier(null);
-                  }
-                }}
-                disabled={isTierLocked(activeDraft)}
-                className="px-4 py-2 text-[13px] font-medium text-red-600 border border-red-100 rounded-lg hover:bg-red-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                title={isTierLocked(activeDraft) ? "Refund sales before deleting" : "Delete tier"}
-              >
-                Delete
-              </button>
-            )}
+            {/* Delete is ALWAYS shown (no hiding features without
+                explanation). When it can't proceed it says why via a toast
+                instead of being hidden/disabled:
+                  - locked tier (has sales) → refund-first message
+                  - last/only tier → "needs at least one tier" */}
+            <button
+              type="button"
+              onClick={() => {
+                if (isTierLocked(activeDraft)) {
+                  showToast("Refund all sales before deleting this tier.");
+                  return;
+                }
+                if (visible.length <= 1) {
+                  showToast("A product needs at least one tier — add another before deleting this one.");
+                  return;
+                }
+                const idx = activeIdx();
+                if (idx != null) {
+                  removeTier(idx);
+                  setActiveTier(null);
+                }
+              }}
+              className="px-4 py-2 text-[13px] font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 cursor-pointer transition-colors"
+            >
+              Delete
+            </button>
             {activeDraft.id && (
               <button
                 type="button"
@@ -651,7 +811,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
                   const idx = activeIdx();
                   if (idx != null) duplicateTier(idx);
                 }}
-                className="px-4 py-2 text-[13px] font-medium text-zinc-700 border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
+                className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer transition-colors"
               >
                 Duplicate
               </button>
@@ -661,21 +821,57 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer"
+            className="px-4 py-2 text-[13px] font-medium text-zinc-600 hover:text-zinc-900 cursor-pointer"
           >
             Cancel
           </button>
         )}
         <div className="flex-1" />
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving || loading}
-          className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer"
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
+        {/* Per-step action slot. Steps with their own primary actions
+            (e.g. the form builder's "+ Question" / "+ Page break") portal
+            their buttons in here so the footer is the modal's single
+            action bar. `contents` → buttons sit directly in this flex row,
+            left of Save. Empty (zero-width) for steps that don't use it. */}
+        <div ref={setFooterSlot} className="contents" />
+        {/* L2 (per-tier hub): a Publish switch sits left of Save. Publishing
+            is a top-level rollout action that hits the backend instantly
+            (no Save) — see togglePublish. */}
+        {activeDraft && !activeStep && (
+          <div className="flex items-center gap-2 mr-1">
+            <span className="text-[12px] font-medium text-zinc-600">
+              {activeDraft.publishedAt ? "Published" : "Draft"}
+            </span>
+            <Switch
+              checked={!!activeDraft.publishedAt}
+              disabled={publishToggling}
+              onChange={() => {
+                const idx = activeIdx();
+                if (idx != null) togglePublish(idx);
+              }}
+              label="Published"
+            />
+          </div>
+        )}
+        {/* Save shows at L1 (tier list) and L3 (step) — where you actually
+            edit. The L2 hub is a pure navigation menu (no fields of its
+            own), so it has no Save: edits made in a step commit via that
+            step's Save (which commits the whole modal), and the list has
+            its own Save. The hub keeps only Back / Delete / Duplicate /
+            Published. */}
+        {!(activeDraft && !activeStep) && (
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving || loading || memberPricingPending}
+            title={memberPricingPending ? "Loading member pricing…" : undefined}
+            className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer transition-colors"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        )}
       </div>
+      </div>
+      </FooterSlotContext.Provider>
     </ModalShell>
   );
 }

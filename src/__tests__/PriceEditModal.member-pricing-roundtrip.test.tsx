@@ -99,9 +99,10 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     // L1 → click tier row → L2 (per-tier hub).
     await user.click(await screen.findByRole("button", { name: /Pro/ }));
 
-    // L2 → click Member pricing SectionCard → L3 (whole card is the
-    // click target in the new UX).
-    await user.click(await screen.findByRole("button", { name: /Member pricing/ }));
+    // L2 → click Pricing configuration SectionCard → L3. Member pricing is
+    // folded into the pricing-config step in the product modal (no separate
+    // tile), so this is where the per-segment override rows live.
+    await user.click(await screen.findByRole("button", { name: /Pricing configuration/ }));
 
     // Toggle VIPs override + set value.
     const vipsCheckbox = await screen.findByLabelText(
@@ -120,8 +121,12 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     // same instance — modal-level state map keeps the dirty row.
     await user.click(screen.getByRole("button", { name: /^Back$/ }));
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Member pricing/ })).toBeInTheDocument(),
+      expect(screen.getByRole("button", { name: /Pricing configuration/ })).toBeInTheDocument(),
     );
+
+    // The hub is a pure menu with no Save — Back once more to the tier list
+    // (L1), where the outer Save lives.
+    await user.click(screen.getByRole("button", { name: /^Back$/ }));
 
     // Outer Save commits both the tier PUT AND the member-pricing POST.
     await user.click(screen.getByRole("button", { name: /^save$/i }));
@@ -149,9 +154,9 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     mockFetch(stubLoadRoutes());
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    // L1 → row → L2 → click Member pricing card → L3.
+    // L1 → row → L2 → click Pricing configuration card → L3.
     await user.click(await screen.findByRole("button", { name: /Pro/ }));
-    await user.click(await screen.findByRole("button", { name: /Member pricing/ }));
+    await user.click(await screen.findByRole("button", { name: /Pricing configuration/ }));
 
     const vipsCheckbox = await screen.findByLabelText(
       /Offer member pricing for VIPs/,
@@ -159,9 +164,9 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     await user.click(vipsCheckbox);
     expect(vipsCheckbox).toBeChecked();
 
-    // Footer Back → L2, then re-enter Member pricing.
+    // Footer Back → L2, then re-enter Pricing configuration.
     await user.click(screen.getByRole("button", { name: /^Back$/ }));
-    await user.click(await screen.findByRole("button", { name: /Member pricing/ }));
+    await user.click(await screen.findByRole("button", { name: /Pricing configuration/ }));
 
     const vipsAfter = await screen.findByLabelText(
       /Offer member pricing for VIPs/,
@@ -187,9 +192,9 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
 
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    // L1 → row → L2 → Member pricing card → L3 → dirty.
+    // L1 → row → L2 → Pricing configuration card → L3 → dirty.
     await user.click(await screen.findByRole("button", { name: /Pro/ }));
-    await user.click(await screen.findByRole("button", { name: /Member pricing/ }));
+    await user.click(await screen.findByRole("button", { name: /Pricing configuration/ }));
 
     await user.click(
       await screen.findByLabelText(/Offer member pricing for VIPs/),

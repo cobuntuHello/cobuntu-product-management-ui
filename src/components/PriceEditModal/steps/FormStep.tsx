@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { GripVertical, X } from "lucide-react";
 import {
   DndContext,
@@ -36,6 +37,7 @@ import {
 import { FieldTypePickerFlow, FIELD_ICONS } from "../sub-flows/FieldTypePickerFlow";
 import { EditFieldFlow } from "../sub-flows/EditFieldFlow";
 import { EditPageBreakFlow } from "../sub-flows/EditPageBreakFlow";
+import { FooterSlotContext } from "../footer-slot";
 
 export interface FormStepProps {
   t: DraftTier;
@@ -73,12 +75,28 @@ type SubView =
 export function FormStep({ t, communityTag, showToast }: FormStepProps) {
   const { apiBaseUrl, authHeaders } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
+  // The form builder's primary actions live in the modal footer, not in
+  // the body — portaled into this slot. See ../footer-slot.tsx.
+  const footerSlot = useContext(FooterSlotContext);
 
   const [items, setItems] = useState<Item[]>([]);
   const [step0Label, setStep0Label] = useState("");
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [view, setView] = useState<SubView>({ kind: "list" });
+
+  // Concurrent-save guard. The form auto-saves on every mutation
+  // (add / edit / delete / reorder / page-break / page-label) which
+  // means two rapid actions can fire two PUTs in flight at once. If
+  // the second action's request body is built from state that the
+  // first request hasn't yet returned for, the responses race and the
+  // second PUT can clobber the first. We coalesce instead: when a
+  // save is already in flight, queue the latest snapshot and replay
+  // it once the in-flight call resolves. The queue only keeps the
+  // *most recent* pending snapshot — earlier queued snapshots are
+  // strictly stale.
+  const inFlightRef = useRef(false);
+  const pendingRef = useRef<{ items: Item[]; step0Label: string } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -138,6 +156,14 @@ export function FormStep({ t, communityTag, showToast }: FormStepProps) {
 
   async function persist(nextItems: Item[], nextStep0Label: string) {
     if (!t.id) return;
+    // If a save is already in flight, stash the latest snapshot and
+    // bail. The in-flight call will replay the stashed snapshot in
+    // its finally block, so the most recent user intent always wins.
+    if (inFlightRef.current) {
+      pendingRef.current = { items: nextItems, step0Label: nextStep0Label };
+      return;
+    }
+    inFlightRef.current = true;
     const { fields, stepLabels } = itemsToPayload(nextItems, nextStep0Label);
     setSaving(true);
     try {
@@ -153,7 +179,18 @@ export function FormStep({ t, communityTag, showToast }: FormStepProps) {
     } catch {
       showToast("Failed to save form");
     } finally {
+      inFlightRef.current = false;
       setSaving(false);
+      // Drain the most recent stashed snapshot, if any. Coalescing
+      // means only one replay regardless of how many calls landed
+      // while we were in flight.
+      const queued = pendingRef.current;
+      pendingRef.current = null;
+      if (queued) {
+        // Fire-and-forget — recursion goes at most one level deep
+        // because the guard above will requeue any further calls.
+        void persist(queued.items, queued.step0Label);
+      }
     }
   }
 
@@ -228,11 +265,9 @@ export function FormStep({ t, communityTag, showToast }: FormStepProps) {
       <div className="px-4 py-6 rounded-lg border border-dashed border-zinc-300 text-center">
         <p className="text-[12px] font-medium text-zinc-700">Save tier first</p>
         <p className="text-[11px] text-zinc-500 mt-1">
-          {/* Marketplace duplicate is server-side via copyFromTierId,
-              so unsaved drafts never carry a source reference here
-              (unlike the events package). Always shows the generic
-              save-first hint. */}
-          Forms are attached to saved tiers. Save once, then come back here.
+          {t.sourceTierId
+            ? `The form will copy from "${t.sourceTierName || "the source tier"}" when you save.`
+            : "Forms are attached to saved tiers. Save once, then come back here."}
         </p>
       </div>
     );
@@ -281,29 +316,56 @@ export function FormStep({ t, communityTag, showToast }: FormStepProps) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      {/* Primary actions (Add question / Page break / Use default) live
+          in the modal footer — portaled into the shared footer slot so
+          the body stays button-free. Only rendered for the list view
+          (the sub-flow early-returns above never reach here). */}
+      {footerSlot && createPortal(
+        items.length === 0 ? (
+          <>
+            <button
+              type="button"
+              onClick={seedDefault}
+              className="px-3 py-2 text-[13px] font-medium text-zinc-700 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
+            >
+              Use default
+            </button>
+            <button
+              type="button"
+              onClick={() => setView({ kind: "add-field" })}
+              className="px-3 py-2 text-[13px] font-medium text-zinc-700 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
+            >
+              Add question
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => setView({ kind: "edit-page-break" })}
+              className="px-3 py-2 text-[13px] font-medium text-zinc-700 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
+            >
+              + Page break
+            </button>
+            <button
+              type="button"
+              onClick={() => setView({ kind: "add-field" })}
+              className="px-3 py-2 text-[13px] font-medium text-zinc-700 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
+            >
+              + Question
+            </button>
+          </>
+        ),
+        footerSlot,
+      )}
+
+      <div className="flex items-center mb-3">
         <p className="text-[12px] text-zinc-500">
           {fieldsFlat.length === 0
             ? "No questions yet."
             : `${fieldsFlat.length} question${fieldsFlat.length === 1 ? "" : "s"}.`}
           {saving && <span className="ml-2 text-zinc-400">Saving…</span>}
         </p>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setView({ kind: "edit-page-break" })}
-            className="px-2.5 py-1.5 text-[11px] font-medium text-zinc-700 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
-          >
-            + Page break
-          </button>
-          <button
-            type="button"
-            onClick={() => setView({ kind: "add-field" })}
-            className="px-2.5 py-1.5 text-[11px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
-          >
-            + Question
-          </button>
-        </div>
       </div>
 
       {fieldsFlat.length > 0 && !hasEmail && (
@@ -315,23 +377,9 @@ export function FormStep({ t, communityTag, showToast }: FormStepProps) {
       {items.length === 0 ? (
         <div className="rounded-lg border border-dashed border-zinc-300 bg-white px-4 py-8 text-center">
           <p className="text-[13px] font-medium text-zinc-700 mb-1">No questions yet</p>
-          <p className="text-[11px] text-zinc-400 mb-4">Start with the minimum or add questions one-by-one.</p>
-          <div className="flex items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={seedDefault}
-              className="px-3 py-1.5 text-[12px] font-medium text-zinc-700 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
-            >
-              Use default (Name + Email)
-            </button>
-            <button
-              type="button"
-              onClick={() => setView({ kind: "add-field" })}
-              className="px-3 py-1.5 text-[12px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
-            >
-              Add first question
-            </button>
-          </div>
+          <p className="text-[11px] text-zinc-400">
+            Use the footer to start with the default Name + Email, or add questions one-by-one.
+          </p>
         </div>
       ) : (
         <div className="rounded-lg border border-zinc-200 bg-white overflow-hidden">

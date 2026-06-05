@@ -13,6 +13,10 @@ import {
   blankTier,
   blankDonation,
 } from "../components/PriceEditModal/helpers";
+import {
+  TIER_NAME_MAX,
+  TIER_DESCRIPTION_MAX,
+} from "../components/PriceEditModal/types";
 
 describe("PriceEditModal helpers (product) — currency conversion", () => {
   it("toSmallestUnit/toDisplay roundtrip for fractional currencies", () => {
@@ -62,6 +66,93 @@ describe("PriceEditModal helpers (product) — validateTier", () => {
         pwywMin: "-5",
       }),
     ).toMatch(/non-negative/);
+  });
+
+  // ── Event-ported name/description length rules (TIER_NAME_MAX=80,
+  //    TIER_DESCRIPTION_MAX=200). Mirrors the EVENT helpers test. ──
+  it("rejects an over-long name (> TIER_NAME_MAX chars)", () => {
+    expect(
+      validateTier({ ...blankTier(), name: "x".repeat(TIER_NAME_MAX + 1), price: "10" }),
+    ).toMatch(new RegExp(`${TIER_NAME_MAX} characters or fewer`));
+  });
+
+  it("rejects an over-long description (> TIER_DESCRIPTION_MAX chars)", () => {
+    expect(
+      validateTier({
+        ...blankTier(),
+        name: "Standard",
+        price: "10",
+        description: "y".repeat(TIER_DESCRIPTION_MAX + 1),
+      }),
+    ).toMatch(new RegExp(`${TIER_DESCRIPTION_MAX} characters or fewer`));
+  });
+
+  it("accepts name + description exactly at the limits", () => {
+    expect(
+      validateTier({
+        ...blankTier(),
+        name: "x".repeat(TIER_NAME_MAX),
+        price: "10",
+        description: "y".repeat(TIER_DESCRIPTION_MAX),
+      }),
+    ).toBeNull();
+  });
+
+  // ── Event-ported auto-schedule sales-window rules. ──
+  describe("auto-schedule sales window (event-ported)", () => {
+    const sched = (over: Record<string, unknown>) =>
+      validateTier({
+        ...blankTier(),
+        name: "Std",
+        price: "10",
+        autoScheduleEnabled: true,
+        salesStartAt: "",
+        salesEndAt: "",
+        ...over,
+      });
+
+    it("rejects auto-schedule enabled with no dates at all", () => {
+      expect(sched({})).toMatch(/turn off auto-schedule/);
+    });
+
+    it("accepts auto-schedule with only a start date (open-ended)", () => {
+      expect(sched({ salesStartAt: "2026-06-01T12:00:00.000Z" })).toBeNull();
+    });
+
+    it("accepts auto-schedule with only an end date (opens on publish)", () => {
+      expect(sched({ salesEndAt: "2026-06-05T12:00:00.000Z" })).toBeNull();
+    });
+
+    it("rejects a window where close <= open", () => {
+      expect(
+        sched({
+          salesStartAt: "2026-06-05T12:00:00.000Z",
+          salesEndAt: "2026-06-01T12:00:00.000Z",
+        }),
+      ).toMatch(/close must be after sales open/);
+    });
+
+    it("accepts a window where close > open", () => {
+      expect(
+        sched({
+          salesStartAt: "2026-06-01T12:00:00.000Z",
+          salesEndAt: "2026-06-05T12:00:00.000Z",
+        }),
+      ).toBeNull();
+    });
+
+    it("ignores the window rules when auto-schedule is off", () => {
+      expect(
+        validateTier({
+          ...blankTier(),
+          name: "Std",
+          price: "10",
+          autoScheduleEnabled: false,
+          salesStartAt: "2026-06-05T12:00:00.000Z",
+          salesEndAt: "2026-06-01T12:00:00.000Z",
+        }),
+      ).toBeNull();
+    });
   });
 
   describe("4-field installment plan (product-specific)", () => {
@@ -237,6 +328,68 @@ describe("PriceEditModal helpers (product) — buildTierBody", () => {
     expect(buildTierBody({ ...blankTier(), name: "  Std  ", price: "10" }))
       .toMatchObject({ name: "Std" });
   });
+
+  it("emits product keys AND the event-ported scheduling keys together", () => {
+    const start = "2026-06-01T12:00:00.000Z";
+    const end = "2026-06-05T12:00:00.000Z";
+    const publishedAt = new Date("2026-06-01T12:00:00.000Z").toISOString();
+    const body = buildTierBody({
+      ...blankTier(),
+      name: "Sub",
+      price: "9.99",
+      isRecurring: true,
+      recurringInterval: "monthly",
+      installmentEnabled: true,
+      installmentTotal: "300",
+      installmentCount: "3",
+      installmentInterval: "1",
+      installmentAccessMonths: "12",
+      publishedAt,
+      autoScheduleEnabled: true,
+      salesStartAt: start,
+      salesEndAt: end,
+    });
+    // Product-specific keys.
+    expect(body).toMatchObject({
+      isRecurring: true,
+      recurringInterval: "monthly",
+      accessDurationMonths: 12,
+    });
+    // Event-ported scheduling keys.
+    expect(body).toMatchObject({
+      publishedAt,
+      autoScheduleEnabled: true,
+      salesStartAt: start,
+      salesEndAt: end,
+    });
+  });
+
+  it("nulls the sales window when autoScheduleEnabled is off, even with dates present", () => {
+    const body = buildTierBody({
+      ...blankTier(),
+      name: "Std",
+      price: "20",
+      publishedAt: new Date().toISOString(),
+      autoScheduleEnabled: false,
+      salesStartAt: "2026-06-01T12:00:00.000Z",
+      salesEndAt: "2026-06-05T12:00:00.000Z",
+    });
+    expect(body).toMatchObject({
+      autoScheduleEnabled: false,
+      salesStartAt: null,
+      salesEndAt: null,
+    });
+  });
+
+  it("sends publishedAt as null for a drafted (unpublished) tier", () => {
+    const body = buildTierBody({
+      ...blankTier(),
+      name: "Std",
+      price: "20",
+      publishedAt: null,
+    });
+    expect(body).toMatchObject({ publishedAt: null });
+  });
 });
 
 describe("PriceEditModal helpers (product) — buildDonationBody", () => {
@@ -277,13 +430,13 @@ describe("PriceEditModal helpers (product) — buildDonationBody", () => {
 });
 
 describe("PriceEditModal helpers (product) — isTierLocked", () => {
-  it("locked iff salesCount > 0 (product semantics)", () => {
-    // Product semantics differ from events: the lock check is purely
-    // salesCount-driven (events also require a `t.id` since the inline
-    // check is `!!t.id && t.salesCount > 0`). Marketplace's pre-redesign
-    // inline check was just `(t.salesCount || 0) > 0`; preserved here.
+  it("locked iff the tier is saved AND has sales (product semantics)", () => {
+    // Merged semantics: `!!t.id && t.salesCount > 0`. A brand-new draft
+    // (no `id`) is never locked even if it carries a salesCount fixture —
+    // there is nothing persisted to protect server-side yet. Lock only
+    // engages once the tier exists AND has at least one non-refunded sale.
     expect(isTierLocked({ ...blankTier(), salesCount: 0 })).toBe(false);
-    expect(isTierLocked({ ...blankTier(), salesCount: 1 })).toBe(true);
+    expect(isTierLocked({ ...blankTier(), salesCount: 1 })).toBe(false);
     expect(isTierLocked({ ...blankTier(), id: "t1", salesCount: 0 })).toBe(false);
     expect(isTierLocked({ ...blankTier(), id: "t1", salesCount: 1 })).toBe(true);
   });
@@ -302,6 +455,14 @@ describe("PriceEditModal helpers (product) — blank builders", () => {
     expect(t.priceMode).toBe("fixed");
     expect(t.installmentEnabled).toBe(false);
     expect(t.installmentAccessMonths).toBe("");
+  });
+
+  it("blankTier seeds the event-ported publish + schedule defaults", () => {
+    const t = blankTier();
+    expect(t.publishedAt).toBeTruthy();
+    expect(t.autoScheduleEnabled).toBe(false);
+    expect(t.salesStartAt).toBe("");
+    expect(t.salesEndAt).toBe("");
   });
 
   it("blankDonation defaults to a 5/10/25 suggested ladder", () => {
