@@ -4,16 +4,17 @@
  *
  * Lifts the row state + API integration out of MemberPricingSection
  * (which used to own them via useState + useImperativeHandle) up to
- * PriceEditModal. Mirrors the events package's member-pricing.ts with
+ * PriceEditModal. The section becomes presentational; this module is
+ * the controller. Mirrors the events package's member-pricing.ts with
  * the product-specific recurringScope field (ALWAYS vs FIRST_ONLY)
  * carried on each row.
  *
- * Why lift state up: the section's lifetime tracked the tier card's
- * expand/collapse state (it was rendered inside <Collapse>), so
- * collapsing a tier unmounted the section and dropped any dirty
- * rows. Lifting the state up means the rows survive collapse/expand
- * cycles and across hub↔step transitions — tied to the modal's
- * lifetime instead.
+ * Why: the section's lifetime tracked the tier card's expand/collapse
+ * state (it was rendered inside <Collapse>), so collapsing a tier
+ * unmounted the section and dropped any dirty rows. The user thought
+ * they had saved; nothing did. Lifting the state up means the rows
+ * survive collapse/expand cycles and across hub↔step transitions —
+ * tied to the modal's lifetime instead.
  */
 
 import { fromSmallestUnit, toSmallestUnit } from "./helpers";
@@ -28,6 +29,8 @@ export interface CommunitySegment {
 }
 
 export interface MemberPricingRow {
+  /** Override row id, present only once the buyer has saved at least
+   *  one override for this (tier, segment). */
   id?: string;
   segmentId: string;
   segmentName: string;
@@ -41,6 +44,8 @@ export interface MemberPricingRow {
    *  discount to renewals (ALWAYS) vs the first invoice only
    *  (FIRST_ONLY). Hidden in the UI for non-recurring tiers. */
   recurringScope: RecurringScope;
+  /** Snapshot of the row's persisted shape so isDirty can tell whether
+   *  the user changed something since the last successful commit. */
   initial?: {
     enabled: boolean;
     mode: MemberPricingMode;
@@ -51,11 +56,15 @@ export interface MemberPricingRow {
   };
 }
 
+/** Per-tier slot in the modal-level state map. */
 export type MemberPricingTierState =
   | { loading: true; error: null; rows: never[] }
   | { loading: false; error: string; rows: never[] }
   | { loading: false; error: null; rows: MemberPricingRow[] };
 
+/** Builds the initial row set from the segments list + any existing
+ *  overrides fetched from the backend. Mirrors what MemberPricingSection
+ *  used to do on its own useEffect. */
 export function buildRowsFromOverrides(
   segments: CommunitySegment[],
   overrides: Array<Record<string, any>>,
@@ -102,6 +111,8 @@ export function rowIsDirty(r: MemberPricingRow): boolean {
   );
 }
 
+/** Returns the first validation error encountered across the rows, or
+ *  null when everything is valid. Stops the save loop early on failure. */
 export function findFirstValidationError(rows: MemberPricingRow[]): string | null {
   for (const r of rows) {
     if (!r.enabled) continue;
@@ -117,6 +128,9 @@ export function findFirstValidationError(rows: MemberPricingRow[]): string | nul
   return null;
 }
 
+/** Resets the local `initial` baseline after a successful commit so
+ *  isDirty starts returning false again. Called by the modal's save
+ *  loop once the network round-trips succeed. */
 export function resetRowsBaseline(rows: MemberPricingRow[]): MemberPricingRow[] {
   return rows.map((r) => ({
     ...r,
@@ -131,10 +145,14 @@ export function resetRowsBaseline(rows: MemberPricingRow[]): MemberPricingRow[] 
   }));
 }
 
-/** Builds the upsert body. Product-specific: includes recurringScope
- *  on the payload only when the parent tier is recurring; backend
- *  ignores the field for non-recurring tiers but sending it on every
- *  tier would surprise debuggers reading the wire. */
+/** Builds the upsert body the backend expects. Per-mode value
+ *  conversion: FLAT_OFF / FIXED_PRICE expect smallest unit,
+ *  PERCENT_OFF expects 1-100 (no conversion).
+ *
+ *  Product-specific: includes recurringScope on the payload only when
+ *  the parent tier is recurring; the backend ignores the field for
+ *  non-recurring tiers, but sending it on every tier would surprise
+ *  debuggers reading the wire. */
 export function buildUpsertBody(
   r: MemberPricingRow,
   currencyCode: string,

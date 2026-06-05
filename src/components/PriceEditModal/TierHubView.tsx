@@ -4,15 +4,27 @@ import { ChevronRight, Lock } from "lucide-react";
 import { SectionCard } from "@cobuntu/management-ui-shared";
 import type { DraftTier } from "./types";
 import { getSymbol, isTierLocked } from "./helpers";
-import { StepInput } from "./_primitives";
 
-export type StepId = "basics" | "options" | "members" | "form";
+export type StepId = "details" | "basics" | "config" | "form";
+
+/** Step metadata — shared by the modal header (breadcrumb + title +
+ *  subtitle) and the hub tiles so they never drift. */
+export const STEP_TITLES: Record<StepId, string> = {
+  details: "Details",
+  basics: "Pricing configuration",
+  config: "Config",
+  form: "Registration form",
+};
+
+export const STEP_SUBTITLES: Record<StepId, string> = {
+  details: "Name, description, and attendance capacity for this tier.",
+  basics: "Price, billing, and member discounts.",
+  config: "Set the timeframe this tier is available for sale.",
+  form: "Attach a form buyers complete when they register.",
+};
 
 export interface TierHubViewProps {
   t: DraftTier;
-  /** Community-only — admin sets true, community-app /manage omits. */
-  showMemberPricing: boolean;
-  onUpdate: (patch: Partial<DraftTier>) => void;
   /** Click a SectionCard → modal enters Level 3 (step view). */
   onEnterStep: (step: StepId) => void;
 }
@@ -20,24 +32,18 @@ export interface TierHubViewProps {
 /**
  * Level 2 (per-tier hub takeover) of the redesigned PriceEditModal.
  *
- * Renders the four section-card landing (Basics / Options / Members /
- * Form) for a single tier. Each card is fully clickable (whole row is
- * the tap target — better mobile UX) and enters Level 3 for editing.
+ * A pure navigation menu of tiles — Details / Pricing configuration /
+ * Config / Registration form — for one tier. Each tile is fully clickable
+ * (whole row is the tap target) and enters Level 3 for editing. The hub itself
+ * has NO editable fields and NO Save: identity (name + capacity) lives in
+ * the Details step now, so the footer Save behaves consistently across
+ * every level (it was previously a misleading inline "Save" next to the
+ * name that actually committed the whole modal).
  *
- * Back / Duplicate / Delete / Save live in the outer modal footer
- * (PriceEditModal-level), not in the body — the footer-driven nav
- * pattern keeps the action surface predictable across L1/L2/L3.
- *
- * MembersStep + FormStep mount in Level 3 (StepView) when the user
- * enters those steps; their state is held at the modal level (via
- * the member-pricing.ts state map for Members, and re-fetch on entry
- * for Form). Neither is mounted here at the hub level — keeps the
- * DOM small while the user is scanning section summaries.
+ * Back / Delete / Duplicate / Published live in the outer modal footer.
  */
 export function TierHubView({
   t,
-  showMemberPricing,
-  onUpdate,
   onEnterStep,
 }: TierHubViewProps) {
   const sym = getSymbol(t.currency);
@@ -45,7 +51,9 @@ export function TierHubView({
   const priceDisplay = t.price && parseFloat(t.price) > 0 ? `${sym}${t.price}` : "Free";
 
   // Mutually exclusive: only one of (installment, recurring, one-time)
-  // applies at a time. Surface in the Basics summary line.
+  // applies at a time. Product subscriptions surface the recurring
+  // interval here so the Pricing configuration tile reads, e.g.,
+  // "$9.99 · Recurring · month".
   const billingSummary = t.installmentEnabled
     ? "Installment plan"
     : t.isRecurring
@@ -61,21 +69,6 @@ export function TierHubView({
 
   return (
     <div>
-      {/* Tier name editor */}
-      <div className="space-y-3 mb-4">
-        <div>
-          <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider block mb-1.5">
-            Tier name
-          </label>
-          <StepInput
-            type="text"
-            value={t.name}
-            onChange={(e) => onUpdate({ name: e.target.value })}
-            placeholder="Standard, VIP, Early-bird…"
-          />
-        </div>
-      </div>
-
       {locked && (
         <div className="flex items-start gap-2 px-3 py-2 mb-3 rounded-lg bg-amber-50/70 border border-amber-100">
           <Lock className="w-3.5 h-3.5 mt-0.5 text-amber-600 shrink-0" />
@@ -88,47 +81,46 @@ export function TierHubView({
         </div>
       )}
 
-      <div className="space-y-2">
+      {/* Section tiles. Details = name + capacity; Basics = price + pricing
+          model + billing + schedule. */}
+      <div className="grid grid-cols-2 gap-2">
         <SectionCard
-          title="Basics"
-          description={`${priceDisplay}${billingSummary ? ` · ${billingSummary}` : ""}`}
+          title="Details"
+          description={t.capacity ? `Capacity ${t.capacity}` : "Name & capacity"}
+          action={chevron}
+          onClick={() => onEnterStep("details")}
+          variant="default"
+        />
+
+        <SectionCard
+          title="Pricing configuration"
+          description={
+            [
+              priceDisplay,
+              t.priceMode === "pwyw" ? "PWYW" : null,
+              billingSummary,
+            ].filter(Boolean).join(" · ")
+          }
           action={chevron}
           onClick={() => onEnterStep("basics")}
           variant="default"
         />
 
         <SectionCard
-          title="Options"
-          description={
-            [
-              t.capacity ? `Cap: ${t.capacity}` : "No capacity cap",
-              t.priceMode === "pwyw" ? "Pay-what-you-want" : null,
-              t.installmentEnabled && t.installmentCount && t.installmentTotal
-                ? `${t.installmentCount}× over ${t.installmentInterval || "1"} mo${t.installmentAccessMonths ? `, ${t.installmentAccessMonths}mo access` : ""}`
-                : null,
-            ].filter(Boolean).join(" · ") || "Defaults"
-          }
+          title="Config"
+          description={t.autoScheduleEnabled ? "Auto-scheduled window" : "Always available"}
           action={chevron}
-          onClick={() => onEnterStep("options")}
+          onClick={() => onEnterStep("config")}
           variant="default"
         />
-
-        {showMemberPricing && (
-          <SectionCard
-            title="Member pricing"
-            description={t.id ? "Per-segment discount overrides for this tier." : "Save tier first to configure overrides."}
-            action={chevron}
-            onClick={() => onEnterStep("members")}
-            disabled={!t.id}
-            variant="default"
-          />
-        )}
 
         <SectionCard
           title="Registration form"
           description={
             !t.id
-              ? "Save tier first to attach a form."
+              ? t.sourceTierId
+                ? `Will copy from "${t.sourceTierName || "source"}" on save.`
+                : "Save tier first to attach a form."
               : t.hasForm
                 ? `${t.formFieldCount} field${t.formFieldCount !== 1 ? "s" : ""} linked.`
                 : "No form yet."

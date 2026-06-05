@@ -1,17 +1,19 @@
 /**
  * Pure helpers for the PriceEditModal redesign — marketplace product
- * variant. Mirrors the events package's helpers.ts with these deltas:
- *   - validateTier enforces 4-of-none (events: 3-of-none).
+ * variant. Tracks the events package's helpers.ts (latest publish +
+ * auto-schedule redesign) with these product deltas:
+ *   - validateTier enforces four-of-none installments (events: three).
  *   - buildTierBody persists isRecurring + recurringInterval +
- *     accessDurationMonths; omits notify-attendees / copyFormFromTierId
- *     / description.
- *   - blankTier seeds isRecurring + accessDuration defaults.
- *   - No findTiersWithMaterialChanges helper — products don't have the
- *     notify-attendees prompt.
+ *     accessDurationMonths in addition to the shared scheduling output.
+ *   - blankTier seeds isRecurring / recurringInterval / accessDuration
+ *     defaults alongside the event publish + schedule defaults.
+ *   - donation loads from the product object (loadDonationFromProduct).
  */
 
 import {
   SUPPORTED_CURRENCIES,
+  TIER_NAME_MAX,
+  TIER_DESCRIPTION_MAX,
   type DonationDraft,
   type DraftTier,
 } from "./types";
@@ -20,14 +22,20 @@ export function getSymbol(code: string): string {
   return SUPPORTED_CURRENCIES.find((c) => c.code === code)?.symbol || code;
 }
 
+/** Smallest unit → display unit (e.g. 2000 cents EUR → 20). JPY has
+ *  no fractional unit so the smallest unit IS the display unit. */
 export function toDisplay(price: number, currency: string): number {
   return currency === "JPY" ? price : price / 100;
 }
 
+/** Display unit → smallest unit (e.g. 20 EUR → 2000 cents). */
 export function toSmallestUnit(majorAmount: number, currency: string): number {
   return currency === "JPY" ? Math.round(majorAmount) : Math.round(majorAmount * 100);
 }
 
+/** Smallest unit → display-string. Used to seed input fields. Null/
+ *  undefined inputs collapse to empty string so React doesn't warn
+ *  about controlled/uncontrolled flips. */
 export function fromSmallestUnit(
   smallestAmount: number | null | undefined,
   currency: string,
@@ -37,8 +45,8 @@ export function fromSmallestUnit(
 }
 
 function newLocalId(): string {
-  if (typeof crypto !== "undefined" && (crypto as any).randomUUID) {
-    return (crypto as any).randomUUID();
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
   }
   return `local-${Math.random().toString(36).slice(2)}`;
 }
@@ -56,21 +64,30 @@ export function blankTier(seed: BlankTierSeed = {}): DraftTier {
   return {
     localId: newLocalId(),
     name: indexHint === 1 ? "Standard" : `Tier ${indexHint}`,
+    description: "",
     price: "",
     currency,
     capacity: "",
     isRecurring: !!seed.isRecurring,
     recurringInterval: seed.recurringInterval || "monthly",
+    hasForm: false,
+    formFieldCount: 0,
+    salesCount: 0,
     priceMode: "fixed",
     pwywMin: "",
-    salesCount: 0,
     installmentEnabled: false,
     installmentTotal: "",
     installmentCount: "",
     installmentInterval: "1",
     installmentAccessMonths: "",
-    hasForm: false,
-    formFieldCount: 0,
+    expanded: true,
+    // New tiers start published — matches the natural "create + ship"
+    // flow. Hosts who want to stage a draft flip the toggle off before
+    // saving. Hidden state for the auto-schedule pickers.
+    publishedAt: new Date().toISOString(),
+    autoScheduleEnabled: false,
+    salesStartAt: "",
+    salesEndAt: "",
   };
 }
 
@@ -85,7 +102,9 @@ export function blankDonation(currency = "EUR"): DonationDraft {
   };
 }
 
-/** Builds a DonationDraft from a product's donationConfig sidecar. */
+/** Builds a DonationDraft from a product's donationConfig sidecar.
+ *  Falls back to a blank draft (with the product's currency) when the
+ *  field is missing or malformed. */
 export function loadDonationFromProduct(product: { donationConfig?: unknown; currency?: string } | null | undefined): DonationDraft {
   const cfg = product?.donationConfig as Record<string, any> | undefined;
   if (!cfg || typeof cfg !== "object") {
@@ -108,11 +127,18 @@ export function loadDonationFromProduct(product: { donationConfig?: unknown; cur
 }
 
 /** Validate one tier draft. Returns null when valid, an error message
- *  otherwise. Enforces the backend's four-of-none + lock-when-sold
- *  rules client-side so the host sees inline messages instead of a
- *  generic 400 toast. */
+ *  otherwise. Called per-tier in the global save loop; surfacing the
+ *  first failure stops the loop. Unions the event name/description
+ *  length + auto-schedule rules with the product's four-of-none
+ *  installment + pwyw-min rules. */
 export function validateTier(t: DraftTier): string | null {
   if (!t.name.trim()) return "Tier name is required";
+  if (t.name.length > TIER_NAME_MAX) {
+    return `Tier name must be ${TIER_NAME_MAX} characters or fewer.`;
+  }
+  if (t.description.length > TIER_DESCRIPTION_MAX) {
+    return `Description for "${t.name}" must be ${TIER_DESCRIPTION_MAX} characters or fewer.`;
+  }
   if (t.price === "" || isNaN(parseFloat(t.price))) {
     return `Price required for "${t.name}"`;
   }
@@ -138,6 +164,22 @@ export function validateTier(t: DraftTier): string | null {
     }
     if (isNaN(access) || access < 1) {
       return `Access duration for "${t.name}" must be at least 1 month.`;
+    }
+  }
+  // Auto-schedule sales window. Enabling it with no bounds at all is a
+  // no-op (opens-on-publish + open-ended = same as off) — block it so the
+  // host doesn't think they scheduled something. When both bounds are set,
+  // close must be strictly after open.
+  if (t.autoScheduleEnabled) {
+    if (!t.salesStartAt && !t.salesEndAt) {
+      return `Set a sales-open or sales-close date for "${t.name}", or turn off auto-schedule.`;
+    }
+    if (t.salesStartAt && t.salesEndAt) {
+      const start = new Date(t.salesStartAt).getTime();
+      const end = new Date(t.salesEndAt).getTime();
+      if (Number.isFinite(start) && Number.isFinite(end) && end <= start) {
+        return `Sales close must be after sales open for "${t.name}".`;
+      }
     }
   }
   return null;
@@ -170,44 +212,80 @@ export function validateDonation(d: DonationDraft): string | null {
 }
 
 /** A tier is "locked" once it has paid sales — price + currency +
- *  pricing mode + installment plan become immutable server-side.
- *  Brand-new tiers (no id) are never locked. */
+ *  pricing mode become immutable server-side. Brand-new tiers (no id)
+ *  are never locked. */
 export function isTierLocked(t: DraftTier): boolean {
-  return (t.salesCount || 0) > 0;
+  return !!t.id && t.salesCount > 0;
 }
 
-/** Builds the per-tier POST/PUT body. Locked tiers still send their
- *  locked fields — the marketplace product backend doesn't have the
- *  events' "skip locked fields" semantics; backend rejects the write
- *  when sales exist, surfacing as the same 400 the validateTier check
- *  catches client-side. */
-export function buildTierBody(t: DraftTier): Record<string, unknown> {
+/** Whether any draft has a non-zero price. Drives the
+ *  StripeRequiredWarning gate — Stripe needs onboarding for paid
+ *  flows but not for free products. */
+export function hasPaidTier(drafts: DraftTier[]): boolean {
+  return drafts.some(
+    (t) => !t.deleted && parseFloat(t.price || "0") > 0,
+  );
+}
+
+/** Builds the per-tier POST/PUT body. Locked tiers omit price /
+ *  currency / priceMode / installment fields so the existing
+ *  lock-when-sold guards don't 400 on no-op saves. Marketplace
+ *  products additionally persist isRecurring / recurringInterval /
+ *  accessDurationMonths, and share the event publish + auto-schedule
+ *  output. */
+export function buildTierBody(
+  t: DraftTier,
+  extras: { notifyAttendees?: boolean } = {},
+): Record<string, unknown> {
+  const locked = isTierLocked(t);
   const pwywMinSmallest = t.priceMode === "pwyw" && t.pwywMin.trim()
     ? toSmallestUnit(parseFloat(t.pwywMin), t.currency)
     : null;
-  const installmentBody = t.installmentEnabled
-    ? {
-        installmentTotalPrice: toSmallestUnit(parseFloat(t.installmentTotal), t.currency),
-        installmentCount: parseInt(t.installmentCount, 10),
-        installmentIntervalMonths: parseInt(t.installmentInterval, 10),
-        accessDurationMonths: parseInt(t.installmentAccessMonths, 10),
-      }
-    : {
-        installmentTotalPrice: null,
-        installmentCount: null,
-        installmentIntervalMonths: null,
-        accessDurationMonths: null,
-      };
+  const installmentBody = locked
+    ? {}
+    : t.installmentEnabled
+      ? {
+          installmentTotalPrice: toSmallestUnit(parseFloat(t.installmentTotal), t.currency),
+          installmentCount: parseInt(t.installmentCount, 10),
+          installmentIntervalMonths: parseInt(t.installmentInterval, 10),
+          accessDurationMonths: parseInt(t.installmentAccessMonths, 10),
+        }
+      : {
+          installmentTotalPrice: null,
+          installmentCount: null,
+          installmentIntervalMonths: null,
+          accessDurationMonths: null,
+        };
+  // Publish + auto-schedule. publishedAt is the source of truth:
+  // null → draft; non-null ISO → published at that moment. The UI
+  // toggle is just `!!publishedAt`. Auto-schedule pickers only matter
+  // when the host explicitly opts in via `autoScheduleEnabled`;
+  // disabled → send null for the window bounds so a previously-set
+  // window doesn't keep enforcing after the host turned auto-schedule
+  // off. Empty strings on the window inputs also resolve to null.
+  const scheduleBody = {
+    publishedAt: t.publishedAt ? new Date(t.publishedAt).toISOString() : null,
+    autoScheduleEnabled: !!t.autoScheduleEnabled,
+    salesStartAt: t.autoScheduleEnabled && t.salesStartAt
+      ? new Date(t.salesStartAt).toISOString()
+      : null,
+    salesEndAt: t.autoScheduleEnabled && t.salesEndAt
+      ? new Date(t.salesEndAt).toISOString()
+      : null,
+  };
   return {
     name: t.name.trim(),
-    price: parseFloat(t.price || "0"),
-    currency: t.currency,
+    description: t.description.trim() || null,
+    ...(locked ? {} : { price: parseFloat(t.price || "0"), currency: t.currency }),
     capacity: t.capacity ? parseInt(t.capacity, 10) : null,
+    ...(locked ? {} : { priceMode: t.priceMode, pwywMinAmount: pwywMinSmallest }),
+    // Marketplace recurring billing — products only. Events omit these.
     isRecurring: t.isRecurring,
     recurringInterval: t.isRecurring ? t.recurringInterval : null,
-    priceMode: t.priceMode,
-    pwywMinAmount: pwywMinSmallest,
     ...installmentBody,
+    ...scheduleBody,
+    ...(t.sourceTierId && !t.id ? { copyFormFromTierId: t.sourceTierId } : {}),
+    ...(extras.notifyAttendees ? { notifyAttendees: true } : {}),
   };
 }
 
@@ -237,4 +315,21 @@ export function buildDonationBody(
   }
   if (d.label.trim()) base.label = d.label.trim();
   return base;
+}
+
+/** Detect tiers whose name or price changed materially vs the
+ *  original snapshot. Drives the notify-buyers prompt. */
+export function findTiersWithMaterialChanges(
+  drafts: DraftTier[],
+  snapshots: Map<string, { name: string; price: string; currency: string }>,
+): DraftTier[] {
+  return drafts.filter((t) => {
+    if (!t.id || t.deleted) return false;
+    const orig = snapshots.get(t.id);
+    if (!orig) return false;
+    const nameChanged = (orig.name || "").trim() !== (t.name || "").trim();
+    const priceChanged = (orig.price || "") !== (t.price || "")
+      || (orig.currency || "") !== (t.currency || "");
+    return nameChanged || priceChanged;
+  });
 }

@@ -7,27 +7,49 @@ import {
 } from "@cobuntu/management-ui-shared";
 import { SUPPORTED_CURRENCIES, type DraftTier } from "../types";
 import { getSymbol, isTierLocked } from "../helpers";
-import { Eyebrow, StepInput } from "../_primitives";
+import { Collapse, Eyebrow, StepInput } from "../_primitives";
+import { MembersStep } from "./MembersStep";
+import type { MemberPricingRow, MemberPricingTierState } from "../member-pricing";
 
 export interface BasicsStepProps {
   t: DraftTier;
   onUpdate: (patch: Partial<DraftTier>) => void;
+  /** Member-pricing (community-only) is folded into this step so all
+   *  pricing config lives in one place. Off → the section isn't rendered. */
+  showMemberPricing?: boolean;
+  memberPricingState?: MemberPricingTierState;
+  onMemberPricingRowChange?: (idx: number, patch: Partial<MemberPricingRow>) => void;
+  showToast?: (msg: string) => void;
 }
 
 /**
- * "Basics" step — the canonical fields every tier needs: name, price,
- * currency, billing mode. Marketplace products expose all three modes:
- *   - ONE_TIME (one-off purchase, no recurring schedule)
- *   - RECURRING (subscription with weekly/monthly/yearly interval)
- *   - INSTALLMENT_PLAN (split-pay with access duration, configured in
- *     the Options step)
+ * "Pricing configuration" step — the per-tier pricing surface. Field
+ * order is deliberate: pricing model → price → billing mode → member
+ * pricing, so the host decides HOW the tier is priced before typing the
+ * amount. (Capacity + name live in the Details step.)
  *
- * Recurring and installment-plan are mutually exclusive — Stripe
- * checkout can't satisfy both subscription_data shapes in one
- * session. BillingRadio enforces the radio semantics; flipping into
- * INSTALLMENT_PLAN turns isRecurring off, and vice versa.
+ * Marketplace products expose all three billing modes:
+ *   - ONE_TIME (one-off purchase, no recurring schedule)
+ *   - RECURRING (Stripe subscription with weekly/monthly/yearly interval)
+ *   - INSTALLMENT_PLAN (split-pay: total + charges + interval + access
+ *     duration in months)
+ *
+ * Recurring and installment-plan are mutually exclusive — Stripe checkout
+ * can't satisfy both subscription_data shapes in one session. Billing mode
+ * is a derived view over `isRecurring` + `installmentEnabled`; flipping into
+ * INSTALLMENT_PLAN turns recurring off, and vice versa. The installment
+ * quartet respects the backend's four-or-none validator (count >= 2,
+ * interval >= 1 month, access >= 1 month, total > 0). Price/currency/mode
+ * lock once a tier has sales.
  */
-export function BasicsStep({ t, onUpdate }: BasicsStepProps) {
+export function BasicsStep({
+  t,
+  onUpdate,
+  showMemberPricing = false,
+  memberPricingState,
+  onMemberPricingRowChange,
+  showToast,
+}: BasicsStepProps) {
   const sym = getSymbol(t.currency);
   const locked = isTierLocked(t);
 
@@ -49,8 +71,34 @@ export function BasicsStep({ t, onUpdate }: BasicsStepProps) {
 
   return (
     <div className="space-y-4">
-      {/* Tier name lives in the L2 hub header — editing here would
-          duplicate that affordance without adding new capability. */}
+      {/* (Description moved to the Details step — it's tier info, not pricing.) */}
+
+      {/* Pricing model — fixed vs PWYW. Above the price so the host picks
+          the model before typing the amount. Locked once sales exist. */}
+      <div>
+        <Eyebrow help="Fixed price charges everyone the same. Pay-what-you-want lets each buyer choose their amount at checkout (with an optional minimum).">
+          Pricing model
+        </Eyebrow>
+        <div className="grid grid-cols-2 gap-2 mt-1.5">
+          <button
+            type="button"
+            onClick={() => !locked && onUpdate({ priceMode: "fixed" })}
+            disabled={locked}
+            className={`px-3 py-2 text-[13px] rounded-lg border transition-colors ${t.priceMode === "fixed" ? "border-zinc-900 bg-zinc-50 text-zinc-900 font-medium" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"} ${locked ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+          >Fixed price</button>
+          <button
+            type="button"
+            onClick={() => !locked && onUpdate({ priceMode: "pwyw" })}
+            disabled={locked}
+            className={`px-3 py-2 text-[13px] rounded-lg border transition-colors ${t.priceMode === "pwyw" ? "border-zinc-900 bg-zinc-50 text-zinc-900 font-medium" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"} ${locked ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+          >Pay what you want</button>
+        </div>
+        {t.priceMode === "pwyw" && (
+          <p className="text-[11px] text-zinc-500 mt-1.5">
+            Buyer chooses the amount at checkout. The price below acts as a suggested default.
+          </p>
+        )}
+      </div>
 
       {/* Price + Currency */}
       <div className="grid grid-cols-[1fr_120px] gap-2.5">
@@ -82,12 +130,30 @@ export function BasicsStep({ t, onUpdate }: BasicsStepProps) {
         </div>
       </div>
 
-      {/* Billing mode — One-time / Recurring / Installment plan.
-          Recurring exposes a weekly/monthly/yearly interval dropdown
-          inline; installment-plan defers its schedule editor to the
-          Options step. */}
+      {/* PWYW minimum — the floor under the buyer-chosen amount. */}
+      <Collapse open={t.priceMode === "pwyw"}>
+        <div>
+          <Eyebrow>Minimum amount (optional)</Eyebrow>
+          <div className="mt-1 max-w-[220px]">
+            <StepInput
+              type="number" min="0" step="0.01" value={t.pwywMin}
+              onChange={(e) => onUpdate({ pwywMin: e.target.value })}
+              placeholder="No minimum"
+              locked={locked}
+              prefix={sym}
+            />
+          </div>
+        </div>
+      </Collapse>
+
+      {/* Billing mode — marketplace products expose all three modes.
+          Recurring exposes a weekly/monthly/yearly interval dropdown inline;
+          installment-plan exposes its schedule editor below. Recurring and
+          installment-plan are mutually exclusive. */}
       <div>
-        <Eyebrow>Billing mode</Eyebrow>
+        <Eyebrow help="One-time charges the full price at checkout. Recurring is a Stripe subscription that renews automatically. Installment plan splits the total into equal monthly charges you configure below.">
+          Billing mode
+        </Eyebrow>
         <div className="mt-1.5">
           <BillingRadio
             value={billingMode}
@@ -107,7 +173,7 @@ export function BasicsStep({ t, onUpdate }: BasicsStepProps) {
               {
                 value: "INSTALLMENT_PLAN",
                 label: "Installment plan",
-                description: "Buyers pay in equal monthly charges; configure the schedule + access duration in the Options step.",
+                description: "Buyers pay in equal monthly charges; configure the schedule + access duration below.",
               },
             ]}
           />
@@ -119,10 +185,10 @@ export function BasicsStep({ t, onUpdate }: BasicsStepProps) {
         )}
       </div>
 
-      {/* Recurring interval — surfaced inline when Recurring is the
-          active mode. Hidden otherwise (installment-plan and one-time
-          have no interval concept). */}
-      {t.isRecurring && (
+      {/* Recurring interval — surfaced inline when Recurring is the active
+          mode. Hidden otherwise (one-time + installment-plan have no
+          interval concept). */}
+      <Collapse open={t.isRecurring}>
         <div className="grid grid-cols-[120px_1fr] gap-2.5 items-center">
           <Eyebrow>Interval</Eyebrow>
           <Select
@@ -137,6 +203,93 @@ export function BasicsStep({ t, onUpdate }: BasicsStepProps) {
               <SelectItem value="yearly">Yearly</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+      </Collapse>
+
+      {/* Installment schedule — only meaningful when Billing mode is
+          INSTALLMENT_PLAN. Four fields: total, charges, interval, and access
+          duration. Validation lives in helpers.validateTier; the user sees a
+          per-field hint instead. */}
+      <Collapse open={t.installmentEnabled}>
+        <div className="space-y-2">
+          <div>
+            <Eyebrow>Installment schedule</Eyebrow>
+            <p className="text-[11px] text-zinc-500 mt-1">
+              The total below is charged in equal parts over the count and interval.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <Eyebrow>Total ({sym})</Eyebrow>
+              <div className="mt-1">
+                <StepInput
+                  type="number" min="0" step="0.01" value={t.installmentTotal}
+                  onChange={(e) => onUpdate({ installmentTotal: e.target.value })}
+                  placeholder="300"
+                  locked={locked}
+                />
+              </div>
+            </div>
+            <div>
+              <Eyebrow>Charges</Eyebrow>
+              <div className="mt-1">
+                <StepInput
+                  type="number" min="2" step="1" value={t.installmentCount}
+                  onChange={(e) => onUpdate({ installmentCount: e.target.value })}
+                  placeholder="3"
+                  locked={locked}
+                />
+              </div>
+            </div>
+            <div>
+              <Eyebrow>Every (months)</Eyebrow>
+              <div className="mt-1">
+                <StepInput
+                  type="number" min="1" step="1" value={t.installmentInterval}
+                  onChange={(e) => onUpdate({ installmentInterval: e.target.value })}
+                  placeholder="1"
+                  locked={locked}
+                />
+              </div>
+            </div>
+            <div>
+              <Eyebrow>Access (months)</Eyebrow>
+              <div className="mt-1">
+                <StepInput
+                  type="number" min="1" step="1" value={t.installmentAccessMonths}
+                  onChange={(e) => onUpdate({ installmentAccessMonths: e.target.value })}
+                  placeholder="12"
+                  locked={locked}
+                />
+              </div>
+            </div>
+          </div>
+          {t.installmentEnabled
+            && t.installmentTotal
+            && t.installmentCount
+            && parseInt(t.installmentCount, 10) >= 2 && (
+            <p className="text-[11px] text-zinc-500">
+              Buyer pays {sym}{(parseFloat(t.installmentTotal) / parseInt(t.installmentCount, 10)).toFixed(2)} every {t.installmentInterval || "1"} month{(t.installmentInterval || "1") !== "1" ? "s" : ""} for {t.installmentCount} charges{t.installmentAccessMonths ? `, ${t.installmentAccessMonths} month${t.installmentAccessMonths !== "1" ? "s" : ""} of access` : ""}.
+            </p>
+          )}
+          {locked && (
+            <p className="text-[10px] text-amber-600">
+              Installment plan is locked while sales exist.
+            </p>
+          )}
+        </div>
+      </Collapse>
+
+      {/* Member pricing — community-only per-segment discount overrides.
+          Folded in here so this step owns ALL pricing config. */}
+      {showMemberPricing && (
+        <div className="pt-3 border-t border-zinc-100">
+          <MembersStep
+            t={t}
+            memberPricingState={memberPricingState}
+            onMemberPricingRowChange={onMemberPricingRowChange}
+            showToast={showToast ?? (() => {})}
+          />
         </div>
       )}
     </div>

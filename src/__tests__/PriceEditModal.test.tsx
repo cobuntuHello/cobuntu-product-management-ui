@@ -33,11 +33,11 @@ describe("PriceEditModal", () => {
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
     // L1: pre-filled Standard tier visible as a row.
-    await screen.findByRole("button", { name: /Standard/ });
+    const row = await screen.findByRole("button", { name: /Standard/ });
     // Click row → L2 hub.
-    await user.click(screen.getByRole("button", { name: /Standard/ }));
-    // Click Basics Edit → L3.
-    await user.click(await screen.findByRole("button", { name: /Basics/ }));
+    await user.click(row);
+    // L2 → click Pricing configuration tile → L3 where price lives.
+    await user.click(await screen.findByRole("button", { name: /Pricing configuration/ }));
     // BasicsStep mounted; price prefilled from product.price (2500 → 25).
     expect(screen.getByDisplayValue("25")).toBeInTheDocument();
   });
@@ -60,9 +60,9 @@ describe("PriceEditModal", () => {
     ]);
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    // L1 → row → L2 → Basics → L3 for the price input.
+    // L1 → row → L2 → Pricing configuration → L3 for the price input.
     await user.click(await screen.findByRole("button", { name: /Pro/ }));
-    await user.click(await screen.findByRole("button", { name: /Basics/ }));
+    await user.click(await screen.findByRole("button", { name: /Pricing configuration/ }));
     expect(screen.getByDisplayValue("50")).toBeInTheDocument();
   });
 
@@ -110,8 +110,9 @@ describe("PriceEditModal", () => {
     const props = baseProps();
     renderWithConfig(<PriceEditModal {...props} />);
 
-    // L1 → click tier row → L2: name input lives at top of hub.
+    // L1 → click tier row → L2 → open Details (name lives there now).
     await user.click(await screen.findByRole("button", { name: /Pro/ }));
+    await user.click(await screen.findByRole("button", { name: /Details/ }));
     const input = (await screen.findByPlaceholderText(
       "Standard, VIP, Early-bird…",
     )) as HTMLInputElement;
@@ -142,9 +143,9 @@ describe("PriceEditModal", () => {
     await waitFor(() =>
       expect(screen.getAllByText(/7\/50/).length).toBeGreaterThanOrEqual(1),
     );
-    // L1 → click row → L2 → click Basics Edit → L3 where price lives.
+    // L1 → click row → L2 → click Pricing configuration tile → L3 where price lives.
     await user.click(screen.getByRole("button", { name: /Pro/ }));
-    await user.click(await screen.findByRole("button", { name: /Basics/ }));
+    await user.click(await screen.findByRole("button", { name: /Pricing configuration/ }));
     const priceInput = screen.getByPlaceholderText("0.00") as HTMLInputElement;
     expect(priceInput.value).toBe("50");
     expect(priceInput.disabled).toBe(true);
@@ -170,11 +171,17 @@ describe("PriceEditModal", () => {
     const user = userEvent.setup();
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    // Duplicate button lives on the L1 row itself.
-    await screen.findByRole("button", { name: /Pro/ });
-    await user.click(screen.getByRole("button", { name: /duplicate tier/i }));
+    // Duplicate is an L2 (per-tier hub) footer action now — enter the tier first.
+    await user.click(await screen.findByRole("button", { name: /Pro/ }));
+    await user.click(await screen.findByRole("button", { name: /^duplicate$/i }));
 
-    // Copy appears in the list — L1 still shows both tiers as rows.
+    // The POST fires immediately; wait for it before navigating back.
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(c => (c[1] as RequestInit | undefined)?.method === "POST")).toBe(true),
+    );
+
+    // Back to L1 — both tiers (incl. the appended copy) show as rows.
+    await user.click(screen.getByRole("button", { name: /^Back$/ }));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /Pro \(copy\)/ })).toBeInTheDocument(),
     );
@@ -189,11 +196,14 @@ describe("PriceEditModal", () => {
     mockFetch([
       { method: "GET", url: "/products/p-1/tiers", body: [] },
     ]);
+    const user = userEvent.setup();
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    // L1: pre-filled "Standard" row is visible.
-    await screen.findByRole("button", { name: /Standard/ });
-    // No Duplicate button on the unsaved tier's row.
-    expect(screen.queryByRole("button", { name: /duplicate tier/i })).not.toBeInTheDocument();
+    // L1: pre-filled unsaved "Standard" row is visible. Enter it → L2 hub.
+    await user.click(await screen.findByRole("button", { name: /Standard/ }));
+    // Delete (always shown) confirms we're in the L2 footer; Duplicate is
+    // hidden for unsaved tiers (no backend id to copy from).
+    await screen.findByRole("button", { name: "Delete" });
+    expect(screen.queryByRole("button", { name: /^duplicate$/i })).not.toBeInTheDocument();
   });
 });

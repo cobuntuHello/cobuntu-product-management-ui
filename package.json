@@ -1,6 +1,6 @@
 {
   "name": "@cobuntu/product-management-ui",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Shared marketplace-product management UI components for the Cobuntu admin app (community-leader-facing) and community app (host-facing /marketplace/[sku]/manage). The single source of truth for product management — both apps consume this as a git dependency. Sibling to @cobuntu/event-management-ui.",
   "private": true,
   "main": "./src/index.ts",
@@ -35,7 +35,8 @@
     "lucide-react": "^1.7.0",
     "react-easy-crop": "^5.5.7",
     "react-quill-new": "^3.8.3",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "@radix-ui/react-popover": "^1.1.15"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

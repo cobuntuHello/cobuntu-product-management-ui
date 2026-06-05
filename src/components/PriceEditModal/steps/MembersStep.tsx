@@ -8,7 +8,8 @@ import type { MemberPricingRow, MemberPricingTierState } from "../member-pricing
 export interface MembersStepProps {
   t: DraftTier;
   /** Per-tier slot from the modal-level state map. Undefined when the
-   *  tier hasn't been saved yet (no id). */
+   *  tier hasn't been saved yet (no id) or showMemberPricing is off
+   *  upstream. */
   memberPricingState?: MemberPricingTierState;
   /** Notify the modal of a member-pricing row change. */
   onMemberPricingRowChange?: (idx: number, patch: Partial<MemberPricingRow>) => void;
@@ -18,14 +19,16 @@ export interface MembersStepProps {
 /**
  * "Members" step — community-only per-segment discount overrides for
  * this marketplace product tier. Renders the presentational
- * MemberPricingSection driven by the modal-level state map (lifted
- * out of the section itself so dirty rows survive tier collapse / step
+ * MemberPricingSection driven by the modal-level state map (lifted out
+ * of the section itself so dirty rows survive tier collapse / step
  * navigation / any unmount).
  *
- * Forwards `isRecurringTier` from the tier draft so the recurringScope
- * (ALWAYS vs FIRST_ONLY) row only renders on subscription tiers.
+ * Forwards `isRecurringTier` from the tier draft so the per-row
+ * recurringScope control (ALWAYS vs FIRST_ONLY) only renders on
+ * subscription tiers.
  *
- * Unsaved tiers (no `t.id`) skip the section.
+ * Unsaved tiers (no `t.id`) skip the section — backend keys overrides
+ * by tier id, so there's nothing to load until the tier is created.
  */
 export function MembersStep({
   t,
