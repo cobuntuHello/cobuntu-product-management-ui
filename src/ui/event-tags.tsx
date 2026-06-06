@@ -50,7 +50,10 @@ export const EventTags = React.forwardRef<HTMLInputElement, EventTagsProps>(
 
     async function searchTags(query: string): Promise<Tag[]> {
       try {
-        const res = await fetch(`${apiBaseUrl}/api/events/search-tags?q=${encodeURIComponent(query)}`, {
+        // Generic tag pool (public, fuzzy). Products are NOT events — querying
+        // /events/search-tags here surfaced the wrong dataset. Creation already
+        // POSTs the generic /api/tags, so search must match it.
+        const res = await fetch(`${apiBaseUrl}/api/tags/search?q=${encodeURIComponent(query)}`, {
           headers: authHeaders(),
         });
         if (!res.ok) return [];

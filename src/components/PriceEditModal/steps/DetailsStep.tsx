@@ -15,7 +15,7 @@ export interface DetailsStepProps {
  * of the tier hub so the hub stays a pure navigation menu of tiles. The
  * old hub had the name input + an inline Save that read as "save the title"
  * when it actually committed the whole modal; routing the name (and the
- * attendance cap) through a normal step means the footer Save behaves the
+ * stock cap) through a normal step means the footer Save behaves the
  * same here as in every other step.
  */
 export function DetailsStep({ t, onUpdate }: DetailsStepProps) {
@@ -46,7 +46,7 @@ export function DetailsStep({ t, onUpdate }: DetailsStepProps) {
       {/* Description — tier info, lives with the identity fields. */}
       <div>
         <Eyebrow
-          help="Shown on the public ticket card — a short note on what this tier includes."
+          help="Shown on the public product card — a short note on what this tier includes."
           count={t.description.length}
           max={TIER_DESCRIPTION_MAX}
         >
@@ -63,10 +63,10 @@ export function DetailsStep({ t, onUpdate }: DetailsStepProps) {
         </div>
       </div>
 
-      {/* Capacity (attendance cap) — raisable even on a locked tier; just
+      {/* Capacity (stock cap) — raisable even on a locked tier; just
           can't drop below sold. */}
       <div>
-        <Eyebrow help="The maximum number of tickets sold for this tier. Leave blank for unlimited.">
+        <Eyebrow help="The maximum number of units sold for this tier. Leave blank for unlimited.">
           Capacity (optional)
         </Eyebrow>
         <div className="mt-1">
