@@ -72,10 +72,10 @@ export { CURRENCIES } from "./PriceEditModal/types";
  * Unlike events, products do NOT have a notify-attendees prompt (no
  * "attendees" concept) — saves go straight through.
  *
- * Per-tier publish/draft toggle (Level 2 footer) is included for parity
- * with the events redesign. NOTE: the product backend tier route
- * currently ignores publishedAt + the auto-schedule window (a separate
- * BE track will wire it); the PUT is a harmless no-op until then.
+ * Per-tier publish/draft toggle (Level 2 footer) is at parity with the
+ * events redesign. The product tier route persists publishedAt + the
+ * auto-schedule window (salesStartAt/salesEndAt/autoScheduleEnabled) — wired
+ * by the product-tier scheduling track; the PUT is no longer a no-op.
  */
 
 // Currency table, currency conversion helpers, and the Tier /
