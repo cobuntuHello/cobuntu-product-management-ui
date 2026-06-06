@@ -17,7 +17,7 @@ export const STEP_TITLES: Record<StepId, string> = {
 };
 
 export const STEP_SUBTITLES: Record<StepId, string> = {
-  details: "Name, description, and attendance capacity for this tier.",
+  details: "Name, description, and stock capacity for this tier.",
   basics: "Price, billing, and member discounts.",
   config: "Set the timeframe this tier is available for sale.",
   form: "Attach a form buyers complete when they register.",
@@ -74,7 +74,7 @@ export function TierHubView({
           <Lock className="w-3.5 h-3.5 mt-0.5 text-amber-600 shrink-0" />
           <p className="text-[12px] text-amber-700">
             <span className="font-medium">
-              {`${t.salesCount} ticket${t.salesCount !== 1 ? "s" : ""} sold`}
+              {`${t.salesCount} sale${t.salesCount !== 1 ? "s" : ""}`}
             </span>
             {" — price, currency, and installment plan are locked. Refund all sales first to change them."}
           </p>

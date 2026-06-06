@@ -106,7 +106,7 @@ describe("TierHubView (product) — tile menu", () => {
 
   it("shows the lock banner when sales exist", () => {
     renderHub({ t: newTier({ salesCount: 3 }) });
-    expect(screen.getByText(/3 tickets sold/)).toBeInTheDocument();
+    expect(screen.getByText(/3 sales/)).toBeInTheDocument();
   });
 
   it("clicking a tile fires onEnterStep with its id", async () => {
