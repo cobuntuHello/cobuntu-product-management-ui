@@ -18,6 +18,11 @@ export { PriceEditModal, type PriceEditModalProps, CURRENCIES } from "./componen
 export { NameEditModal } from "./components/NameEditModal";
 export { ShareModal } from "./components/ShareModal";
 export { DeleteModal } from "./components/DeleteModal";
+export {
+  ProductDistributionModal,
+  type ProductDistributionModalProps,
+  type ProductDistributionFields,
+} from "./components/ProductDistributionModal";
 export { ProductForm, type ProductFormData } from "./components/ProductForm";
 export {
   ProductTiersAndDonations,
