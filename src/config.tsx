@@ -22,6 +22,15 @@ export interface ProductManagementConfig {
    * once per request; should be cheap.
    */
   authHeaders: () => Record<string, string>;
+
+  /**
+   * Returns the path the user should be sent to in order to connect
+   * Stripe for this community. Different host apps point at different
+   * routes — admin's connect-stripe page vs community-app's
+   * /hub/payouts/onboard. Used by `<StripeRequiredWarning>` to gate
+   * paid-tier editing when the community hasn't connected Stripe yet.
+   */
+  stripeConnectUrl: (communityTag: string) => string;
 }
 
 const Ctx = React.createContext<ProductManagementConfig | null>(null);

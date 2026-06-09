@@ -11,6 +11,7 @@ import {
 } from "@dnd-kit/sortable";
 import { ModalShell } from "../ui/modal-shell";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
+import { useStripeStatus, StripeRequiredWarning } from "./stripe-status";
 import {
   buildRowsFromOverrides,
   buildUpsertBody,
@@ -115,6 +116,12 @@ export interface PriceEditModalProps {
 export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing }: PriceEditModalProps) {
   const { apiBaseUrl, authHeaders } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
+  // Stripe gate — mirrors the event-side wiring. Hides the tier editor
+  // and surfaces a "Connect Stripe" prompt when the community hasn't
+  // connected Stripe yet AND any tier on this product is paid. Cached
+  // per communityTag inside useStripeStatus so repeated opens of the
+  // modal don't re-hit the API.
+  const stripe = useStripeStatus(communityTag);
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<DraftTier[]>([]);
   const [saving, setSaving] = useState(false);
@@ -311,9 +318,10 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
    * PUT against, so the toggle just stages publishedAt on the draft; it
    * persists on the tier's first save.
    *
-   * NOTE: the product tier route currently ignores publishedAt (a
-   * separate BE track will wire it), so the PUT is a harmless no-op for
-   * now — the optimistic flip + toast still give the right UX for parity.
+   * Backend: ProductTierService accepts `publishedAt` (along with
+   * `salesStartAt`/`salesEndAt` and `autoScheduleEnabled`) — same shape
+   * as EventTierService. Wired in feat/storefront-tier-sale-state (Track
+   * 2a, mid-2026-06).
    */
   async function togglePublish(idx: number) {
     const tier = drafts[idx];
@@ -634,6 +642,17 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
     if (activeStep) {
       crumbs.push({ label: tierName, onClick: () => setActiveStep(null) });
     }
+  }
+
+  // Stripe gate — show the "Connect Stripe" warning instead of the tier
+  // editor when (a) the community isn't connected (or has charges
+  // disabled) AND (b) at least one tier on this product is paid. We
+  // wait until the initial tier fetch completes (`loading=false`) and
+  // the Stripe status resolves (`stripe.loading=false`) to avoid
+  // flashing the warning on the way to a benign all-free product.
+  const hasPaidTier = drafts.some((d) => !d.deleted && parseFloat(d.price || "0") > 0);
+  if (!loading && !stripe.loading && !stripe.chargesEnabled && hasPaidTier) {
+    return <StripeRequiredWarning communityTag={communityTag} onClose={onClose} />;
   }
 
   return (
