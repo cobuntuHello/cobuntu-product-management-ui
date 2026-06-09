@@ -5,6 +5,7 @@ import { ProductManagementConfigProvider, type ProductManagementConfig } from ".
 const defaultConfig: ProductManagementConfig = {
   apiBaseUrl: "http://api.test",
   authHeaders: () => ({ Authorization: "Bearer test-token" }),
+  stripeConnectUrl: (communityTag: string) => `/test-stripe-connect/${communityTag}`,
 };
 
 export function renderWithConfig(
@@ -26,9 +27,20 @@ export function mockFetch(routes: Array<{
   body?: unknown;
   bodyFn?: (init: RequestInit | undefined) => unknown;
 }>): ReturnType<typeof vi.fn> {
+  // Default Stripe-status response so any test that opens PriceEditModal
+  // doesn't have to remember to mock /stripe/connected — the modal calls
+  // useStripeStatus on mount to gate paid-tier editing. Tests can still
+  // override by passing their own /stripe/connected stub earlier in the
+  // routes array (first-match-wins).
+  const defaultRoutes = [{
+    method: "GET",
+    url: /\/api\/communities\/[^/]+\/stripe\/connected$/,
+    body: { connected: true, chargesEnabled: true },
+  }];
+  const allRoutes = [...routes, ...defaultRoutes];
   const fn = vi.fn(async (url: string, init?: RequestInit) => {
     const method = (init?.method || "GET").toUpperCase();
-    for (const r of routes) {
+    for (const r of allRoutes) {
       const methodOk = !r.method || r.method.toUpperCase() === method;
       const urlOk = typeof r.url === "string" ? url === r.url || url.endsWith(r.url) : r.url.test(url);
       if (methodOk && urlOk) {

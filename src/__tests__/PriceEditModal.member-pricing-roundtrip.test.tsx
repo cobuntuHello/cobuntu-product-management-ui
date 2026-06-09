@@ -78,6 +78,14 @@ function stubLoadRoutes() {
       url: /\/api\/communities\/orbis\/tiers\/tier-1\/member-pricing$/,
       body: [],
     },
+    // Stripe-status probe — useStripeStatus hits this on mount. Tests
+    // exercise the paid-tier editor, so the community is treated as
+    // already-connected; the gate path is covered by its own test.
+    {
+      method: "GET" as const,
+      url: /\/api\/communities\/orbis\/stripe\/connected$/,
+      body: { connected: true, chargesEnabled: true },
+    },
   ];
 }
 
