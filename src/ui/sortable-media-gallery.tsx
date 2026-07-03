@@ -93,10 +93,10 @@ function AddTile({ count, max, onClick }: { count: number; max: number; onClick:
     <button
       type="button"
       onClick={onClick}
-      className={`${TILE} rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors`}
+      className={`${TILE} rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 p-3 cursor-pointer transition-colors`}
       style={{ borderColor: "color-mix(in srgb, currentColor 18%, transparent)", background: "color-mix(in srgb, currentColor 4%, transparent)" }}
     >
-      <span className="h-9 w-9 rounded-full flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--brand-color, #71717a) 18%, transparent)", color: "var(--brand-color, #52525b)" }}>
+      <span className="h-8 w-8 rounded-full flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--brand-color, #71717a) 18%, transparent)", color: "var(--brand-color, #52525b)" }}>
         <Upload className="h-4 w-4" />
       </span>
       <span className="text-[11.5px] font-medium opacity-80">Add photos</span>
