@@ -99,11 +99,18 @@ interface ProductFormProps {
    * `false` so existing callers keep the simple single-price form.
    */
   showTiers?: boolean;
+  /**
+   * When true, the built-in Visibility section (viewability + accessibility)
+   * is NOT rendered — the consumer takes over rendering it elsewhere (e.g. a
+   * right-column config panel) and owns those two values at submit. The form
+   * still emits its default PUBLIC/PUBLIC in onChange; the consumer overrides.
+   */
+  hideVisibility?: boolean;
 }
 
 // ─── Component ─────────────────────────────────────────────────
 
-export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers }: ProductFormProps) {
+export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility }: ProductFormProps) {
   // Form state
   const [name, setName] = useState(initialData?.name || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -335,7 +342,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           - viewability: who can SEE the listing
           - accessibility: who can PURCHASE
           Defaults are PUBLIC for both; backend createProduct stamps from
-          the community's effective default when these fields aren't sent. */}
+          the community's effective default when these fields aren't sent.
+          Skipped when `hideVisibility` — the consumer renders it elsewhere. */}
+      {!hideVisibility && (
       <div className="space-y-2">
         <h3 className="text-sm font-medium text-zinc-700 flex items-center gap-2">
           <Eye className="h-4 w-4" />
@@ -378,6 +387,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           </div>
         </div>
       </div>
+      )}
 
       {/* ─── CTA Text ─── */}
       <div className="space-y-2">
