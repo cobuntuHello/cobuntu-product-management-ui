@@ -87,14 +87,14 @@ export function FileUploadZone({ files, onChange, maxFiles = 10 }: FileUploadZon
           // Theme-aware fill/border (color-mix off the current text colour) so
           // the dropzone is dark on community themes, light on admin — not a
           // hardcoded zinc-50 white block.
-          className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-7 transition-colors cursor-pointer"
+          className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-12 transition-colors cursor-pointer"
           style={{
             background: isDragOver ? "color-mix(in srgb, currentColor 8%, transparent)" : "color-mix(in srgb, currentColor 4%, transparent)",
             borderColor: isDragOver ? "color-mix(in srgb, currentColor 40%, transparent)" : "color-mix(in srgb, currentColor 16%, transparent)",
           }}
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full opacity-70" style={{ background: "color-mix(in srgb, currentColor 8%, transparent)" }}>
-            <Upload className="h-4 w-4" />
+          <span className="flex h-12 w-12 items-center justify-center rounded-full opacity-70" style={{ background: "color-mix(in srgb, currentColor 8%, transparent)" }}>
+            <Upload className="h-5 w-5" />
           </span>
           <div className="text-center">
             <p className="text-sm font-medium opacity-90">Drop files here or click to browse</p>
