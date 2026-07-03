@@ -25,7 +25,7 @@ import {
 } from "./ProductTiersAndDonations";
 import {
   Pencil, FileText, Tag as TagIcon, Image as ImageIcon, Package,
-  DollarSign, MousePointerClick, ChevronRight, RefreshCw,
+  DollarSign, MousePointerClick, ChevronRight, Check, BarChart3,
   Eye, EyeOff, UserCheck, Lock,
 } from "lucide-react";
 
@@ -147,6 +147,19 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
     });
   }, [name, description, tags, mediaItems, productFiles, isPaid, price, currency, isRecurring, recurringInterval, ctaText, viewability, accessibility, multiTier, tiers, donation]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Theme-aware tokens (work on dark community themes AND the light admin via
+  // color-mix off the current text colour + a brand var with a zinc fallback).
+  const T = {
+    fill: "color-mix(in srgb, currentColor 5%, transparent)",
+    line: "color-mix(in srgb, currentColor 10%, transparent)",
+    line2: "color-mix(in srgb, currentColor 16%, transparent)",
+    brand: "var(--brand-color, #18181b)",
+    brandTint: "color-mix(in srgb, var(--brand-color, #18181b) 15%, transparent)",
+    brandLine: "color-mix(in srgb, var(--brand-color, #18181b) 45%, transparent)",
+  };
+  const segStyle = (on: boolean): React.CSSProperties =>
+    on ? { background: T.brandTint, color: T.brand, boxShadow: `inset 0 0 0 1px ${T.brandLine}` } : undefined as unknown as React.CSSProperties;
+
   return (
     <div className="space-y-6">
       {/* ─── Product Name ─── */}
@@ -200,107 +213,121 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         <FileUploadZone files={productFiles} onChange={setProductFiles} maxFiles={10} />
       </div>
 
-      {/* ─── Pricing ─── */}
+      {/* ─── Pricing (redesigned 2026-07) — segmented Free/Paid, price as the
+          hero when Paid, billing as a segmented control, multi-tier folded
+          behind Advanced. Compact: only as tall as the current state needs. */}
       <div className="space-y-3">
-        <div className="text-sm font-medium text-zinc-700 flex items-center gap-2">
+        <div className="text-sm font-medium flex items-center gap-2 opacity-80">
           <DollarSign className="h-4 w-4" />
           Pricing
         </div>
-        <div className="rounded-lg border border-zinc-200 bg-white p-4 space-y-0">
-          {/* Free/Paid Toggle */}
+
+        {/* Free / Paid segmented */}
+        <div className="flex gap-1.5 rounded-xl border p-1" style={{ borderColor: T.line, background: T.fill }}>
           <button type="button"
-            onClick={() => { setIsPaid(!isPaid); if (isPaid) { setIsRecurring(false); setPrice(""); } }}
-            className="w-full flex items-center justify-between hover:bg-zinc-50 rounded-md px-2 py-3 -mx-2 transition-colors cursor-pointer">
-            <div className="flex items-center gap-3">
-              <DollarSign className="h-5 w-5 text-zinc-400" />
-              <div className="flex flex-col items-start">
-                <span className="text-sm font-medium text-zinc-700">{isPaid ? "Paid Product" : "Free Product"}</span>
-                <span className="text-xs text-zinc-400">{isPaid ? "Customers will pay to access" : "Available at no cost"}</span>
-              </div>
-            </div>
-            <Switch checked={isPaid} onCheckedChange={checked => { setIsPaid(checked); if (!checked) { setIsRecurring(false); setPrice(""); } }}
-              onClick={e => e.stopPropagation()} />
+            onClick={() => { setIsPaid(false); setIsRecurring(false); setPrice(""); }}
+            className="flex-1 rounded-lg py-2 text-[13.5px] font-semibold transition-colors cursor-pointer"
+            style={segStyle(!isPaid)}>
+            Free
           </button>
+          <button type="button"
+            onClick={() => setIsPaid(true)}
+            className="flex-1 rounded-lg py-2 text-[13.5px] font-semibold transition-colors cursor-pointer"
+            style={segStyle(isPaid)}>
+            Paid
+          </button>
+        </div>
 
-          {/* Pricing body — depends on isPaid AND whether multi-tier mode is on */}
-          <div className={cn("overflow-hidden transition-all duration-300 ease-in-out", isPaid ? "max-h-[2000px] opacity-100 mt-2" : "max-h-0 opacity-0")}>
-            {showTiers && (
-              <button
-                type="button"
-                onClick={() => setMultiTier(v => !v)}
-                className="w-full flex items-center justify-between hover:bg-zinc-50 rounded-md px-2 py-3 -mx-2 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <RefreshCw className="h-5 w-5 text-zinc-400" />
-                  <div className="flex flex-col items-start">
-                    <span className="text-sm font-medium text-zinc-700">Advanced pricing</span>
-                    <span className="text-xs text-zinc-400">
-                      {multiTier ? "Multiple tiers + donations" : "One price for everyone"}
-                    </span>
-                  </div>
-                </div>
-                <Switch checked={!!multiTier} onCheckedChange={v => setMultiTier(v)} onClick={e => e.stopPropagation()} />
-              </button>
-            )}
-
-            {!multiTier && (
-              <div className="space-y-3 px-2 pt-2">
-                <div className="space-y-2">
-                  <Label>Currency</Label>
-                  <Select value={currency} onValueChange={setCurrency}>
-                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {SUPPORTED_CURRENCIES.map(c => <SelectItem key={c.code} value={c.code}>{c.flag} {c.code} - {c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Price ({getCurrencySymbol(currency)})</Label>
-                  <Input type="number" min={0} step={0.01} value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00"
-                    error={showErrors && isPaid && (!price || parseFloat(price) <= 0) ? "Price is required for paid products" : undefined}
-                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                </div>
-
-                {/* Subscription (single-price mode only — multi-tier handles it per-tier) */}
-                <button type="button" onClick={() => setIsRecurring(!isRecurring)}
-                  className="w-full flex items-center justify-between hover:bg-zinc-50 rounded-md px-2 py-3 -mx-2 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-3">
-                    <RefreshCw className="h-5 w-5 text-zinc-400" />
-                    <div className="flex flex-col items-start">
-                      <span className="text-sm font-medium text-zinc-700">Subscription</span>
-                      <span className="text-xs text-zinc-400">{isRecurring ? "Recurring billing" : "One-time payment"}</span>
-                    </div>
-                  </div>
-                  <Switch checked={isRecurring} onCheckedChange={setIsRecurring} onClick={e => e.stopPropagation()} />
-                </button>
-                {isRecurring && (
-                  <div className="space-y-2 px-2">
-                    <Label>Billing Interval</Label>
-                    <Select value={recurringInterval} onValueChange={v => setRecurringInterval(v as "monthly" | "yearly")}>
-                      <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="yearly">Yearly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {multiTier && showTiers && (
-              <div className="pt-3">
-                <ProductTiersAndDonations
-                  tiers={tiers}
-                  onTiersChange={setTiers}
-                  donation={donation}
-                  onDonationChange={setDonation}
-                  showErrors={showErrors}
+        {!isPaid ? (
+          <div className="flex items-center gap-2.5 rounded-xl border px-4 py-3 text-[13px] opacity-75" style={{ borderColor: T.line, background: T.fill }}>
+            <Check className="h-4 w-4 shrink-0" style={{ color: T.brand }} />
+            Free for everyone in the community.
+          </div>
+        ) : !multiTier ? (
+          <div className="space-y-3.5">
+            {/* Price hero — currency inline with the amount */}
+            <div className="space-y-1.5">
+              <Label>Price</Label>
+              <div className="flex items-stretch rounded-xl border overflow-hidden" style={{ borderColor: T.line2 }}>
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger className="w-auto shrink-0 gap-1 border-0 rounded-none px-3 font-semibold focus:ring-0" style={{ borderRight: `1px solid ${T.line}` }}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUPPORTED_CURRENCIES.map(c => <SelectItem key={c.code} value={c.code}>{c.flag} {c.code} - {c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <input
+                  type="number" min={0} step={0.01} value={price}
+                  onChange={e => setPrice(e.target.value)} placeholder="0.00"
+                  aria-label={`Price in ${currency}`}
+                  className="flex-1 min-w-0 bg-transparent px-4 py-3 text-lg font-bold outline-none border-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:opacity-40"
+                  style={{ color: "inherit" }}
                 />
               </div>
+              {showErrors && isPaid && (!price || parseFloat(price) <= 0) && (
+                <p className="text-[12px] text-red-500">Price is required for paid products</p>
+              )}
+            </div>
+
+            {/* Billing — segmented One-time / Monthly / Yearly */}
+            <div className="space-y-1.5">
+              <Label>Billing</Label>
+              <div className="flex gap-1.5">
+                {([
+                  { key: "onetime", label: "One-time", on: !isRecurring },
+                  { key: "monthly", label: "Monthly", on: isRecurring && recurringInterval === "monthly" },
+                  { key: "yearly", label: "Yearly", on: isRecurring && recurringInterval === "yearly" },
+                ] as const).map(opt => (
+                  <button key={opt.key} type="button"
+                    onClick={() => {
+                      if (opt.key === "onetime") setIsRecurring(false);
+                      else { setIsRecurring(true); setRecurringInterval(opt.key as "monthly" | "yearly"); }
+                    }}
+                    className="flex-1 rounded-lg border py-2.5 text-[12.5px] font-semibold transition-colors cursor-pointer"
+                    style={opt.on ? segStyle(true) : { borderColor: T.line, background: T.fill }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Advanced pricing (tiers + donations) — one expandable row */}
+            {showTiers && (
+              <button type="button" onClick={() => setMultiTier(true)}
+                className="w-full flex items-center justify-between rounded-xl border px-4 py-3 text-[13px] transition-colors cursor-pointer hover:opacity-90"
+                style={{ borderColor: T.line, background: T.fill }}>
+                <span className="flex items-center gap-2.5">
+                  <BarChart3 className="h-[18px] w-[18px] opacity-60" />
+                  <span><b className="font-semibold">Advanced pricing</b> <span className="opacity-60">· tiers + donations</span></span>
+                </span>
+                <ChevronRight className="h-4 w-4 opacity-50" />
+              </button>
             )}
           </div>
-        </div>
+        ) : (
+          // Multi-tier mode
+          <div className="space-y-3">
+            <button type="button" onClick={() => setMultiTier(false)}
+              className="w-full flex items-center justify-between rounded-xl border px-4 py-3 text-[13px] transition-colors cursor-pointer hover:opacity-90"
+              style={{ borderColor: T.brandLine, background: T.brandTint, color: T.brand }}>
+              <span className="flex items-center gap-2.5">
+                <BarChart3 className="h-[18px] w-[18px]" />
+                <b className="font-semibold">Advanced pricing</b>
+              </span>
+              <span className="text-[12px] font-semibold">Back to simple</span>
+            </button>
+            {showTiers && (
+              <ProductTiersAndDonations
+                tiers={tiers}
+                onTiersChange={setTiers}
+                donation={donation}
+                onDonationChange={setDonation}
+                showErrors={showErrors}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {/* ─── Visibility ─── */}
