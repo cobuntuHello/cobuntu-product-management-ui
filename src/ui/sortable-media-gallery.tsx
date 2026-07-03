@@ -27,7 +27,7 @@ interface SortableMediaGalleryProps {
 
 // Shared tile sizing: a fixed-width tile on the mobile horizontal strip, and
 // auto (fills the grid cell) on the desktop grid.
-const TILE = "shrink-0 w-[108px] sm:w-auto aspect-square";
+const TILE = "shrink-0 w-[128px] sm:w-auto aspect-square";
 
 /** A filled media tile — draggable, croppable, removable. The first tile
  *  carries a "Cover" badge (it's the card thumbnail). */
@@ -44,12 +44,13 @@ function FilledTile({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    borderColor: "color-mix(in srgb, currentColor 12%, transparent)",
   };
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative ${TILE} rounded-xl border border-zinc-200 bg-zinc-50 overflow-hidden ${isDragging ? "z-10 scale-[1.02]" : ""}`}
+      className={`relative ${TILE} rounded-xl border overflow-hidden ${isDragging ? "z-10 scale-[1.02]" : ""}`}
     >
       <div
         {...attributes}
@@ -59,8 +60,8 @@ function FilledTile({
         title={item.type === "image" ? "Click to crop · drag to reorder" : "Drag to reorder"}
       >
         {item.type === "video" ? (
-          <div className="w-full h-full flex items-center justify-center bg-zinc-100">
-            <Video className="h-8 w-8 text-zinc-400 pointer-events-none" />
+          <div className="w-full h-full flex items-center justify-center" style={{ background: "color-mix(in srgb, currentColor 8%, transparent)" }}>
+            <Video className="h-8 w-8 opacity-50 pointer-events-none" />
           </div>
         ) : (
           <img src={item.preview || item.url} alt="" draggable={false} className="w-full h-full object-cover pointer-events-none" />
@@ -92,13 +93,14 @@ function AddTile({ count, max, onClick }: { count: number; max: number; onClick:
     <button
       type="button"
       onClick={onClick}
-      className={`${TILE} rounded-xl border-2 border-dashed border-zinc-200 bg-zinc-50/50 hover:border-zinc-300 hover:bg-zinc-50 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors`}
+      className={`${TILE} rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors`}
+      style={{ borderColor: "color-mix(in srgb, currentColor 18%, transparent)", background: "color-mix(in srgb, currentColor 4%, transparent)" }}
     >
-      <span className="h-9 w-9 rounded-full bg-zinc-200/60 flex items-center justify-center">
-        <Upload className="h-4 w-4 text-zinc-500" />
+      <span className="h-9 w-9 rounded-full flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--brand-color, #71717a) 18%, transparent)", color: "var(--brand-color, #52525b)" }}>
+        <Upload className="h-4 w-4" />
       </span>
-      <span className="text-[11px] font-medium text-zinc-500">Add photos</span>
-      <span className="text-[10px] text-zinc-400">{count}/{max}</span>
+      <span className="text-[11.5px] font-medium opacity-80">Add photos</span>
+      <span className="text-[10px] opacity-50">{count}/{max}</span>
     </button>
   );
 }
