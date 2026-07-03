@@ -25,42 +25,31 @@ interface SortableMediaGalleryProps {
   maxItems?: number;
 }
 
-interface SlotProps {
-  slotId: string;
-  index: number;
-  item: MediaItem | null;
-  onRemove: () => void;
-  onEmptyClick: () => void;
-  onFilledClick: () => void;
-}
+// Shared tile sizing: a fixed-width tile on the mobile horizontal strip, and
+// auto (fills the grid cell) on the desktop grid.
+const TILE = "shrink-0 w-[108px] sm:w-auto aspect-square";
 
-function Slot({ slotId, index, item, onRemove, onEmptyClick, onFilledClick }: SlotProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: slotId, disabled: !item });
+/** A filled media tile — draggable, croppable, removable. The first tile
+ *  carries a "Cover" badge (it's the card thumbnail). */
+function FilledTile({
+  item, isCover, onRemove, onFilledClick,
+}: {
+  item: MediaItem;
+  isCover: boolean;
+  onRemove: () => void;
+  onFilledClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
+    opacity: isDragging ? 0.5 : 1,
   };
-
-  if (!item) {
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-        onClick={onEmptyClick}
-        className="relative aspect-square rounded-lg border-2 border-dashed border-zinc-200 bg-zinc-50/50 hover:border-zinc-300 hover:bg-zinc-50 flex flex-col items-center justify-center cursor-pointer transition-colors"
-      >
-        <Upload className="h-5 w-5 text-zinc-400 mb-1" />
-        <p className="text-[11px] font-medium text-zinc-400">Media {index + 1}</p>
-        <p className="text-[10px] text-zinc-400 mt-0.5">Click to add</p>
-      </div>
-    );
-  }
-
   return (
     <div
       ref={setNodeRef}
-      style={{ ...style, opacity: isDragging ? 0.5 : 1 }}
-      className={`relative aspect-square rounded-lg border border-zinc-200 bg-zinc-50 overflow-hidden ${isDragging ? "z-10 scale-[1.02]" : ""}`}
+      style={style}
+      className={`relative ${TILE} rounded-xl border border-zinc-200 bg-zinc-50 overflow-hidden ${isDragging ? "z-10 scale-[1.02]" : ""}`}
     >
       <div
         {...attributes}
@@ -78,19 +67,39 @@ function Slot({ slotId, index, item, onRemove, onEmptyClick, onFilledClick }: Sl
         )}
       </div>
 
-      <div className="absolute top-1.5 left-1.5 bg-black/60 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded pointer-events-none">
-        {index + 1}
-      </div>
+      {isCover && (
+        <div className="absolute top-1.5 left-1.5 bg-black/70 text-white text-[10px] font-semibold px-2 py-0.5 rounded-md pointer-events-none">
+          Cover
+        </div>
+      )}
 
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onRemove(); }}
-        className="absolute top-1.5 right-1.5 h-6 w-6 rounded bg-black/60 hover:bg-red-600 text-white flex items-center justify-center cursor-pointer transition-colors"
+        className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/60 hover:bg-red-600 text-white flex items-center justify-center cursor-pointer transition-colors"
         title="Remove"
       >
         <X className="h-3.5 w-3.5" />
       </button>
     </div>
+  );
+}
+
+/** The single "add photos" tile at the end of the strip (shown until the cap
+ *  is reached) — replaces the old wall of empty dashed slots. */
+function AddTile({ count, max, onClick }: { count: number; max: number; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${TILE} rounded-xl border-2 border-dashed border-zinc-200 bg-zinc-50/50 hover:border-zinc-300 hover:bg-zinc-50 flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors`}
+    >
+      <span className="h-9 w-9 rounded-full bg-zinc-200/60 flex items-center justify-center">
+        <Upload className="h-4 w-4 text-zinc-500" />
+      </span>
+      <span className="text-[11px] font-medium text-zinc-500">Add photos</span>
+      <span className="text-[10px] text-zinc-400">{count}/{max}</span>
+    </button>
   );
 }
 
@@ -103,28 +112,17 @@ export function SortableMediaGallery({ items, onChange, maxItems = 5 }: Sortable
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
-  const slots: (MediaItem | null)[] = React.useMemo(() => {
-    const padded: (MediaItem | null)[] = Array(maxItems).fill(null);
-    items.slice(0, maxItems).forEach((it, i) => { padded[i] = it; });
-    return padded;
-  }, [items, maxItems]);
-
-  const filledCount = items.length;
-
-  const slotIds = React.useMemo(
-    () => slots.map((it, i) => (it ? it.id : `__empty-${i}`)),
-    [slots]
-  );
+  const filled = React.useMemo(() => items.slice(0, maxItems), [items, maxItems]);
+  const filledCount = filled.length;
+  const sortableIds = React.useMemo(() => filled.map((it) => it.id), [filled]);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-
-    const oldSlotIndex = slotIds.findIndex(id => id === active.id);
-    const newSlotIndex = slotIds.findIndex(id => id === over.id);
-    if (oldSlotIndex === -1 || newSlotIndex === -1) return;
-    const reordered = arrayMove(slots, oldSlotIndex, newSlotIndex);
-    onChange(reordered.filter((it): it is MediaItem => !!it));
+    const oldIndex = items.findIndex((it) => it.id === active.id);
+    const newIndex = items.findIndex((it) => it.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    onChange(arrayMove(items, oldIndex, newIndex));
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -169,28 +167,34 @@ export function SortableMediaGallery({ items, onChange, maxItems = 5 }: Sortable
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+      {/* Horizontal thumbnail strip on mobile; the desktop 5-up grid is kept.
+          Only real photos + a single "add" tile render — no wall of empty
+          dashed slots. */}
+      <div className="flex gap-2.5 overflow-x-auto pb-1 sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={slotIds} strategy={rectSortingStrategy}>
-            {slots.map((item, i) => (
-              <Slot
-                key={slotIds[i]}
-                slotId={slotIds[i]}
-                index={i}
+          <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
+            {filled.map((item, i) => (
+              <FilledTile
+                key={item.id}
                 item={item}
+                isCover={i === 0}
                 onRemove={() => handleRemove(i)}
-                onEmptyClick={() => fileInputRef.current?.click()}
                 onFilledClick={() => handleFilledClick(i)}
               />
             ))}
           </SortableContext>
         </DndContext>
+        {filledCount < maxItems && (
+          <AddTile count={filledCount} max={maxItems} onClick={() => fileInputRef.current?.click()} />
+        )}
       </div>
 
       <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelect} />
 
       <p className="text-[11px] text-zinc-400">
-        {filledCount}/{maxItems} items · First image is used as the card thumbnail · Drag to reorder
+        {filledCount > 0
+          ? `${filledCount}/${maxItems} · First photo is the cover · drag to reorder`
+          : `Add up to ${maxItems} photos · the first is the cover`}
       </p>
 
       <BannerCropModal
