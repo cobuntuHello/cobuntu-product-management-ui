@@ -71,6 +71,7 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       ctaText: product.ctaText || "",
       viewability: product.viewability || "PUBLIC",
       accessibility: product.accessibility || "PUBLIC",
+      requiresApproval: product.requiresApproval || false,
     };
   }, [product]);
 
@@ -100,6 +101,9 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       // updateProduct (PR feat/update-path-product-visibility 2026-05-20).
       formData.append("viewability", data.viewability);
       formData.append("accessibility", data.accessibility);
+      // Buyer-approval gate — comprehensive update coerces the "true"/"false"
+      // string; propagated to tier sub-products backend-side.
+      formData.append("requiresApproval", String(!!data.requiresApproval));
 
       formData.append("tags", JSON.stringify(data.tags.map(t => t.id)));
 
