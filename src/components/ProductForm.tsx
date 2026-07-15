@@ -16,18 +16,26 @@ import { RichTextEditor } from "../ui/rich-text-editor";
 import { SortableMediaGallery, type MediaItem } from "../ui/sortable-media-gallery";
 import { FileUploadZone, type UploadedFile } from "../ui/file-upload-zone";
 import { cn } from "../ui/utils";
-import {
-  ProductTiersAndDonations,
-  type TierDraft,
-  type DonationDraft,
-  blankTier,
-  blankDonation,
-} from "./ProductTiersAndDonations";
+import { PriceEditModal } from "./PriceEditModal";
+import { ProductManagementConfigProvider } from "../config";
+import { type DraftTier, type DonationDraft } from "./PriceEditModal/types";
+import { blankTier, blankDonation } from "./PriceEditModal/helpers";
 import {
   Pencil, FileText, Tag as TagIcon, Image as ImageIcon, Package,
   DollarSign, MousePointerClick, ChevronRight, Check, BarChart3,
   Eye, EyeOff, UserCheck, Lock, ClipboardCheck,
 } from "lucide-react";
+
+// draftMode makes ZERO API calls (mount fetch, member-pricing fetch, and
+// FormStep's load/persist are all gated on `!draftMode` or a saved tier id),
+// so the create-time wizard needs only a stub config to satisfy
+// useProductManagementConfig — no provider wiring in the consumer apps. The
+// real connected-Stripe check happens at the parent's create-product submit.
+const DRAFT_CONFIG_STUB = {
+  apiBaseUrl: "",
+  authHeaders: () => ({}),
+  stripeConnectUrl: () => "",
+};
 
 // ─── Currencies ────────────────────────────────────────────────
 
@@ -84,7 +92,7 @@ export interface ProductFormData {
    * instead. The two modes are mutually exclusive; the backend rejects
    * a payload that sends both.
    */
-  tiers: TierDraft[];
+  tiers: DraftTier[];
   /**
    * Donation sidecar. Always present but `enabled: false` by default —
    * the parent emits `donationDraftToPayload(donation)` which returns
@@ -137,11 +145,14 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   // stays the default so the simple "I just want one price" path doesn't
   // get blown up with tier cards.
   const [multiTier, setMultiTier] = useState(initialData?.tiers && initialData.tiers.length > 0);
-  const [tiers, setTiers] = useState<TierDraft[]>(initialData?.tiers && initialData.tiers.length > 0 ? initialData.tiers : [blankTier(currency)]);
+  const [tiers, setTiers] = useState<DraftTier[]>(initialData?.tiers && initialData.tiers.length > 0 ? initialData.tiers : [blankTier({ currency })]);
   const [donation, setDonation] = useState<DonationDraft>(initialData?.donation || blankDonation(currency));
 
   // UI state
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
+  // Tier wizard (the shared PriceEditModal in draftMode). Opened from the
+  // Advanced-pricing summary row; commits drafts back into `tiers`/`donation`.
+  const [showTierModal, setShowTierModal] = useState(false);
 
   // Notify parent
   useEffect(() => {
@@ -173,6 +184,15 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   };
   const segStyle = (on: boolean): React.CSSProperties =>
     on ? { background: T.brandTint, color: T.brand, boxShadow: `inset 0 0 0 1px ${T.brandLine}` } : undefined as unknown as React.CSSProperties;
+
+  // Summary shown on the Advanced-pricing row (tap to open the wizard).
+  const configuredTiers = tiers.filter(t => !t.deleted && t.name.trim());
+  const tierSummaryTitle = configuredTiers.length > 0
+    ? `${configuredTiers.length} pricing ${configuredTiers.length === 1 ? "tier" : "tiers"}`
+    : "Set up pricing tiers";
+  const tierSummarySub = configuredTiers.length > 0
+    ? configuredTiers.map(t => t.name.trim()).join(" · ") + (donation.enabled ? " · Donations on" : "")
+    : "Prices, installments, scheduling, and forms";
 
   return (
     <div className="space-y-6">
@@ -306,21 +326,23 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               </div>
             </div>
 
-            {/* Advanced pricing (tiers + donations) — one expandable row */}
+            {/* Advanced pricing — flips to multi-tier and opens the wizard. */}
             {showTiers && (
-              <button type="button" onClick={() => setMultiTier(true)}
+              <button type="button" onClick={() => { setMultiTier(true); setShowTierModal(true); }}
                 className="w-full flex items-center justify-between rounded-xl border px-4 py-3 text-[13px] transition-colors cursor-pointer hover:opacity-90"
                 style={{ borderColor: T.line, background: T.fill }}>
                 <span className="flex items-center gap-2.5">
                   <BarChart3 className="h-[18px] w-[18px] opacity-60" />
-                  <span><b className="font-semibold">Advanced pricing</b> <span className="opacity-60">· tiers + donations</span></span>
+                  <span><b className="font-semibold">Advanced pricing</b> <span className="opacity-60">· tiers, installments, forms</span></span>
                 </span>
                 <ChevronRight className="h-4 w-4 opacity-50" />
               </button>
             )}
           </div>
         ) : (
-          // Multi-tier mode
+          // Multi-tier mode — a summary row that opens the shared tier
+          // wizard (full parity with events: tiers, PWYW, installments,
+          // per-tier scheduling/publish, and registration forms).
           <div className="space-y-3">
             <button type="button" onClick={() => setMultiTier(false)}
               className="w-full flex items-center justify-between rounded-xl border px-4 py-3 text-[13px] transition-colors cursor-pointer hover:opacity-90"
@@ -332,13 +354,18 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               <span className="text-[12px] font-semibold">Back to simple</span>
             </button>
             {showTiers && (
-              <ProductTiersAndDonations
-                tiers={tiers}
-                onTiersChange={setTiers}
-                donation={donation}
-                onDonationChange={setDonation}
-                showErrors={showErrors}
-              />
+              <button type="button" onClick={() => setShowTierModal(true)}
+                className="w-full flex items-center justify-between rounded-xl border px-4 py-3.5 text-left transition-colors cursor-pointer hover:opacity-90"
+                style={{ borderColor: T.line2, background: T.fill }}>
+                <span className="flex items-center gap-3 min-w-0">
+                  <BarChart3 className="h-[18px] w-[18px] opacity-60 shrink-0" />
+                  <span className="min-w-0">
+                    <span className="block text-[13.5px] font-semibold">{tierSummaryTitle}</span>
+                    <span className="block text-[12px] opacity-60 truncate">{tierSummarySub}</span>
+                  </span>
+                </span>
+                <ChevronRight className="h-4 w-4 opacity-50 shrink-0" />
+              </button>
             )}
           </div>
         )}
@@ -449,6 +476,33 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ─── Tier wizard (draftMode) ─── the same PriceEditModal events use,
+          seeded from this form's own draft state. draftMode → no API calls;
+          on Save it hands the drafts back via onDraftCommit and the parent
+          POSTs them as part of the create-product payload. Member-pricing +
+          forms that need a saved tier id show "Save tier first" and are
+          configured post-create in edit mode. */}
+      {showTierModal && (
+        <ProductManagementConfigProvider value={DRAFT_CONFIG_STUB}>
+          <PriceEditModal
+            product={{ price: 0, currency, isRecurring, recurringInterval }}
+            communityTag={communityTag}
+            productId=""
+            draftMode
+            initialDraftTiers={tiers}
+            initialDraftDonation={donation}
+            onDraftCommit={({ tiers: nextTiers, donation: nextDonation }) => {
+              setTiers(nextTiers);
+              setDonation(nextDonation);
+            }}
+            onClose={() => setShowTierModal(false)}
+            onSaved={() => setShowTierModal(false)}
+            showToast={() => {}}
+            showMemberPricing={false}
+          />
+        </ProductManagementConfigProvider>
+      )}
     </div>
   );
 }

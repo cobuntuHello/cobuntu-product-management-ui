@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildDonationBody,
   buildTierBody,
+  draftTiersToCreatePayload,
   fromSmallestUnit,
   getSymbol,
   isTierLocked,
@@ -467,5 +468,55 @@ describe("PriceEditModal helpers (product) — blank builders", () => {
 
   it("blankDonation defaults to a 5/10/25 suggested ladder", () => {
     expect(blankDonation().amounts).toEqual(["5", "10", "25"]);
+  });
+});
+
+describe("draftTiersToCreatePayload", () => {
+  it("maps each live draft through buildTierBody (full rich shape)", () => {
+    const drafts = [
+      {
+        ...blankTier({ currency: "EUR" }),
+        name: "General",
+        price: "45",
+        capacity: "120",
+        priceMode: "pwyw" as const,
+        pwywMin: "30",
+        installmentEnabled: true,
+        installmentTotal: "300",
+        installmentCount: "3",
+        installmentInterval: "1",
+        installmentAccessMonths: "6",
+      },
+    ];
+    const payload = draftTiersToCreatePayload(drafts);
+    expect(payload).toHaveLength(1);
+    // Carries the advanced fields the create-product API (ProductTierInput)
+    // honors — installments, pwyw floor, capacity — not just name/price.
+    expect(payload[0]).toMatchObject({
+      name: "General",
+      price: 45,
+      currency: "EUR",
+      capacity: 120,
+      priceMode: "pwyw",
+      pwywMinAmount: 3000,
+      installmentTotalPrice: 30000,
+      installmentCount: 3,
+      installmentIntervalMonths: 1,
+      accessDurationMonths: 6,
+    });
+    // Publish/schedule keys are present (buildTierBody always emits them).
+    expect(payload[0]).toHaveProperty("publishedAt");
+    expect(payload[0]).toHaveProperty("autoScheduleEnabled");
+  });
+
+  it("drops soft-deleted and blank-name drafts so a placeholder tier is never sent", () => {
+    const drafts = [
+      { ...blankTier({ currency: "EUR" }), name: "Keep", price: "10" },
+      { ...blankTier({ currency: "EUR" }), name: "  ", price: "5" }, // blank name
+      { ...blankTier({ currency: "EUR" }), name: "Gone", price: "9", deleted: true },
+    ];
+    const payload = draftTiersToCreatePayload(drafts);
+    expect(payload).toHaveLength(1);
+    expect(payload[0]).toMatchObject({ name: "Keep" });
   });
 });

@@ -289,6 +289,23 @@ export function buildTierBody(
   };
 }
 
+/**
+ * Build the `tiers[]` array for the create-product payload from the
+ * draftMode wizard's committed drafts. Each entry is a full
+ * `buildTierBody` (name/price/currency/capacity/priceMode/pwyw +
+ * installments + publish/sales-window schedule), which matches the
+ * backend's `ProductTierInput` shape 1:1 — `ProductService.createProduct`
+ * runs each through `ProductTierHelpers.createTier`. Soft-deleted and
+ * blank-name drafts are dropped so an untouched placeholder tier is never
+ * sent. Member-pricing + per-tier forms need a saved tier id, so they are
+ * configured post-create in edit mode (the wizard shows "Save tier first").
+ */
+export function draftTiersToCreatePayload(drafts: DraftTier[]): Record<string, unknown>[] {
+  return drafts
+    .filter((t) => !t.deleted && t.name.trim())
+    .map((t) => buildTierBody(t));
+}
+
 /** Builds the donation-config sidecar body. Returns null when the
  *  draft is disabled — caller PUTs null to clear server state. */
 export function buildDonationBody(
