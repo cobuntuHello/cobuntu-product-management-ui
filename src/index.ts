@@ -33,6 +33,12 @@ export {
   tierDraftsToPayload,
   donationDraftToPayload,
 } from "./components/ProductTiersAndDonations";
+// Rich draft-tier shape used by the create wizard (ProductForm's draftMode
+// PriceEditModal). ProductFormData.tiers is DraftTier[]; consumers build the
+// create-product tiers[] via draftTiersToCreatePayload. The simpler TierDraft
+// + tierDraftsToPayload above stay exported for any legacy caller.
+export { type DraftTier } from "./components/PriceEditModal/types";
+export { draftTiersToCreatePayload } from "./components/PriceEditModal/helpers";
 export { EditProductDrawer } from "./components/EditProductDrawer";
 
 // UI primitives — duplicated from @cobuntu/event-management-ui by design

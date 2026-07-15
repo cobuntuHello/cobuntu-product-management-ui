@@ -71,29 +71,28 @@ describe("ProductForm", () => {
     const user = userEvent.setup();
     renderWithConfig(<ProductForm {...baseProps({ onChange })} />);
 
-    expect(screen.getByText(/free product/i)).toBeInTheDocument();
+    // Free segment is active by default (isPaid false).
     onChange.mockClear();
 
-    await user.click(screen.getByText(/free product/i));
+    await user.click(screen.getByRole("button", { name: "Paid" }));
 
     await waitFor(() => {
       const last = onChange.mock.calls.at(-1)?.[0] as ProductFormData | undefined;
       expect(last?.isPaid).toBe(true);
     });
-    expect(screen.getByText(/paid product/i)).toBeInTheDocument();
   });
 
   it("showTiers={false}: tier toggle is NOT rendered, even when Paid", async () => {
     const user = userEvent.setup();
     renderWithConfig(<ProductForm {...baseProps()} />);
-    await user.click(screen.getByText(/free product/i));
+    await user.click(screen.getByRole("button", { name: "Paid" }));
     expect(screen.queryByText(/advanced pricing/i)).not.toBeInTheDocument();
   });
 
   it("showTiers={true}: 'Advanced pricing' toggle is visible once Paid is selected", async () => {
     const user = userEvent.setup();
     renderWithConfig(<ProductForm {...baseProps({ showTiers: true })} />);
-    await user.click(screen.getByText(/free product/i));
+    await user.click(screen.getByRole("button", { name: "Paid" }));
     await waitFor(() => expect(screen.getByText(/advanced pricing/i)).toBeInTheDocument());
   });
 
@@ -161,10 +160,10 @@ describe("ProductForm", () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
     renderWithConfig(<ProductForm {...baseProps({ onChange, showTiers: true })} />);
-    await user.click(screen.getByText(/free product/i)); // → Paid
+    await user.click(screen.getByRole("button", { name: "Paid" })); // → Paid
     await waitFor(() => expect(screen.getByText(/advanced pricing/i)).toBeInTheDocument());
 
-    // Flip on multi-tier
+    // Flip on multi-tier (also opens the wizard)
     onChange.mockClear();
     await user.click(screen.getByText(/advanced pricing/i));
 
@@ -174,5 +173,19 @@ describe("ProductForm", () => {
       expect(last?.tiers?.[0]?.name).toBe("Standard");
       expect(last?.price).toBe(""); // parent price MUST be empty in multi-tier mode
     });
+  });
+
+  it("Advanced pricing opens the shared tier wizard (draftMode PriceEditModal)", async () => {
+    const user = userEvent.setup();
+    renderWithConfig(<ProductForm {...baseProps({ showTiers: true })} />);
+    await user.click(screen.getByRole("button", { name: "Paid" }));
+    await user.click(await screen.findByText(/advanced pricing/i));
+
+    // The wizard mounts in draftMode — its "Pricing tiers" header + a seeded
+    // "Standard" tier row appear, with no network calls (stub config). The
+    // name "Standard" shows in both the summary row and the modal's tier row,
+    // so assert at least one such control exists.
+    expect(await screen.findByRole("heading", { name: /pricing tiers|add pricing|edit pricing/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /Standard/ }).length).toBeGreaterThanOrEqual(1);
   });
 });

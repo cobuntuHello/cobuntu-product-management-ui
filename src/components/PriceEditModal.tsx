@@ -111,9 +111,31 @@ export interface PriceEditModalProps {
    * hidden for unsaved drafts (no `id`).
    */
   showMemberPricing?: boolean;
+  /**
+   * Draft mode — no fetches on mount, no backend writes on Save. Used by
+   * the create-product flow where the product doesn't exist yet, so the
+   * parent (ProductForm) owns the draft state and posts it as part of the
+   * create-product payload. Mirrors the event package exactly.
+   *
+   * In draftMode:
+   *   - No GET /tiers (initialDraftTiers seeds drafts instead)
+   *   - No GET /stripe status (gate happens at the parent's submit time)
+   *   - Member-pricing segments fetch is skipped; the Members step Edit
+   *     buttons stay disabled ("Save tier first" copy covers it)
+   *   - On Save: validate locally, then call onDraftCommit instead of
+   *     POSTing
+   */
+  draftMode?: boolean;
+  /** Initial drafts (from parent's form state). draftMode only. */
+  initialDraftTiers?: DraftTier[];
+  /** Initial donation (from parent's form state). draftMode only. */
+  initialDraftDonation?: DonationDraft;
+  /** Called on Save in draftMode. Parent persists the result in its own
+   *  form state. Modal then closes via onSaved. */
+  onDraftCommit?: (payload: { tiers: DraftTier[]; donation: DonationDraft }) => void;
 }
 
-export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing }: PriceEditModalProps) {
+export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing, draftMode, initialDraftTiers, initialDraftDonation, onDraftCommit }: PriceEditModalProps) {
   const { apiBaseUrl, authHeaders } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
   // Stripe gate — mirrors the event-side wiring. Hides the tier editor
@@ -121,12 +143,12 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   // connected Stripe yet AND any tier on this product is paid. Cached
   // per communityTag inside useStripeStatus so repeated opens of the
   // modal don't re-hit the API.
-  const stripe = useStripeStatus(communityTag);
+  const stripe = useStripeStatus(communityTag, { enabled: !draftMode });
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<DraftTier[]>([]);
   const [saving, setSaving] = useState(false);
   const [publishToggling, setPublishToggling] = useState(false);
-  const [donation, setDonation] = useState<DonationDraft>(() => loadDonationFromProduct(product));
+  const [donation, setDonation] = useState<DonationDraft>(() => draftMode && initialDraftDonation ? initialDraftDonation : loadDonationFromProduct(product));
   const [donationDirty, setDonationDirty] = useState(false);
 
   // Three-level navigation state. Each non-null value escalates the
@@ -173,6 +195,17 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   }
 
   useEffect(() => {
+    // Draft mode: parent owns the source of truth. No fetches; seed
+    // drafts from initialDraftTiers (or a single blank tier).
+    if (draftMode) {
+      setDrafts(
+        initialDraftTiers && initialDraftTiers.length > 0
+          ? initialDraftTiers
+          : [blankTier()],
+      );
+      setLoading(false);
+      return;
+    }
     (async () => {
       try {
         const res = await fetch(`${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/tiers`, { headers: authHeaders() });
@@ -243,12 +276,14 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
       } finally { setLoading(false); }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productId, communityTag, apiBaseUrl, product.price, product.currency, product.isRecurring, product.recurringInterval]);
+  }, [productId, communityTag, apiBaseUrl, product.price, product.currency, product.isRecurring, product.recurringInterval, draftMode]);
 
   // Fetch community segments once when the modal opens with
   // showMemberPricing on. Mirrors the events package's effect.
   useEffect(() => {
-    if (!showMemberPricing) return;
+    // Skipped in draftMode — unsaved tiers have no id to attach overrides
+    // to, so the Members step shows "Save tier first" instead.
+    if (!showMemberPricing || draftMode) return;
     let cancelled = false;
     (async () => {
       try {
@@ -263,7 +298,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showMemberPricing, communityTag, apiBaseUrl]);
+  }, [showMemberPricing, communityTag, apiBaseUrl, draftMode]);
 
   // Lazy per-tier override fetch once segments are loaded.
   useEffect(() => {
@@ -494,6 +529,19 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
       const donationErr = validateDonation(donation);
       if (donationErr) throw new Error(donationErr);
 
+      // Draft mode: hand the validated drafts to the parent and close. No
+      // backend writes — the parent (ProductForm) owns the source of truth
+      // and POSTs these as part of the create-product payload. Member-
+      // pricing + forms need a saved tier id, so they stay edit-time (same
+      // as events); the modal already shows "Save tier first" for them.
+      if (draftMode) {
+        const liveDrafts = drafts.filter((d) => !d.deleted);
+        onDraftCommit?.({ tiers: liveDrafts, donation });
+        showToast("Pricing saved");
+        onSaved();
+        return;
+      }
+
       // Tier writes
       for (const t of drafts) {
         const body = buildTierBody(t);
@@ -650,8 +698,10 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   // wait until the initial tier fetch completes (`loading=false`) and
   // the Stripe status resolves (`stripe.loading=false`) to avoid
   // flashing the warning on the way to a benign all-free product.
+  // Stripe gate doesn't apply in draftMode — the parent's create-product
+  // submit does the connected-account check at the right moment.
   const hasPaidTier = drafts.some((d) => !d.deleted && parseFloat(d.price || "0") > 0);
-  if (!loading && !stripe.loading && !stripe.chargesEnabled && hasPaidTier) {
+  if (!draftMode && !loading && !stripe.loading && !stripe.chargesEnabled && hasPaidTier) {
     return <StripeRequiredWarning communityTag={communityTag} onClose={onClose} />;
   }
 
