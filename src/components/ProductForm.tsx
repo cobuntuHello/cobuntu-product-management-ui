@@ -26,7 +26,7 @@ import {
 import {
   Pencil, FileText, Tag as TagIcon, Image as ImageIcon, Package,
   DollarSign, MousePointerClick, ChevronRight, Check, BarChart3,
-  Eye, EyeOff, UserCheck, Lock,
+  Eye, EyeOff, UserCheck, Lock, ClipboardCheck,
 } from "lucide-react";
 
 // ─── Currencies ────────────────────────────────────────────────
@@ -71,6 +71,12 @@ export interface ProductFormData {
   // checkout (finances service rejects with 403). Same default
   // resolution as viewability.
   accessibility: "PUBLIC" | "MEMBERS_ONLY";
+  /**
+   * Buyer-approval gate. When true, a purchase lands in PENDING escrow until
+   * the seller approves (paid → funds held; free → entitlement gate). Mirrors
+   * the event Require-Approval toggle; backend column products.requiresApproval.
+   */
+  requiresApproval?: boolean;
   /**
    * Tier list — populated only when the consumer renders this form with
    * `showTiers={true}` AND the user has flipped on multi-tier mode.
@@ -125,6 +131,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const [ctaText, setCtaText] = useState(initialData?.ctaText || "");
   const [viewability, setViewability] = useState<"PUBLIC" | "MEMBERS_ONLY">(initialData?.viewability || "PUBLIC");
   const [accessibility, setAccessibility] = useState<"PUBLIC" | "MEMBERS_ONLY">(initialData?.accessibility || "PUBLIC");
+  const [requiresApproval, setRequiresApproval] = useState(initialData?.requiresApproval || false);
 
   // Multi-tier mode — opt-in even when `showTiers` is true. Single-price
   // stays the default so the simple "I just want one price" path doesn't
@@ -148,11 +155,11 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       isPaid, price: emittedPrice, currency,
       isRecurring: multiTier ? false : isRecurring,
       recurringInterval, ctaText,
-      viewability, accessibility,
+      viewability, accessibility, requiresApproval,
       tiers: emittedTiers,
       donation,
     });
-  }, [name, description, tags, mediaItems, productFiles, isPaid, price, currency, isRecurring, recurringInterval, ctaText, viewability, accessibility, multiTier, tiers, donation]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [name, description, tags, mediaItems, productFiles, isPaid, price, currency, isRecurring, recurringInterval, ctaText, viewability, accessibility, requiresApproval, multiTier, tiers, donation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Theme-aware tokens (work on dark community themes AND the light admin via
   // color-mix off the current text colour + a brand var with a zinc fallback).
@@ -388,6 +395,33 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         </div>
       </div>
       )}
+
+      {/* ─── Buyer approval ─── */}
+      <div className="space-y-2">
+        <h3 className="text-sm font-medium text-zinc-700 flex items-center gap-2">
+          <ClipboardCheck className="h-4 w-4" />
+          Approval
+        </h3>
+        <div className="rounded-xl border border-zinc-200 overflow-hidden">
+          <div
+            onClick={() => setRequiresApproval(!requiresApproval)}
+            className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-50/50 transition-colors"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <ClipboardCheck className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-sm font-medium text-zinc-800">Require approval</span>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Buyers apply and you approve before they get access. Their payment is held until you decide.</p>
+              </div>
+            </div>
+            <Switch
+              checked={requiresApproval}
+              onCheckedChange={setRequiresApproval}
+              onClick={e => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      </div>
 
       {/* ─── CTA Text ─── */}
       <div className="space-y-2">
