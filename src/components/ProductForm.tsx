@@ -20,6 +20,7 @@ import {
   FileText, Tag as TagIcon, Package,
   DollarSign, MousePointerClick, ChevronRight,
   Eye, EyeOff, UserCheck, Lock, ClipboardCheck,
+  Image as ImageIcon, Plus, Check,
 } from "lucide-react";
 
 // draftMode makes ZERO API calls (mount fetch, member-pricing fetch, and
@@ -214,41 +215,103 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         )}
       </div>
 
-      {/* ─── Description / Tags / Files — tap-rows (match the event rows) ─── */}
+      {/* ─── Media hero ─── prominent cover + thumbnail strip; opens the
+           gallery editor. Cover uses object-cover on a fixed aspect ratio so
+           photos FILL without distorting (WYSIWYG with the marketplace card),
+           never stretched. */}
+      <div>
+        <button type="button" onClick={() => setIsGalleryOpen(true)}
+          className={`group relative block w-full aspect-[16/10] rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5 ${mediaItems[0]?.url ? "ring-1 ring-zinc-100 hover:ring-zinc-200 hover:shadow-[0_16px_34px_-18px_rgba(60,40,30,0.5)]" : "bg-zinc-50 border-2 border-dashed border-zinc-200 hover:border-zinc-300"}`}>
+          {mediaItems[0]?.url ? (
+            <>
+              <img src={mediaItems[0].url} alt="" className="w-full h-full object-cover" />
+              <span className="absolute top-3 left-3 text-[11px] font-semibold tracking-wide bg-white/85 backdrop-blur-sm text-zinc-800 px-2.5 py-1 rounded-full">Cover</span>
+              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/25 text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                <ImageIcon className="h-[18px] w-[18px]" /> Change cover
+              </div>
+            </>
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 text-zinc-400 transition-colors group-hover:text-zinc-500">
+              <div className="w-12 h-12 rounded-2xl bg-white ring-1 ring-zinc-100 flex items-center justify-center transition-transform duration-200 group-hover:scale-105">
+                <ImageIcon className="h-6 w-6 text-zinc-300" />
+              </div>
+              <span className="text-[13px] font-medium">Add photos</span>
+              <span className="text-[11px] text-zinc-300">Up to 5 · the first is your cover</span>
+            </div>
+          )}
+        </button>
+        {mediaItems.length > 0 && (
+          <>
+            <div className="flex gap-2.5 mt-2.5">
+              {mediaItems.slice(1, 5).map((m, i) => (
+                <button type="button" key={m.id ?? i} onClick={() => setIsGalleryOpen(true)}
+                  className="w-16 h-16 rounded-xl overflow-hidden ring-1 ring-zinc-100 transition-all duration-150 hover:-translate-y-0.5 hover:scale-[1.04] hover:ring-zinc-200 cursor-pointer">
+                  <img src={m.url} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+              {mediaItems.length < 5 && (
+                <button type="button" onClick={() => setIsGalleryOpen(true)} aria-label="Add photo"
+                  className="w-16 h-16 rounded-xl flex items-center justify-center text-zinc-300 border-2 border-dashed border-zinc-200 transition-all duration-150 hover:text-zinc-500 hover:border-zinc-300 hover:-translate-y-0.5 hover:scale-[1.04] cursor-pointer">
+                  <Plus className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+            <p className="text-[12px] text-zinc-400 mt-2.5">{mediaItems.length} of 5 photos · the first is your cover · drag to reorder</p>
+          </>
+        )}
+      </div>
+
+      {/* ─── Detail rows — done-states (check + snippet when filled) + hover
+           motion. The whole row lifts on hover; the chevron nudges right. ─── */}
       <div className="space-y-2.5">
         <button type="button" onClick={() => setIsDescriptionOpen(true)}
-          className="w-full flex items-center gap-3 rounded-2xl bg-white ring-1 ring-zinc-100 px-4 py-3.5 text-left hover:bg-zinc-50/60 transition-colors cursor-pointer">
-          <FileText className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
-          <span className={`text-sm flex-1 truncate ${description ? "text-zinc-700" : "text-zinc-500"}`}>{description ? "Edit description…" : "Add Description"}</span>
-          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300" />
+          className="group w-full flex items-center gap-3 rounded-2xl bg-white ring-1 ring-zinc-100 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
+          {description.replace(/<[^>]*>/g, "").trim() ? (
+            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
+          ) : <FileText className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
+          <span className="flex-1 min-w-0">
+            <span className={`block text-sm truncate ${description.replace(/<[^>]*>/g, "").trim() ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{description.replace(/<[^>]*>/g, "").trim() ? "Description" : "Add description"}</span>
+            {description.replace(/<[^>]*>/g, "").trim() && <span className="block text-[12.5px] text-zinc-500 truncate">{description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()}</span>}
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
         </button>
 
         <button type="button" onClick={() => setIsTagsOpen(true)}
-          className="w-full flex items-center gap-3 rounded-2xl bg-white ring-1 ring-zinc-100 px-4 py-3.5 text-left hover:bg-zinc-50/60 transition-colors cursor-pointer">
-          <TagIcon className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
-          <span className={`text-sm flex-1 truncate ${tags.length > 0 ? "text-zinc-700" : "text-zinc-500"}`}>{tags.length > 0 ? tags.map(t => t.name).join(", ") : "Add Tags"}</span>
-          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300" />
+          className="group w-full flex items-center gap-3 rounded-2xl bg-white ring-1 ring-zinc-100 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
+          {tags.length > 0 ? (
+            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
+          ) : <TagIcon className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
+          <span className="flex-1 min-w-0">
+            <span className={`block text-sm truncate ${tags.length > 0 ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{tags.length > 0 ? "Tags" : "Add tags"}</span>
+            {tags.length > 0 && <span className="block text-[12.5px] text-zinc-500 truncate">{tags.map(t => t.name).join(" · ")}</span>}
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
         </button>
 
         <button type="button" onClick={() => setIsFilesOpen(true)}
-          className="w-full flex items-center gap-3 rounded-2xl bg-white ring-1 ring-zinc-100 px-4 py-3.5 text-left hover:bg-zinc-50/60 transition-colors cursor-pointer">
-          <Package className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
-          <span className={`text-sm flex-1 truncate ${productFiles.length > 0 ? "text-zinc-700" : "text-zinc-500"}`}>{productFiles.length > 0 ? `${productFiles.length} file${productFiles.length > 1 ? "s" : ""} attached` : "Add Files (optional)"}</span>
-          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300" />
+          className="group w-full flex items-center gap-3 rounded-2xl bg-white ring-1 ring-zinc-100 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
+          {productFiles.length > 0 ? (
+            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
+          ) : <Package className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
+          <span className="flex-1 min-w-0">
+            <span className={`block text-sm truncate ${productFiles.length > 0 ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{productFiles.length > 0 ? "Files" : "Add files"}<span className="font-normal text-zinc-400 text-[12.5px]">{productFiles.length > 0 ? "" : " · optional"}</span></span>
+            {productFiles.length > 0 && <span className="block text-[12.5px] text-zinc-500 truncate">{productFiles.length} file{productFiles.length > 1 ? "s" : ""} attached</span>}
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
         </button>
 
-        {/* Button label — tap-row like Tags / Files (opens a small text modal) */}
         <button type="button" onClick={() => setIsCtaOpen(true)}
-          className="w-full flex items-center gap-3 rounded-2xl bg-white ring-1 ring-zinc-100 px-4 py-3.5 text-left hover:bg-zinc-50/60 transition-colors cursor-pointer">
-          <MousePointerClick className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
-          <span className={`text-sm flex-1 truncate ${ctaText ? "text-zinc-700" : "text-zinc-500"}`}>{ctaText ? `Button: “${ctaText}”` : "Button Label (optional)"}</span>
-          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300" />
+          className="group w-full flex items-center gap-3 rounded-2xl bg-white ring-1 ring-zinc-100 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
+          {ctaText.trim() ? (
+            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
+          ) : <MousePointerClick className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
+          <span className="flex-1 min-w-0">
+            <span className={`block text-sm truncate ${ctaText.trim() ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{ctaText.trim() ? "Button label" : "Button label"}<span className="font-normal text-zinc-400 text-[12.5px]">{ctaText.trim() ? "" : " · optional"}</span></span>
+            {ctaText.trim() && <span className="block text-[12.5px] text-zinc-500 truncate">&ldquo;{ctaText}&rdquo;</span>}
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
         </button>
       </div>
-
-      {/* ─── Media carousel — kept as-is (multi-image gallery / reorder).
-           Sits between the Files tap-row and the pricing / options block. ─── */}
-      <SortableMediaGallery items={mediaItems} onChange={setMediaItems} maxItems={5} />
 
       {/* ─── Product Options ─── one card, hairline-divided rows (mirrors the
            event "Event Options" card). Pricing is the first row and opens the
