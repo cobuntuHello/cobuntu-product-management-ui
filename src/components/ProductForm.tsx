@@ -164,21 +164,27 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
 
   // Notify parent
   useEffect(() => {
-    // When multi-tier mode is on, the parent product carries no price of
-    // its own — emit empty `price` + empty `tiers` accordingly. Backend
-    // rejects a payload that sends both. Donation always flows through.
-    const emittedTiers = multiTier ? tiers : [];
-    const emittedPrice = multiTier ? "" : price;
+    // Pricing is set entirely through the tier wizard now (parity with events),
+    // so there is no Free/Paid toggle: "paid" is DERIVED from the tiers. A
+    // product is paid iff a configured (named, non-deleted) tier actually
+    // charges — a fixed price > 0 or PWYW. A free/blank seed tier keeps the
+    // product free and emits no tiers, so a consumer gating on
+    // `isPaid && tiers.length` correctly submits it as a free product; a paid
+    // configuration emits the full tier set for draftTiersToCreatePayload.
+    const named = tiers.filter(t => !t.deleted && t.name.trim());
+    const paid = named.some(t => t.priceMode === "pwyw" || (!!t.price && parseFloat(t.price) > 0));
     onChange?.({
       name, description, tags, mediaItems, productFiles,
-      isPaid, price: emittedPrice, currency,
-      isRecurring: multiTier ? false : isRecurring,
+      isPaid: paid,
+      price: "",
+      currency,
+      isRecurring: false,
       recurringInterval, ctaText,
       viewability, accessibility, requiresApproval,
-      tiers: emittedTiers,
+      tiers: paid ? named : [],
       donation,
     });
-  }, [name, description, tags, mediaItems, productFiles, isPaid, price, currency, isRecurring, recurringInterval, ctaText, viewability, accessibility, requiresApproval, multiTier, tiers, donation]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [name, description, tags, mediaItems, productFiles, currency, recurringInterval, ctaText, viewability, accessibility, requiresApproval, tiers, donation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Configured tiers drive the Pricing row summary + tier cards. A blank
   // seed tier ("Standard") counts once the user has named it.
