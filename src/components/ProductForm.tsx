@@ -120,11 +120,19 @@ interface ProductFormProps {
    * still emits its default PUBLIC/PUBLIC in onChange; the consumer overrides.
    */
   hideVisibility?: boolean;
+  /**
+   * When true, the built-in Buyer-approval section is NOT rendered — the
+   * consumer owns the requireApproval toggle elsewhere (e.g. a shared
+   * "Product Options" config card) and stamps it at submit. The form still
+   * emits `requiresApproval` in onChange; the consumer overrides. Mirrors
+   * hideVisibility.
+   */
+  hideApproval?: boolean;
 }
 
 // ─── Component ─────────────────────────────────────────────────
 
-export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility }: ProductFormProps) {
+export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval }: ProductFormProps) {
   // Form state
   const [name, setName] = useState(initialData?.name || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -424,6 +432,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       )}
 
       {/* ─── Buyer approval ─── */}
+      {/* Skipped when `hideApproval` — the consumer renders it elsewhere
+          (e.g. a shared "Product Options" card). */}
+      {!hideApproval && (
       <div className="space-y-2">
         <h3 className="text-sm font-medium text-zinc-700 flex items-center gap-2">
           <ClipboardCheck className="h-4 w-4" />
@@ -449,6 +460,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           </div>
         </div>
       </div>
+      )}
 
       {/* ─── CTA Text ─── */}
       <div className="space-y-2">
