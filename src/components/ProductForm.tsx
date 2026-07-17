@@ -216,12 +216,13 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       </div>
 
       {/* ─── Media hero ─── prominent cover + thumbnail strip; opens the
-           gallery editor. Cover uses object-cover on a fixed aspect ratio so
-           photos FILL without distorting (WYSIWYG with the marketplace card),
-           never stretched. */}
+           gallery editor. Cover is a capped SQUARE (1:1) — object-cover so
+           photos FILL without distorting, and 1:1 matches BOTH the square
+           crop the gallery editor enforces AND the square marketplace card /
+           detail view (true WYSIWYG). Capped width so it doesn't dominate. */}
       <div>
         <button type="button" onClick={() => setIsGalleryOpen(true)}
-          className={`group relative block w-full aspect-[16/10] rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5 ${mediaItems[0]?.url ? "ring-1 ring-zinc-100 hover:ring-zinc-200 hover:shadow-[0_16px_34px_-18px_rgba(60,40,30,0.5)]" : "bg-zinc-50 border-2 border-dashed border-zinc-200 hover:border-zinc-300"}`}>
+          className={`group relative block w-full max-w-[360px] aspect-square rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5 ${mediaItems[0]?.url ? "ring-1 ring-zinc-100 hover:ring-zinc-200 hover:shadow-[0_16px_34px_-18px_rgba(60,40,30,0.5)]" : "bg-zinc-50 border-2 border-dashed border-zinc-200 hover:border-zinc-300"}`}>
           {mediaItems[0]?.url ? (
             <>
               <img src={mediaItems[0].url} alt="" className="w-full h-full object-cover" />
