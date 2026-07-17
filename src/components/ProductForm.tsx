@@ -241,25 +241,27 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             </div>
           )}
         </button>
-        {mediaItems.length > 0 && (
-          <>
-            <div className="flex gap-2.5 mt-2.5">
-              {mediaItems.slice(1, 5).map((m, i) => (
-                <button type="button" key={m.id ?? i} onClick={() => setIsGalleryOpen(true)}
-                  className="w-16 h-16 rounded-xl overflow-hidden ring-1 ring-zinc-100 transition-all duration-150 hover:-translate-y-0.5 hover:scale-[1.04] hover:ring-zinc-200 cursor-pointer">
-                  <img src={m.url} alt="" className="w-full h-full object-cover" />
-                </button>
-              ))}
-              {mediaItems.length < 5 && (
-                <button type="button" onClick={() => setIsGalleryOpen(true)} aria-label="Add photo"
-                  className="w-16 h-16 rounded-xl flex items-center justify-center text-zinc-300 border-2 border-dashed border-zinc-200 transition-all duration-150 hover:text-zinc-500 hover:border-zinc-300 hover:-translate-y-0.5 hover:scale-[1.04] cursor-pointer">
-                  <Plus className="h-5 w-5" />
-                </button>
-              )}
-            </div>
-            <p className="text-[12px] text-zinc-400 mt-2.5">{mediaItems.length} of 5 photos · the first is your cover · drag to reorder</p>
-          </>
-        )}
+        {/* Thumbnail carousel — always visible (even before any upload) so the
+             multi-image nature reads from the empty state, matching the design
+             mockup. Four slots for photos 2-5; each is a filled thumbnail or a
+             ghost add-slot. Photo 1 is the cover hero above. */}
+        <div className="flex gap-2.5 mt-2.5">
+          {[1, 2, 3, 4].map((i) => {
+            const m = mediaItems[i];
+            return m ? (
+              <button type="button" key={m.id ?? i} onClick={() => setIsGalleryOpen(true)}
+                className="w-16 h-16 rounded-xl overflow-hidden ring-1 ring-zinc-100 transition-all duration-150 hover:-translate-y-0.5 hover:scale-[1.04] hover:ring-zinc-200 cursor-pointer">
+                <img src={m.url} alt="" className="w-full h-full object-cover" />
+              </button>
+            ) : (
+              <button type="button" key={`add-${i}`} onClick={() => setIsGalleryOpen(true)} aria-label="Add photo"
+                className="w-16 h-16 rounded-xl flex items-center justify-center text-zinc-300 border-2 border-dashed border-zinc-200 transition-all duration-150 hover:text-zinc-500 hover:border-zinc-300 hover:-translate-y-0.5 hover:scale-[1.04] cursor-pointer">
+                <Plus className="h-5 w-5" />
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[12px] text-zinc-400 mt-2.5">{mediaItems.length > 0 ? `${mediaItems.length} of 5 photos · the first is your cover · drag to reorder` : "Up to 5 photos · the first is your cover"}</p>
       </div>
 
       {/* ─── Detail rows — done-states (check + snippet when filled) + hover
