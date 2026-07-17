@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
@@ -9,7 +9,8 @@ import {
 } from "../ui/dialog";
 import { EventTags } from "../ui/event-tags";
 import { RichTextEditor } from "../ui/rich-text-editor";
-import { SortableMediaGallery, type MediaItem } from "../ui/sortable-media-gallery";
+import { type MediaItem } from "../ui/sortable-media-gallery";
+import { BannerCropModal, type BannerCropResult } from "../ui/banner-crop-modal";
 import { FileUploadZone, type UploadedFile } from "../ui/file-upload-zone";
 import { cn } from "../ui/utils";
 import { PriceEditModal } from "./PriceEditModal";
@@ -20,7 +21,7 @@ import {
   FileText, Tag as TagIcon, Package,
   DollarSign, MousePointerClick, ChevronRight,
   Eye, EyeOff, UserCheck, Lock, ClipboardCheck,
-  Image as ImageIcon, Plus, Check,
+  Image as ImageIcon, Plus, Check, X,
 } from "lucide-react";
 
 // draftMode makes ZERO API calls (mount fetch, member-pricing fetch, and
@@ -157,8 +158,58 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
   const [isTagsOpen, setIsTagsOpen] = useState(false);
   const [isFilesOpen, setIsFilesOpen] = useState(false);
-  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [isCtaOpen, setIsCtaOpen] = useState(false);
+
+  // ─── Inline photo upload ───
+  // Tap a slot → native device picker (our own hidden input) → the square
+  // cropper (the only popup) → the photo lands in the carousel. No separate
+  // "Product Photos" gallery popup. cropEditIndex null = adding a new photo;
+  // a number = re-cropping the photo at that index.
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [cropEditIndex, setCropEditIndex] = useState<number | null>(null);
+  const mediaSrc = (m?: MediaItem) => m?.preview || m?.url || "";
+
+  function pickPhoto() {
+    setCropEditIndex(null);
+    photoInputRef.current?.click();
+  }
+  function onPhotoFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (photoInputRef.current) photoInputRef.current.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { setCropSrc(reader.result as string); setCropOpen(true); };
+    reader.readAsDataURL(file);
+  }
+  function recropPhoto(index: number) {
+    const m = mediaItems[index];
+    if (!m) return;
+    setCropEditIndex(index);
+    setCropSrc(mediaSrc(m));
+    setCropOpen(true);
+  }
+  function onCropSave(result: BannerCropResult) {
+    if (!result.base64) return;
+    if (cropEditIndex === null) {
+      setMediaItems([...mediaItems, { id: crypto.randomUUID(), preview: result.base64, type: "image" as const }].slice(0, 5));
+    } else {
+      const next = [...mediaItems];
+      if (next[cropEditIndex]) next[cropEditIndex] = { ...next[cropEditIndex], preview: result.base64 };
+      setMediaItems(next);
+    }
+  }
+  function removePhoto(index: number) {
+    setMediaItems(mediaItems.filter((_, i) => i !== index));
+  }
+  function makeCover(index: number) {
+    if (index <= 0 || !mediaItems[index]) return;
+    const next = [...mediaItems];
+    const [m] = next.splice(index, 1);
+    next.unshift(m);
+    setMediaItems(next);
+  }
   // Tier wizard (the shared PriceEditModal in draftMode). Opened from the
   // Advanced-pricing summary row; commits drafts back into `tiers`/`donation`.
   const [showTierModal, setShowTierModal] = useState(false);
@@ -215,53 +266,64 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         )}
       </div>
 
-      {/* ─── Media hero ─── prominent cover + thumbnail strip; opens the
-           gallery editor. Cover is a capped SQUARE (1:1) — object-cover so
-           photos FILL without distorting, and 1:1 matches BOTH the square
-           crop the gallery editor enforces AND the square marketplace card /
-           detail view (true WYSIWYG). Capped width so it doesn't dominate. */}
+      {/* ─── Photos ─── inline uploader. Tap the cover or any slot → the
+           device's own photo picker → the square cropper (the ONLY popup) →
+           the photo lands here. Cover (photo 1) is a capped 1:1 square that
+           matches the crop + the marketplace card. Tap a thumbnail to make it
+           the cover; tap the corner X to remove. Fully responsive: the cover
+           is full-width up to 360px, thumbnails wrap. No gallery popup. */}
       <div>
-        <button type="button" onClick={() => setIsGalleryOpen(true)}
-          className={`group relative block w-full max-w-[360px] aspect-square rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5 ${mediaItems[0]?.url ? "ring-1 ring-zinc-100 hover:ring-zinc-200 hover:shadow-[0_16px_34px_-18px_rgba(60,40,30,0.5)]" : "bg-zinc-50 border-2 border-dashed border-zinc-200 hover:border-zinc-300"}`}>
-          {mediaItems[0]?.url ? (
-            <>
-              <img src={mediaItems[0].url} alt="" className="w-full h-full object-cover" />
+        {mediaItems[0] ? (
+          <div className="group relative w-full max-w-[360px] aspect-square rounded-2xl overflow-hidden ring-1 ring-zinc-100">
+            <button type="button" onClick={() => recropPhoto(0)} className="block w-full h-full cursor-pointer" aria-label="Recrop cover photo">
+              <img src={mediaSrc(mediaItems[0])} alt="" className="w-full h-full object-cover" />
               <span className="absolute top-3 left-3 text-[11px] font-semibold tracking-wide bg-white/85 backdrop-blur-sm text-zinc-800 px-2.5 py-1 rounded-full">Cover</span>
-              <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/25 text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                <ImageIcon className="h-[18px] w-[18px]" /> Change cover
-              </div>
-            </>
-          ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 text-zinc-400 transition-colors group-hover:text-zinc-500">
-              <div className="w-12 h-12 rounded-2xl bg-white ring-1 ring-zinc-100 flex items-center justify-center transition-transform duration-200 group-hover:scale-105">
-                <ImageIcon className="h-6 w-6 text-zinc-300" />
-              </div>
-              <span className="text-[13px] font-medium">Add photos</span>
-              <span className="text-[11px] text-zinc-300">Up to 5 · the first is your cover</span>
-            </div>
-          )}
-        </button>
-        {/* Thumbnail carousel — always visible (even before any upload) so the
-             multi-image nature reads from the empty state, matching the design
-             mockup. Four slots for photos 2-5; each is a filled thumbnail or a
-             ghost add-slot. Photo 1 is the cover hero above. */}
-        <div className="flex gap-2.5 mt-2.5">
+              <span className="absolute inset-0 flex items-center justify-center gap-2 bg-black/25 text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                <ImageIcon className="h-[18px] w-[18px]" /> Recrop
+              </span>
+            </button>
+            <button type="button" onClick={() => removePhoto(0)} aria-label="Remove cover photo"
+              className="absolute top-2.5 right-2.5 h-7 w-7 rounded-full bg-black/55 hover:bg-black/75 text-white flex items-center justify-center transition-colors cursor-pointer">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={pickPhoto}
+            className="group relative w-full max-w-[360px] aspect-square rounded-2xl bg-zinc-50 border-2 border-dashed border-zinc-200 hover:border-zinc-300 transition-colors cursor-pointer flex flex-col items-center justify-center gap-2.5 text-zinc-400 hover:text-zinc-500">
+            <span className="w-12 h-12 rounded-2xl bg-white ring-1 ring-zinc-100 flex items-center justify-center transition-transform duration-200 group-hover:scale-105">
+              <ImageIcon className="h-6 w-6 text-zinc-300" />
+            </span>
+            <span className="text-[13px] font-medium">Add cover photo</span>
+            <span className="text-[11px] text-zinc-300">Up to 5 · the first is your cover</span>
+          </button>
+        )}
+
+        {/* Thumbnails (photos 2-5) — filled tiles or ghost add-slots. */}
+        <div className="flex flex-wrap gap-2.5 mt-2.5">
           {[1, 2, 3, 4].map((i) => {
             const m = mediaItems[i];
             return m ? (
-              <button type="button" key={m.id ?? i} onClick={() => setIsGalleryOpen(true)}
-                className="w-16 h-16 rounded-xl overflow-hidden ring-1 ring-zinc-100 transition-all duration-150 hover:-translate-y-0.5 hover:scale-[1.04] hover:ring-zinc-200 cursor-pointer">
-                <img src={m.url} alt="" className="w-full h-full object-cover" />
-              </button>
+              <div key={m.id ?? i} className="group relative w-16 h-16 rounded-xl overflow-hidden ring-1 ring-zinc-100">
+                <button type="button" onClick={() => makeCover(i)} title="Make cover" aria-label="Make this the cover"
+                  className="block w-full h-full cursor-pointer transition-transform duration-150 hover:scale-[1.04]">
+                  <img src={mediaSrc(m)} alt="" className="w-full h-full object-cover" />
+                  <span className="absolute inset-x-0 bottom-0 text-[9px] font-semibold text-white text-center py-0.5 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity">Make cover</span>
+                </button>
+                <button type="button" onClick={() => removePhoto(i)} aria-label="Remove photo"
+                  className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-black/70 hover:bg-black/85 text-white flex items-center justify-center transition-colors cursor-pointer">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
             ) : (
-              <button type="button" key={`add-${i}`} onClick={() => setIsGalleryOpen(true)} aria-label="Add photo"
+              <button type="button" key={`add-${i}`} onClick={pickPhoto} aria-label="Add photo"
                 className="w-16 h-16 rounded-xl flex items-center justify-center text-zinc-300 border-2 border-dashed border-zinc-200 transition-all duration-150 hover:text-zinc-500 hover:border-zinc-300 hover:-translate-y-0.5 hover:scale-[1.04] cursor-pointer">
                 <Plus className="h-5 w-5" />
               </button>
             );
           })}
         </div>
-        <p className="text-[12px] text-zinc-400 mt-2.5">{mediaItems.length > 0 ? `${mediaItems.length} of 5 photos · the first is your cover · drag to reorder` : "Up to 5 photos · the first is your cover"}</p>
+        <p className="text-[12px] text-zinc-400 mt-2.5">{mediaItems.length > 0 ? `${mediaItems.length} of 5 photos · tap a photo to make it the cover` : "Up to 5 photos · the first is your cover"}</p>
+        <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={onPhotoFile} />
       </div>
 
       {/* ─── Detail rows — done-states (check + snippet when filled) + hover
@@ -339,7 +401,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                   <div className="space-y-2 mb-3">
                     {configuredTiers.map((t, i) => (
                       <button type="button" key={i} onClick={() => openTierEditor(t.localId)}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-zinc-50 hover:bg-zinc-100 transition-colors cursor-pointer text-left">
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-zinc-50 hover:bg-zinc-100 hover:translate-x-0.5 transition-all duration-150 cursor-pointer text-left">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-zinc-200 text-zinc-600">
                           <DollarSign className="h-3.5 w-3.5" />
                         </div>
@@ -352,7 +414,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                   </div>
                 )}
                 <button type="button" onClick={addAndEditTier}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[13px] font-medium text-zinc-500 hover:text-zinc-700 border border-dashed border-zinc-200 hover:border-zinc-300 rounded-xl cursor-pointer transition-colors">
+                  onMouseEnter={e => { const b = "var(--brand-color, #b8336a)"; e.currentTarget.style.color = b; e.currentTarget.style.borderColor = "color-mix(in srgb, var(--brand-color, #b8336a) 35%, transparent)"; e.currentTarget.style.background = "color-mix(in srgb, var(--brand-color, #b8336a) 6%, transparent)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = ""; e.currentTarget.style.borderColor = ""; e.currentTarget.style.background = ""; }}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[13px] font-medium text-zinc-500 border border-dashed border-zinc-200 rounded-xl cursor-pointer transition-all duration-150">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                   {configuredTiers.length === 0 ? "Set pricing" : "Add pricing tier"}
                 </button>
@@ -439,19 +503,17 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         </DialogContent>
       </Dialog>
 
-      {/* ─── Gallery Modal ─── (cover square → full sortable gallery) */}
-      <Dialog open={isGalleryOpen} onOpenChange={setIsGalleryOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Product Photos</DialogTitle>
-            <DialogDescription>Add up to 5 photos. The first is the cover.</DialogDescription>
-          </DialogHeader>
-          <SortableMediaGallery items={mediaItems} onChange={setMediaItems} maxItems={5} />
-          <DialogFooter>
-            <Button onClick={() => setIsGalleryOpen(false)}>Done</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* ─── Crop popup ─── the ONLY photo popup. The device picker feeds it
+           an image (directCropSrc); the user frames it to a 1:1 square and it
+           lands in the carousel. No gallery popup in between. */}
+      <BannerCropModal
+        open={cropOpen}
+        onOpenChange={setCropOpen}
+        directCropSrc={cropSrc}
+        onSave={onCropSave}
+        title="Frame your photo"
+        hideStockPhotos
+      />
 
       {/* ─── Files Modal ─── (digital delivery) */}
       <Dialog open={isFilesOpen} onOpenChange={setIsFilesOpen}>
