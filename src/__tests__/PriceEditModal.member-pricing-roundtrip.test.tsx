@@ -157,6 +157,25 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     });
   });
 
+  it("keeps Save ENABLED when the community has no segments (regression: was permanently disabled)", async () => {
+    // Prod bug: with showMemberPricing + a saved tier + ZERO segments, the
+    // per-tier member-pricing fetch effect returns early, so memberPricingByTier
+    // never populates → memberPricingPending was stuck true → the Save button was
+    // disabled forever (clicking it did nothing, no toast). A no-segment community
+    // could not save any product tier.
+    mockFetch([
+      { method: "GET", url: /\/api\/communities\/orbis\/products\/p-1\/tiers$/, body: [tier] },
+      { method: "GET", url: /\/api\/communities\/orbis\/tiers\/tier-1\/form$/, status: 404, body: {} },
+      { method: "GET", url: /\/api\/communities\/orbis\/segments$/, body: [] }, // NO segments
+      { method: "GET", url: /\/api\/communities\/orbis\/stripe\/connected$/, body: { connected: true, chargesEnabled: true } },
+    ]);
+    renderWithConfig(<PriceEditModal {...baseProps()} />);
+    // At the tier list (L1), the outer Save must not be stuck disabled once the
+    // tiers have loaded — there is nothing to wait on when there are no segments.
+    const saveBtn = await screen.findByRole("button", { name: /^save$/i });
+    await waitFor(() => expect(saveBtn).not.toBeDisabled());
+  });
+
   it("re-entering Members step shows the previously-toggled state (mount stability)", async () => {
     const user = userEvent.setup();
     mockFetch(stubLoadRoutes());
