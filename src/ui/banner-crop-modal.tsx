@@ -178,14 +178,14 @@ export function BannerCropModal({
 
       {/* Crop Modal */}
       <Dialog open={open && showCropModal} onOpenChange={onOpenChange}>
-        <DialogContent hideClose className="sm:max-w-2xl max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col">
+        <DialogContent hideClose className="sm:max-w-md max-h-[88vh] p-0 gap-0 overflow-hidden flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-4 border-b border-zinc-100 flex-shrink-0">
             <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
-            <p className="text-sm text-zinc-500 mt-1">Adjust the image to fit a square (1:1) format</p>
+            <p className="text-sm mt-1" style={{ color: "color-mix(in srgb, var(--text-color, #18181b) 55%, transparent)" }}>Adjust the image to fit a square (1:1) format</p>
           </DialogHeader>
 
           <div className="px-6 py-4 space-y-6 overflow-y-auto flex-1 min-h-0">
-            <div className="relative w-full rounded-xl overflow-hidden bg-zinc-100 border border-zinc-200 aspect-square shadow-inner max-w-full">
+            <div className="relative w-full max-w-[340px] mx-auto rounded-xl overflow-hidden aspect-square shadow-inner" style={{ background: "color-mix(in srgb, var(--text-color, #18181b) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--text-color, #18181b) 15%, transparent)" }}>
               {imageSrc ? (
                 <Cropper image={imageSrc} crop={crop} zoom={zoom} aspect={1} showGrid={false} cropShape="rect"
                   onCropChange={setCrop} onCropComplete={onCropComplete} onZoomChange={setZoom} restrictPosition={false} />
