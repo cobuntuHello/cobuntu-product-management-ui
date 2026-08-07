@@ -330,7 +330,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
            motion. The whole row lifts on hover; the chevron nudges right. ─── */}
       <div className="space-y-2.5">
         <button type="button" onClick={() => setIsDescriptionOpen(true)}
-          className="group w-full flex items-center gap-3 rounded-2xl bg-white ring-1 ring-zinc-100 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
+          className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
           {description.replace(/<[^>]*>/g, "").trim() ? (
             <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
           ) : <FileText className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
@@ -342,7 +342,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         </button>
 
         <button type="button" onClick={() => setIsTagsOpen(true)}
-          className="group w-full flex items-center gap-3 rounded-2xl bg-white ring-1 ring-zinc-100 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
+          className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
           {tags.length > 0 ? (
             <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
           ) : <TagIcon className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
@@ -354,7 +354,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         </button>
 
         <button type="button" onClick={() => setIsFilesOpen(true)}
-          className="group w-full flex items-center gap-3 rounded-2xl bg-white ring-1 ring-zinc-100 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
+          className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
           {productFiles.length > 0 ? (
             <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
           ) : <Package className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
@@ -366,7 +366,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         </button>
 
         <button type="button" onClick={() => setIsCtaOpen(true)}
-          className="group w-full flex items-center gap-3 rounded-2xl bg-white ring-1 ring-zinc-100 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
+          className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
           {ctaText.trim() ? (
             <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
           ) : <MousePointerClick className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
@@ -385,7 +385,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       {(showTiers || !hideVisibility || !hideApproval) && (
         <div>
           <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Product Options</p>
-          <div className="rounded-2xl bg-white ring-1 ring-zinc-100 divide-y divide-zinc-100 overflow-hidden">
+          <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
             {/* Pricing — identical treatment to the event "Tickets" row:
                 summary + tier cards + a dashed button into the shared wizard. */}
             {showTiers && (
@@ -401,7 +401,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                   <div className="space-y-2 mb-3">
                     {configuredTiers.map((t, i) => (
                       <button type="button" key={i} onClick={() => openTierEditor(t.localId)}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-zinc-50 hover:bg-zinc-100 hover:translate-x-0.5 transition-all duration-150 cursor-pointer text-left">
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white hover:bg-zinc-100 hover:translate-x-0.5 transition-all duration-150 cursor-pointer text-left">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-zinc-200 text-zinc-600">
                           <DollarSign className="h-3.5 w-3.5" />
                         </div>
@@ -427,7 +427,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 {/* Visibility — who can SEE the listing */}
                 <div
                   onClick={() => setViewability(viewability === "PUBLIC" ? "MEMBERS_ONLY" : "PUBLIC")}
-                  className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-50/50 transition-colors">
+                  className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-100/60 transition-colors">
                   <div className="flex items-center gap-3 min-w-0">
                     {viewability === "PUBLIC" ? <Eye className="h-[18px] w-[18px] text-zinc-400 shrink-0" /> : <EyeOff className="h-[18px] w-[18px] text-zinc-400 shrink-0" />}
                     <div className="min-w-0">
@@ -440,7 +440,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 {/* Purchase — who can BUY */}
                 <div
                   onClick={() => setAccessibility(accessibility === "PUBLIC" ? "MEMBERS_ONLY" : "PUBLIC")}
-                  className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-50/50 transition-colors">
+                  className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-100/60 transition-colors">
                   <div className="flex items-center gap-3 min-w-0">
                     {accessibility === "PUBLIC" ? <UserCheck className="h-[18px] w-[18px] text-zinc-400 shrink-0" /> : <Lock className="h-[18px] w-[18px] text-zinc-400 shrink-0" />}
                     <div className="min-w-0">
@@ -456,7 +456,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               /* Require approval — buyer applies, seller approves (escrow held) */
               <div
                 onClick={() => setRequiresApproval(!requiresApproval)}
-                className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-50/50 transition-colors">
+                className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-100/60 transition-colors">
                 <div className="flex items-center gap-3 min-w-0">
                   <ClipboardCheck className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
                   <div className="min-w-0">
