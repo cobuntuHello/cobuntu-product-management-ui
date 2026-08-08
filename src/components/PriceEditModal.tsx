@@ -811,6 +811,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             const idx = activeIdx();
             if (idx != null) updateDraft(idx, patch);
           }}
+          draftMode={!!draftMode}
           showMemberPricing={!!showMemberPricing}
           memberPricingState={activeDraft.id ? memberPricingByTier.get(activeDraft.id) : undefined}
           onMemberPricingRowChange={
