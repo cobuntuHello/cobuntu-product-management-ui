@@ -571,6 +571,15 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             }}
             onClose={() => setShowTierModal(false)}
             onSaved={() => setShowTierModal(false)}
+            /*
+             * Deliberate no-op: ProductForm has no toast host of its own, and
+             * inventing one here would collide with whatever the consuming app
+             * already renders. Safe only because PriceEditModal surfaces its
+             * own failures inline (see saveError there) — until 2026-08-08 it
+             * did not, and this stub silently swallowed "Price required",
+             * which is what made Save look dead. If a consumer wants toasts,
+             * the fix is to thread its own through, not to fill this in.
+             */
             showToast={() => {}}
             showMemberPricing={false}
           />
