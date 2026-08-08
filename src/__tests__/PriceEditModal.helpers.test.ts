@@ -520,3 +520,32 @@ describe("draftTiersToCreatePayload", () => {
     expect(payload[0]).toMatchObject({ name: "Keep" });
   });
 });
+
+/**
+ * The create payload carries a staged form; the tier POST/PUT bodies do not.
+ *
+ * buildTierBody serves BOTH — the create payload and the tier endpoints on a
+ * saved product, where a form is managed through its own endpoint. Putting
+ * `form` in buildTierBody would send dead weight on every tier update, so it
+ * is added in draftTiersToCreatePayload instead. This pins that split; it is
+ * the kind of thing a later "tidy up, they're nearly the same" refactor undoes.
+ */
+describe("draftTiersToCreatePayload — staged registration form", () => {
+  it("includes form only when the draft actually has fields", () => {
+    const withForm = { ...blankTier({ currency: "EUR" }), name: "Standard", price: "10", draftForm: { fields: [{ id: "a", label: "A" }] } };
+    const withoutForm = { ...blankTier({ currency: "EUR" }), name: "Basic", price: "5" };
+    const emptyForm = { ...blankTier({ currency: "EUR" }), name: "Empty", price: "5", draftForm: { fields: [] } };
+
+    const payload = draftTiersToCreatePayload([withForm, withoutForm, emptyForm] as any);
+
+    expect((payload[0] as any).form.fields).toHaveLength(1);
+    // Absent, not null: an empty form would gate checkout behind no questions.
+    expect((payload[1] as any).form).toBeUndefined();
+    expect((payload[2] as any).form).toBeUndefined();
+  });
+
+  it("does NOT put form on the tier update body", () => {
+    const t = { ...blankTier({ currency: "EUR" }), name: "Standard", price: "10", draftForm: { fields: [{ id: "a", label: "A" }] } };
+    expect((buildTierBody(t as any) as any).form).toBeUndefined();
+  });
+});
