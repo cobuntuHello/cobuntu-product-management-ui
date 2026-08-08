@@ -18,6 +18,7 @@ import { PriceEditModal } from "./PriceEditModal";
 import { ProductManagementConfigProvider } from "../config";
 import { type DraftTier, type DonationDraft } from "./PriceEditModal/types";
 import { blankTier, blankDonation } from "./PriceEditModal/helpers";
+import { CategoryPickerRow, type CategoryOption } from "./CategoryPickerRow";
 import {
   FileText, Tag as TagIcon, Package,
   DollarSign, MousePointerClick, ChevronRight,
@@ -61,6 +62,9 @@ export interface ProductFormData {
   name: string;
   description: string;
   tags: Tag[];
+  /** Community taxonomy. null = unfiled. Sub-category is only ever set with its parent. */
+  categoryId: string | null;
+  subCategoryId: string | null;
   mediaItems: MediaItem[];
   productFiles: UploadedFile[];
   isPaid: boolean;
@@ -103,6 +107,16 @@ export interface ProductFormData {
 
 interface ProductFormProps {
   communityTag: string;
+  /**
+   * The community's product categories, loaded by the CONSUMER.
+   *
+   * Not fetched here on purpose: the create wizard runs against a stub config
+   * with an empty apiBaseUrl and makes zero API calls, which is what lets
+   * consumers embed this form without wiring a provider. The row hides itself
+   * when this is empty or omitted, so a community with no taxonomy sees no
+   * picker rather than an empty one.
+   */
+  categories?: CategoryOption[];
   initialData?: Partial<ProductFormData>;
   onChange?: (data: ProductFormData) => void;
   showErrors?: boolean;
@@ -131,7 +145,7 @@ interface ProductFormProps {
 
 // ─── Component ─────────────────────────────────────────────────
 
-export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval }: ProductFormProps) {
+export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, categories }: ProductFormProps) {
   // Form state
   const [name, setName] = useState(initialData?.name || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -162,6 +176,8 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
 
   // UI state
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
+  const [categoryId, setCategoryId] = useState<string | null>(initialData?.categoryId ?? null);
+  const [subCategoryId, setSubCategoryId] = useState<string | null>(initialData?.subCategoryId ?? null);
   const [isTagsOpen, setIsTagsOpen] = useState(false);
   const [isFilesOpen, setIsFilesOpen] = useState(false);
   const [isCtaOpen, setIsCtaOpen] = useState(false);
@@ -266,7 +282,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
     const named = tiers.filter(t => !t.deleted && t.name.trim());
     const paid = named.some(t => t.priceMode === "pwyw" || (!!t.price && parseFloat(t.price) > 0));
     onChange?.({
-      name, description, tags, mediaItems, productFiles,
+      name, description, tags, categoryId, subCategoryId, mediaItems, productFiles,
       isPaid: paid,
       price: "",
       currency,
@@ -276,7 +292,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       tiers: paid ? named : [],
       donation,
     });
-  }, [name, description, tags, mediaItems, productFiles, currency, recurringInterval, ctaText, viewability, accessibility, requiresApproval, tiers, donation]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [name, description, tags, categoryId, subCategoryId, mediaItems, productFiles, currency, recurringInterval, ctaText, viewability, accessibility, requiresApproval, tiers, donation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Configured tiers drive the Pricing row summary + tier cards. A blank
   // seed tier ("Standard") counts once the user has named it.
@@ -382,6 +398,17 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           </span>
           <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
         </button>
+
+        <CategoryPickerRow
+          categories={categories ?? []}
+          categoryId={categoryId}
+          subCategoryId={subCategoryId}
+          noun="product"
+          onChange={({ categoryId: c, subCategoryId: sc }) => {
+            setCategoryId(c);
+            setSubCategoryId(sc);
+          }}
+        />
 
         <button type="button" onClick={() => setIsFilesOpen(true)}
           className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">

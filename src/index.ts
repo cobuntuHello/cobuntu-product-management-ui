@@ -93,3 +93,7 @@ export { StockPhotoPicker } from "./ui/stock-photo-picker";
 export { BannerCropModal, type BannerCropResult } from "./ui/banner-crop-modal";
 export { SortableMediaGallery, type MediaItem } from "./ui/sortable-media-gallery";
 export { cn } from "./ui/utils";
+
+// Category picker — the consumer loads the options and passes them to
+// ProductForm; the type is exported so it can shape that fetch.
+export { CategoryPickerRow, type CategoryOption } from "./components/CategoryPickerRow";
