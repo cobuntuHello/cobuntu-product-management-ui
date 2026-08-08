@@ -303,7 +303,16 @@ export function buildTierBody(
 export function draftTiersToCreatePayload(drafts: DraftTier[]): Record<string, unknown>[] {
   return drafts
     .filter((t) => !t.deleted && t.name.trim())
-    .map((t) => buildTierBody(t));
+    .map((t) => {
+      const body = buildTierBody(t);
+      // Registration form staged during create. Added HERE and not in
+      // buildTierBody because that function also builds the POST/PUT bodies
+      // for the tier endpoints on a SAVED product, where a form is managed
+      // through its own endpoint and this key would be dead weight. Only the
+      // create payload can carry a form for a tier that has no id yet.
+      if (t.draftForm && t.draftForm.fields?.length) body.form = t.draftForm;
+      return body;
+    });
 }
 
 /** Builds the donation-config sidecar body. Returns null when the
