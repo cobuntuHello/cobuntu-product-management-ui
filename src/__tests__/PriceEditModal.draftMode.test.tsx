@@ -91,3 +91,61 @@ describe("PriceEditModal — draftMode (products)", () => {
     expect(props.onDraftCommit).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Reported 2026-08-08 on /marketplace/new: "the Save button does nothing or at
+ * least gives no visual feedback."
+ *
+ * The cause was not the Save handler — it correctly refused a tier with no
+ * price and raised "Price required". It was that ProductForm passed
+ * `showToast={() => {}}`, so the modal's only error channel was a stub. The
+ * message was produced and discarded, the modal stayed open unchanged, and
+ * Save looked dead.
+ *
+ * These assert what a user can SEE, with showToast deliberately a no-op — the
+ * exact wiring the create form uses. A test that asserted showToast was called
+ * would have passed throughout the entire time the bug was live.
+ */
+describe("PriceEditModal — draftMode save failures are visible without a host toast", () => {
+  it("renders the validation failure inside the modal", async () => {
+    mockFetch([]);
+    const user = userEvent.setup();
+    // A blank tier has an empty price — precisely the reported state.
+    const props = baseProps({ showToast: () => {} });
+    renderWithConfig(<PriceEditModal {...props} />);
+
+    await screen.findByRole("button", { name: /Standard/ });
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/price required/i);
+    // And it did NOT silently commit a draft the user never completed.
+    expect(props.onDraftCommit).not.toHaveBeenCalled();
+    expect(props.onSaved).not.toHaveBeenCalled();
+  });
+
+  it("clears a previous failure when the user fixes it and saves again", async () => {
+    // Otherwise the banner becomes a permanent scold that outlives the problem.
+    mockFetch([]);
+    const user = userEvent.setup();
+    const props = baseProps({
+      showToast: () => {},
+      initialDraftTiers: [{ ...blankTier({ currency: "EUR" }), name: "Standard", price: "" }],
+    });
+    renderWithConfig(<PriceEditModal {...props} />);
+
+    await screen.findByRole("button", { name: /Standard/ });
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+    expect(await screen.findByRole("alert")).toBeTruthy();
+
+    // Give it a price, save again — the banner goes and the commit lands.
+    // The price field lives inside the tier (L2), not on the L1 list.
+    await user.click(screen.getByRole("button", { name: /Standard/ }));
+    const price = await screen.findByPlaceholderText("0.00");
+    await user.type(price, "25");
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(props.onDraftCommit).toHaveBeenCalled());
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});

@@ -155,6 +155,16 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<DraftTier[]>([]);
   const [saving, setSaving] = useState(false);
+  /**
+   * Why the modal keeps its own error state instead of relying on showToast:
+   * consumers were passing stubs. ProductForm passed `() => {}` and EventForm
+   * passed a console.warn, so a failed Save was completely silent — the user
+   * pressed Save, validation threw "Price required", the message went nowhere
+   * and nothing on screen changed. Reported 2026-08-08 as "the Save button
+   * does nothing". A modal has to be able to explain its own refusal without
+   * depending on the host app wiring something up.
+   */
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [publishToggling, setPublishToggling] = useState(false);
   const [donation, setDonation] = useState<DonationDraft>(() => draftMode && initialDraftDonation ? initialDraftDonation : loadDonationFromProduct(product));
   const [donationDirty, setDonationDirty] = useState(false);
@@ -547,6 +557,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
 
   async function save() {
     setSaving(true);
+    setSaveError(null);
     try {
       // Validate tiers — pure helper returns the first failure message,
       // or null when the draft is valid. Four-of-none installment rules
@@ -659,7 +670,11 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
 
       showToast("Pricing updated");
       onSaved();
-    } catch (e: any) { showToast(e.message || "Failed to save"); }
+    } catch (e: any) {
+      const msg = e?.message || "Failed to save";
+      setSaveError(msg);
+      showToast(msg);
+    }
     finally { setSaving(false); }
   }
 
@@ -886,6 +901,14 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
           Back / Cancel / Delete / Duplicate live here so the action
           surface stays predictable across levels — no inline pill-shaped
           affordances inside the body. */}
+      {saveError && (
+        <div
+          role="alert"
+          className="shrink-0 mt-4 rounded-lg bg-red-50 px-3 py-2 text-[12.5px] text-red-700 ring-1 ring-red-100"
+        >
+          {saveError}
+        </div>
+      )}
       <div className="shrink-0 flex items-center gap-2 mt-4 pt-4 border-t border-zinc-100">
         {activeDraft && activeStep ? (
           <button
