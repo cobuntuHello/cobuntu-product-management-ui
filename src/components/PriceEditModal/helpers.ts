@@ -65,7 +65,11 @@ export function blankTier(seed: BlankTierSeed = {}): DraftTier {
     localId: newLocalId(),
     name: indexHint === 1 ? "Standard" : `Tier ${indexHint}`,
     description: "",
-    price: "",
+    // "0", not "". validateTier rejects an empty price, so a blank seed made
+    // Save fail with "Price required for Standard" the moment a seller added a
+    // SECOND tier — a dead end they did nothing to cause. "0" renders
+    // identically ("Free": both fail the price > 0 test) and saves cleanly.
+    price: "0",
     currency,
     capacity: "",
     isRecurring: !!seed.isRecurring,

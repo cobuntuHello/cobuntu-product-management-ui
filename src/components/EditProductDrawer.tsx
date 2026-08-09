@@ -85,13 +85,23 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       formData.append("name", data.name.trim());
       formData.append("description", data.description.trim() || "");
 
+      /*
+       * Only send a price when this form actually produced one.
+       *
+       * This used to fall through to `price: "0"` whenever `data.price` was
+       * empty — and since ProductForm stopped owning single-price entry it
+       * ALWAYS emits `price: ""`. So opening this drawer on a priced product
+       * and saving anything (a typo in the title) silently zeroed its price.
+       * The backend only writes price when the field is present
+       * (`if (updates.price !== undefined)`), so omitting it leaves the
+       * product's real price alone.
+       */
       if (data.isPaid && data.price) {
         formData.append("price", String(parseFloat(data.price)));
         formData.append("currency", data.currency);
         formData.append("isRecurring", String(data.isRecurring));
         if (data.isRecurring) formData.append("recurringInterval", data.recurringInterval);
       } else {
-        formData.append("price", "0");
         formData.append("isRecurring", "false");
       }
 
