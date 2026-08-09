@@ -9,6 +9,7 @@ import {
 } from "../ui/dialog";
 import { EventTags } from "../ui/event-tags";
 import { htmlToPlainText } from "../lib/htmlToPlainText";
+import { dataUrlToFile } from "../lib/dataUrlToFile";
 import { RichTextEditor } from "../ui/rich-text-editor";
 import { type MediaItem } from "../ui/sortable-media-gallery";
 import { BannerCropModal, type BannerCropResult } from "../ui/banner-crop-modal";
@@ -143,6 +144,13 @@ interface ProductFormProps {
   hideApproval?: boolean;
 }
 
+/**
+ * Names blankTier assigns by position ("Standard", "Tier 2", …). A tier still
+ * carrying one of these is one the seller never renamed, so the name alone is
+ * not evidence they configured anything.
+ */
+const AUTO_SEED_NAME = /^(Standard|Tier \d+)$/;
+
 // ─── Component ─────────────────────────────────────────────────
 
 export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, categories }: ProductFormProps) {
@@ -214,11 +222,25 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   }
   function onCropSave(result: BannerCropResult) {
     if (!result.base64) return;
+    /*
+     * Rebuild an uploadable File from the crop.
+     *
+     * The original File is already gone here — onPhotoFile only reads it to
+     * get a src for the cropper — and the cropper returns base64 alone. The
+     * consumer uploads `item.file` and skips items without one, so a photo
+     * added with no File attached rendered in the carousel and was then
+     * silently dropped at submit: products saved with no images.
+     * Reported 2026-08-09.
+     */
+    const file = dataUrlToFile(result.base64, `photo-${Date.now()}`);
     if (cropEditIndex === null) {
-      setMediaItems([...mediaItems, { id: crypto.randomUUID(), preview: result.base64, type: "image" as const }].slice(0, 5));
+      setMediaItems([...mediaItems, { id: crypto.randomUUID(), preview: result.base64, type: "image" as const, file }].slice(0, 5));
     } else {
       const next = [...mediaItems];
-      if (next[cropEditIndex]) next[cropEditIndex] = { ...next[cropEditIndex], preview: result.base64 };
+      // Re-cropping an EXISTING (already hosted) photo has to replace its file
+      // too, or the upload keeps the pre-crop image while the carousel shows
+      // the cropped one.
+      if (next[cropEditIndex]) next[cropEditIndex] = { ...next[cropEditIndex], preview: result.base64, file };
       setMediaItems(next);
     }
   }
@@ -272,15 +294,36 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
 
   // Notify parent
   useEffect(() => {
-    // Pricing is set entirely through the tier wizard now (parity with events),
-    // so there is no Free/Paid toggle: "paid" is DERIVED from the tiers. A
-    // product is paid iff a configured (named, non-deleted) tier actually
-    // charges — a fixed price > 0 or PWYW. A free/blank seed tier keeps the
-    // product free and emits no tiers, so a consumer gating on
-    // `isPaid && tiers.length` correctly submits it as a free product; a paid
-    // configuration emits the full tier set for draftTiersToCreatePayload.
+    /*
+     * `isPaid` and "should we send tiers" are two different questions. They
+     * used to be one, and that silently threw away work.
+     *
+     * isPaid stays strictly PRICE-derived: it drives the Stripe gate and the
+     * disabled state on Submit, so a free tier must never flip it true or a
+     * seller with no Stripe account gets blocked from a free listing.
+     *
+     * What changed is the second question. The old rule emitted
+     * `tiers: paid ? named : []`, so a FREE tier carrying a capacity and a
+     * registration form emitted ZERO tiers and both were discarded — "free
+     * product, 50 seats, with an application form" was configurable and
+     * unsavable. A tier is now submitted when the seller actually configured
+     * it: it charges, or it caps supply, or it asks questions, or they named
+     * it something of their own. The untouched seed tier still emits nothing,
+     * so a plain free product is unchanged.
+     *
+     * The backend already supports all of this — it accepts a zero-price tier,
+     * requires no Stripe for one, persists capacity and the form, and enforces
+     * stock inside the free-checkout transaction.
+     */
     const named = tiers.filter(t => !t.deleted && t.name.trim());
     const paid = named.some(t => t.priceMode === "pwyw" || (!!t.price && parseFloat(t.price) > 0));
+    const configured = named.filter(t =>
+        (!!t.price && parseFloat(t.price) > 0)
+        || t.priceMode === "pwyw"
+        || !!t.capacity?.trim()
+        || !!t.draftForm?.fields?.length
+        || !AUTO_SEED_NAME.test(t.name.trim()),
+    );
     onChange?.({
       name, description, tags, categoryId, subCategoryId, mediaItems, productFiles,
       isPaid: paid,
@@ -289,7 +332,8 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       isRecurring: false,
       recurringInterval, ctaText,
       viewability, accessibility, requiresApproval,
-      tiers: paid ? named : [],
+      // Every configured tier, free or paid — not only the paid ones.
+      tiers: configured.length > 0 ? named : [],
       donation,
     });
   }, [name, description, tags, categoryId, subCategoryId, mediaItems, productFiles, currency, recurringInterval, ctaText, viewability, accessibility, requiresApproval, tiers, donation]); // eslint-disable-line react-hooks/exhaustive-deps

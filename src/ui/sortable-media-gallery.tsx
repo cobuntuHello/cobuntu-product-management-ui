@@ -9,6 +9,7 @@ import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from "@d
 import { CSS } from "@dnd-kit/utilities";
 import { Upload, X, Video } from "lucide-react";
 import { BannerCropModal, type BannerCropResult } from "./banner-crop-modal";
+import { dataUrlToFile } from "../lib/dataUrlToFile";
 
 export interface MediaItem {
   id: string;
@@ -163,7 +164,17 @@ export function SortableMediaGallery({ items, onChange, maxItems = 5 }: Sortable
     if (cropIndex === null || !result.base64) return;
     const updated = [...items];
     if (!updated[cropIndex]) return;
-    updated[cropIndex] = { ...updated[cropIndex], preview: result.base64 };
+    /*
+     * Replace the FILE as well as the preview. Updating only `preview` left
+     * the item carrying its pre-crop file (or, for a photo added through the
+     * cropper, none at all) — so the upload sent something different from
+     * what the seller was looking at, or nothing.
+     */
+    updated[cropIndex] = {
+      ...updated[cropIndex],
+      preview: result.base64,
+      file: dataUrlToFile(result.base64, `photo-${Date.now()}`),
+    };
     onChange(updated);
   }
 
