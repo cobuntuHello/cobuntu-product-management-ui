@@ -3,11 +3,18 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useProductManagementConfig } from "../config";
+import { type CategoryOption } from "./CategoryPickerRow";
 import { ProductForm, type ProductFormData } from "./ProductForm";
 import type { MediaItem } from "../ui/sortable-media-gallery";
 import type { UploadedFile } from "../ui/file-upload-zone";
 
 interface Props {
+  /**
+   * The community's product categories, loaded by the consumer — same contract
+   * as ProductForm, which this drawer renders. Passed straight through so the
+   * create and edit surfaces cannot disagree about the list.
+   */
+  categories?: CategoryOption[];
   product: any;
   communityTag: string;
   isOpen: boolean;
@@ -15,7 +22,7 @@ interface Props {
   onSaved: () => void;
 }
 
-export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSaved }: Props) {
+export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSaved, categories }: Props) {
   const { apiBaseUrl, authHeaders } = useProductManagementConfig();
   const formDataRef = useRef<ProductFormData | null>(null);
   const [saving, setSaving] = useState(false);
@@ -61,6 +68,8 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       name: product.name || "",
       description: product.description || "",
       tags: product.tags?.map((t: any) => ({ id: t.id || t.tagId, name: t.name || t.tag?.name })).filter((t: any) => t.id && t.name) || [],
+      categoryId: (product as any).categoryId ?? null,
+      subCategoryId: (product as any).subCategoryId ?? null,
       mediaItems,
       productFiles,
       isPaid: !!product.price && product.price > 0,
@@ -116,6 +125,11 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       formData.append("requiresApproval", String(!!data.requiresApproval));
 
       formData.append("tags", JSON.stringify(data.tags.map(t => t.id)));
+      // Always sent, unlike create: on an EDIT an absent field means "leave
+      // as is", so clearing a category would be impossible if we only sent it
+      // when set. "" is what the backend normalises to null.
+      formData.append("categoryId", data.categoryId ?? "");
+      formData.append("subCategoryId", data.subCategoryId ?? "");
 
       const existingMediaIds = data.mediaItems.filter(m => m.isExisting).map(m => m.id);
       const originalMediaIds = (product.media || []).map((m: any) => m.id);
@@ -187,6 +201,7 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
           <ProductForm
             communityTag={communityTag}
             initialData={initialFormData}
+            categories={categories}
             onChange={data => { formDataRef.current = data; }}
           />
         </div>
