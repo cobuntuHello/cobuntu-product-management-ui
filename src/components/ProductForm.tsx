@@ -9,6 +9,7 @@ import {
 } from "../ui/dialog";
 import { EventTags } from "../ui/event-tags";
 import { htmlToPlainText } from "../lib/htmlToPlainText";
+import { dataUrlToFile } from "../lib/dataUrlToFile";
 import { RichTextEditor } from "../ui/rich-text-editor";
 import { type MediaItem } from "../ui/sortable-media-gallery";
 import { BannerCropModal, type BannerCropResult } from "../ui/banner-crop-modal";
@@ -198,11 +199,25 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   }
   function onCropSave(result: BannerCropResult) {
     if (!result.base64) return;
+    /*
+     * Rebuild an uploadable File from the crop.
+     *
+     * The original File is already gone here — onPhotoFile only reads it to
+     * get a src for the cropper — and the cropper returns base64 alone. The
+     * consumer uploads `item.file` and skips items without one, so a photo
+     * added with no File attached rendered in the carousel and was then
+     * silently dropped at submit: products saved with no images.
+     * Reported 2026-08-09.
+     */
+    const file = dataUrlToFile(result.base64, `photo-${Date.now()}`);
     if (cropEditIndex === null) {
-      setMediaItems([...mediaItems, { id: crypto.randomUUID(), preview: result.base64, type: "image" as const }].slice(0, 5));
+      setMediaItems([...mediaItems, { id: crypto.randomUUID(), preview: result.base64, type: "image" as const, file }].slice(0, 5));
     } else {
       const next = [...mediaItems];
-      if (next[cropEditIndex]) next[cropEditIndex] = { ...next[cropEditIndex], preview: result.base64 };
+      // Re-cropping an EXISTING (already hosted) photo has to replace its file
+      // too, or the upload keeps the pre-crop image while the carousel shows
+      // the cropped one.
+      if (next[cropEditIndex]) next[cropEditIndex] = { ...next[cropEditIndex], preview: result.base64, file };
       setMediaItems(next);
     }
   }
