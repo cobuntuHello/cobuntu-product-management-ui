@@ -377,7 +377,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
           ) : <MousePointerClick className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
           <span className="flex-1 min-w-0">
-            <span className={`block text-sm truncate ${ctaText.trim() ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{ctaText.trim() ? "Button label" : "Button label"}<span className="font-normal text-zinc-400 text-[12.5px]">{ctaText.trim() ? "" : " · optional"}</span></span>
+            <span className={`block text-sm truncate ${ctaText.trim() ? "font-medium text-zinc-800" : "text-zinc-500"}`}>Call to Action Label<span className="font-normal text-zinc-400 text-[12.5px]">{ctaText.trim() ? "" : " · optional"}</span></span>
             {ctaText.trim() && <span className="block text-[12.5px] text-zinc-500 truncate">&ldquo;{ctaText}&rdquo;</span>}
           </span>
           <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
@@ -388,9 +388,11 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
            event "Event Options" card). Pricing is the first row and opens the
            SAME tier wizard events use. Visibility rows drop when
            `hideVisibility`; the approval row drops when `hideApproval`. */}
+      {/* The "Product Options" eyebrow was removed 2026-08-09 — the rows say
+          what they are, and the label was the only thing separating this card
+          from the detail rows above it. */}
       {(showTiers || !hideVisibility || !hideApproval) && (
         <div>
-          <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Product Options</p>
           <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
             {/* Pricing — identical treatment to the event "Tickets" row:
                 summary + tier cards + a dashed button into the shared wizard. */}
@@ -535,11 +537,11 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         </DialogContent>
       </Dialog>
 
-      {/* ─── Button Label Modal ─── (CTA text) */}
+      {/* ─── Call to Action Label Modal ─── (CTA text) */}
       <Dialog open={isCtaOpen} onOpenChange={setIsCtaOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Button Label</DialogTitle>
+            <DialogTitle>Call to Action Label</DialogTitle>
             <DialogDescription>The action button on your product card. Default: &ldquo;Buy Now&rdquo;. Max 15 characters.</DialogDescription>
           </DialogHeader>
           <Input value={ctaText} onChange={e => setCtaText(e.target.value)} placeholder="Buy Now" maxLength={15} />
