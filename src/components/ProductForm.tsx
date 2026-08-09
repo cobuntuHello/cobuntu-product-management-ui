@@ -130,6 +130,13 @@ interface ProductFormProps {
   hideApproval?: boolean;
 }
 
+/**
+ * Names blankTier assigns by position ("Standard", "Tier 2", …). A tier still
+ * carrying one of these is one the seller never renamed, so the name alone is
+ * not evidence they configured anything.
+ */
+const AUTO_SEED_NAME = /^(Standard|Tier \d+)$/;
+
 // ─── Component ─────────────────────────────────────────────────
 
 export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval }: ProductFormProps) {
@@ -271,15 +278,36 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
 
   // Notify parent
   useEffect(() => {
-    // Pricing is set entirely through the tier wizard now (parity with events),
-    // so there is no Free/Paid toggle: "paid" is DERIVED from the tiers. A
-    // product is paid iff a configured (named, non-deleted) tier actually
-    // charges — a fixed price > 0 or PWYW. A free/blank seed tier keeps the
-    // product free and emits no tiers, so a consumer gating on
-    // `isPaid && tiers.length` correctly submits it as a free product; a paid
-    // configuration emits the full tier set for draftTiersToCreatePayload.
+    /*
+     * `isPaid` and "should we send tiers" are two different questions. They
+     * used to be one, and that silently threw away work.
+     *
+     * isPaid stays strictly PRICE-derived: it drives the Stripe gate and the
+     * disabled state on Submit, so a free tier must never flip it true or a
+     * seller with no Stripe account gets blocked from a free listing.
+     *
+     * What changed is the second question. The old rule emitted
+     * `tiers: paid ? named : []`, so a FREE tier carrying a capacity and a
+     * registration form emitted ZERO tiers and both were discarded — "free
+     * product, 50 seats, with an application form" was configurable and
+     * unsavable. A tier is now submitted when the seller actually configured
+     * it: it charges, or it caps supply, or it asks questions, or they named
+     * it something of their own. The untouched seed tier still emits nothing,
+     * so a plain free product is unchanged.
+     *
+     * The backend already supports all of this — it accepts a zero-price tier,
+     * requires no Stripe for one, persists capacity and the form, and enforces
+     * stock inside the free-checkout transaction.
+     */
     const named = tiers.filter(t => !t.deleted && t.name.trim());
     const paid = named.some(t => t.priceMode === "pwyw" || (!!t.price && parseFloat(t.price) > 0));
+    const configured = named.filter(t =>
+        (!!t.price && parseFloat(t.price) > 0)
+        || t.priceMode === "pwyw"
+        || !!t.capacity?.trim()
+        || !!t.draftForm?.fields?.length
+        || !AUTO_SEED_NAME.test(t.name.trim()),
+    );
     onChange?.({
       name, description, tags, mediaItems, productFiles,
       isPaid: paid,
@@ -288,7 +316,8 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       isRecurring: false,
       recurringInterval, ctaText,
       viewability, accessibility, requiresApproval,
-      tiers: paid ? named : [],
+      // Every configured tier, free or paid — not only the paid ones.
+      tiers: configured.length > 0 ? named : [],
       donation,
     });
   }, [name, description, tags, mediaItems, productFiles, currency, recurringInterval, ctaText, viewability, accessibility, requiresApproval, tiers, donation]); // eslint-disable-line react-hooks/exhaustive-deps

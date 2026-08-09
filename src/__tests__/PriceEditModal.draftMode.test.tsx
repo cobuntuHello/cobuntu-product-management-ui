@@ -110,8 +110,18 @@ describe("PriceEditModal — draftMode save failures are visible without a host 
   it("renders the validation failure inside the modal", async () => {
     mockFetch([]);
     const user = userEvent.setup();
-    // A blank tier has an empty price — precisely the reported state.
-    const props = baseProps({ showToast: () => {} });
+    /*
+     * An empty price is stated explicitly rather than inherited from
+     * blankTier. The seed used to carry `price: ""` and this test leaned on
+     * that; the seed now carries "0" so that adding a second tier does not
+     * dead-end on "Price required for Standard". The behaviour under test —
+     * a validation failure has to be VISIBLE when the host passes no toast —
+     * is unchanged, so the state it needs is set here instead.
+     */
+    const props = baseProps({
+      showToast: () => {},
+      initialDraftTiers: [{ ...blankTier({ currency: "EUR" }), name: "Standard", price: "" }],
+    });
     renderWithConfig(<PriceEditModal {...props} />);
 
     await screen.findByRole("button", { name: /Standard/ });
