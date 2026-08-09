@@ -224,10 +224,34 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   // straight to the per-tier edit screen.
   const [editTierLocalId, setEditTierLocalId] = useState<string | undefined>(undefined);
   const openTierEditor = (localId: string) => { setMultiTier(true); setEditTierLocalId(localId); setShowTierModal(true); };
+
+  /**
+   * A tier being added but not yet committed.
+   *
+   * It is NOT written into `tiers` up front. It used to be — addAndEditTier
+   * appended a blankTier and then opened the modal — and since the modal's
+   * direct-open footer says "Cancel" and only calls onClose(), backing out left
+   * that tier behind. Every one was named "Standard" (blankTier defaults to
+   * indexHint 1), so cancelling three times produced three identical rows.
+   * Reported 2026-08-09 as "opening/closing the modal creates a new tier".
+   *
+   * onDraftCommit is now the only thing that writes `tiers`.
+   */
+  const [pendingNewTier, setPendingNewTier] = useState<DraftTier | null>(null);
+
   const addAndEditTier = () => {
-    const nt = blankTier({ currency });
-    setTiers(prev => [...prev, nt]);
+    // indexHint from the current count, so the second tier is "Tier 2" rather
+    // than a second "Standard".
+    const nt = blankTier({ currency, indexHint: tiers.filter(t => !t.deleted).length + 1 });
+    setPendingNewTier(nt);
     openTierEditor(nt.localId);
+  };
+
+  /** Shared by every path that closes the modal — commit or not. */
+  const closeTierModal = () => {
+    setShowTierModal(false);
+    setPendingNewTier(null);
+    setEditTierLocalId(undefined);
   };
 
   // Notify parent
@@ -407,18 +431,41 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 </div>
                 {configuredTiers.length > 0 && (
                   <div className="space-y-2 mb-3">
-                    {configuredTiers.map((t, i) => (
-                      <button type="button" key={i} onClick={() => openTierEditor(t.localId)}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white hover:bg-zinc-100 hover:translate-x-0.5 transition-all duration-150 cursor-pointer text-left">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-zinc-200 text-zinc-600">
-                          <DollarSign className="h-3.5 w-3.5" />
+                    {configuredTiers.map((t, i) => {
+                      const published = !!t.publishedAt;
+                      return (
+                      <div key={i}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white hover:bg-zinc-100 transition-all duration-150">
+                        {/* Only this part opens the tier. The row itself cannot
+                            be the button — the publish switch below is
+                            interactive, and nesting the two is invalid HTML
+                            that fires both handlers on one click. */}
+                        <button type="button" onClick={() => openTierEditor(t.localId)}
+                          className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-zinc-200 text-zinc-600">
+                            <DollarSign className="h-3.5 w-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-medium text-zinc-800 truncate">{t.name.trim() || "Unnamed tier"}</p>
+                            <p className="text-[11px] text-zinc-400">{t.price && parseFloat(t.price) > 0 ? `${getCurrencySymbol(t.currency)}${t.price}` : "Free"}</p>
+                          </div>
+                        </button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`text-[10.5px] ${published ? "text-zinc-500" : "text-zinc-400"}`}>
+                            {published ? "Published" : "Draft"}
+                          </span>
+                          <Switch
+                            checked={published}
+                            aria-label={`Publish ${t.name.trim() || "tier"}`}
+                            onCheckedChange={(next: boolean) => setTiers(prev => prev.map(x =>
+                              x.localId === t.localId
+                                ? { ...x, publishedAt: next ? new Date().toISOString() : null }
+                                : x))}
+                          />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-zinc-800 truncate">{t.name.trim() || "Unnamed tier"}</p>
-                          <p className="text-[11px] text-zinc-400">{t.price && parseFloat(t.price) > 0 ? `${getCurrencySymbol(t.currency)}${t.price}` : "Free"}</p>
-                        </div>
-                      </button>
-                    ))}
+                      </div>
+                      );
+                    })}
                   </div>
                 )}
                 <button type="button" onClick={addAndEditTier}
@@ -439,7 +486,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                   <div className="flex items-center gap-3 min-w-0">
                     {viewability === "PUBLIC" ? <Eye className="h-[18px] w-[18px] text-zinc-400 shrink-0" /> : <EyeOff className="h-[18px] w-[18px] text-zinc-400 shrink-0" />}
                     <div className="min-w-0">
-                      <span className="text-sm font-medium text-zinc-800">Visibility: {viewability === "PUBLIC" ? "Public" : "Members only"}</span>
+                      <span className="text-sm font-medium text-zinc-800">Visibility: {viewability === "PUBLIC" ? "Everyone" : "Members only"}</span>
                       <p className="text-[11px] text-zinc-400 mt-0.5">Who can see this product listing</p>
                     </div>
                   </div>
@@ -452,7 +499,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                   <div className="flex items-center gap-3 min-w-0">
                     {accessibility === "PUBLIC" ? <UserCheck className="h-[18px] w-[18px] text-zinc-400 shrink-0" /> : <Lock className="h-[18px] w-[18px] text-zinc-400 shrink-0" />}
                     <div className="min-w-0">
-                      <span className="text-sm font-medium text-zinc-800">Purchase: {accessibility === "PUBLIC" ? "Public" : "Members only"}</span>
+                      <span className="text-sm font-medium text-zinc-800">Purchase: {accessibility === "PUBLIC" ? "Everyone" : "Members only"}</span>
                       <p className="text-[11px] text-zinc-400 mt-0.5">Who can buy this product</p>
                     </div>
                   </div>
@@ -564,15 +611,15 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             communityTag={communityTag}
             productId=""
             draftMode
-            initialDraftTiers={tiers}
+            initialDraftTiers={pendingNewTier ? [...tiers, pendingNewTier] : tiers}
             initialDraftDonation={donation}
             openTierLocalId={editTierLocalId}
             onDraftCommit={({ tiers: nextTiers, donation: nextDonation }) => {
               setTiers(nextTiers);
               setDonation(nextDonation);
             }}
-            onClose={() => setShowTierModal(false)}
-            onSaved={() => setShowTierModal(false)}
+            onClose={closeTierModal}
+            onSaved={closeTierModal}
             /*
              * Deliberate no-op: ProductForm has no toast host of its own, and
              * inventing one here would collide with whatever the consuming app

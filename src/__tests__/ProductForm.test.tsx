@@ -112,7 +112,7 @@ describe("ProductForm", () => {
     onChange.mockClear();
 
     // Click the Visibility row label to toggle.
-    await user.click(screen.getByText(/Visibility: Public/i));
+    await user.click(screen.getByText(/Visibility: Everyone/i));
 
     await waitFor(() => {
       const last = onChange.mock.calls.at(-1)?.[0] as ProductFormData;
@@ -127,7 +127,7 @@ describe("ProductForm", () => {
     renderWithConfig(<ProductForm {...baseProps({ onChange })} />);
     onChange.mockClear();
 
-    await user.click(screen.getByText(/Purchase: Public/i));
+    await user.click(screen.getByText(/Purchase: Everyone/i));
 
     await waitFor(() => {
       const last = onChange.mock.calls.at(-1)?.[0] as ProductFormData;
