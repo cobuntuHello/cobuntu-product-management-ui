@@ -157,3 +157,42 @@ describe("ProductActivityTab", () => {
     expect(stamp?.getAttribute("title")).toBe(new Date(createdAt).toLocaleString());
   });
 });
+
+/**
+ * The relative-base regression.
+ *
+ * The community app is same-origin — it passes apiBaseUrl: "" so the session
+ * cookie rides along and no Bearer is read from JS. The tab built its request
+ * with `new URL()`, which needs an absolute base, so it threw "Failed to
+ * construct 'URL': Invalid URL" and every seller on that app saw an error
+ * where the log should be.
+ */
+describe("works with a RELATIVE api base", () => {
+  it("fetches without throwing when apiBaseUrl is empty", async () => {
+    const fn = mockFetch([{ method: "GET", url: /\/api\/communities\/avepark\/products\/p1\/activity/, body: { entries: [entry()], nextCursor: null } }]);
+    renderWithConfig(<ProductActivityTab product={{ id: "p1" }} communityTag="avepark" />, {
+      config: { apiBaseUrl: "" },
+    });
+    expect(await screen.findByText("Bea created this product")).toBeInTheDocument();
+    expect(String(fn.mock.calls[0][0])).toMatch(/^\/api\/communities\/avepark\/products\/p1\/activity\?/);
+  });
+
+  it("still sends limit and cursor on a relative base", async () => {
+    const fn = mockFetch([{ method: "GET", url: /activity/, body: { entries: [], nextCursor: null } }]);
+    renderWithConfig(
+      <ProductActivityTab product={{ id: "p1" }} communityTag="avepark" pageSize={7} />,
+      { config: { apiBaseUrl: "" } },
+    );
+    await waitFor(() => expect(fn).toHaveBeenCalled());
+    expect(String(fn.mock.calls[0][0])).toContain("limit=7");
+  });
+
+  it("still works with an ABSOLUTE base (the admin app)", async () => {
+    const fn = mockFetch([{ method: "GET", url: /activity/, body: { entries: [], nextCursor: null } }]);
+    renderWithConfig(<ProductActivityTab product={{ id: "p1" }} communityTag="avepark" />, {
+      config: { apiBaseUrl: "https://api.example.com" },
+    });
+    await waitFor(() => expect(fn).toHaveBeenCalled());
+    expect(String(fn.mock.calls[0][0])).toMatch(/^https:\/\/api\.example\.com\/api\/communities\//);
+  });
+});
