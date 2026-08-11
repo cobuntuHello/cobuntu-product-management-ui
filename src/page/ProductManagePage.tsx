@@ -208,6 +208,7 @@ export function ProductManagePage({
           onUpdate={onUpdate}
           showToast={showToast}
           canEdit={isSeller}
+          currentUserId={viewerUserId}
         />
       );
       break;
