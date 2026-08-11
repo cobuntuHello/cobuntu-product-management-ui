@@ -87,12 +87,43 @@ describe("the media column", () => {
     expect(h.onEditMedia).toHaveBeenCalled();
   });
 
-  it("keeps the strip's height with no images, so the column does not jump", () => {
-    // Counted INSIDE the grid: the banner is aspect-square too now that it no
-    // longer takes a measured height, so a document-wide count would be 5.
+  it("draws NO rail at zero images", () => {
+    /*
+     * REVERSED DELIBERATELY (direction A). This used to assert four dashed
+     * slots always render, to keep the column's height constant.
+     *
+     * Constant height was not worth what it cost: most products have exactly
+     * one image, so the common case was a photo above four empty outlines, and
+     * a column that is finished read as unfinished. At ZERO images it was
+     * worse — an add tile sitting beside a frame that is itself the add
+     * control, i.e. the same offer made twice.
+     *
+     * The frame carries the empty state now, and the rail says nothing when
+     * there is nothing to say.
+     */
     const { container } = renderCard({ media: [] });
-    const strip = container.querySelector(".grid-cols-4");
-    expect(strip?.querySelectorAll(".aspect-square").length).toBe(4);
+    expect(container.querySelector(".grid-cols-4")).toBeNull();
+    expect(screen.getByText("Add your first image")).toBeInTheDocument();
+    // A REASON, not a restatement of what the button does.
+    expect(screen.getByText(/opened far more often/)).toBeInTheDocument();
+  });
+
+  it("gives one rail tile per image after the banner, plus one add tile", () => {
+    // The old strip was fixed at four, and its "+" only appeared at one image
+    // or fewer — so a three-image product showed two dead tiles you could not
+    // add through.
+    const { container } = renderCard();  // 3 images
+    const rail = container.querySelector(".overflow-x-auto");
+    expect(rail).toBeTruthy();
+    // 2 thumbnails (images 2 and 3) + the add tile.
+    expect(rail?.querySelectorAll("button").length).toBe(3);
+    expect(rail?.querySelector('[aria-label="Add images"]')).toBeTruthy();
+  });
+
+  it("states how many images there are", () => {
+    // Nine and three were indistinguishable: the extras appeared nowhere.
+    renderCard();
+    expect(screen.getByText("3")).toBeInTheDocument();
   });
 });
 
@@ -161,11 +192,23 @@ describe("the card has no self-referential sizing", () => {
     expect(container.querySelector(".w-\\[200px\\]")).toBeTruthy();
   });
 
-  it("keeps the banner square without a measured height", () => {
+  it("frames the banner at the BUYER's 4/3, not a square", () => {
+    /*
+     * REVERSED DELIBERATELY (direction A). A buyer meets this product at 4/3
+     * twice — the /marketplace grid card and the detail carousel — and this
+     * column was the only surface showing a square. A seller framed a photo
+     * that looked right here and the storefront trimmed the top and bottom off
+     * it, so the crop being approved was one nobody ever saw.
+     *
+     * The no-measured-height half of the original assertion is KEPT: that is
+     * what stops the ResizeObserver feedback loop that once inflated the card
+     * until it filled the viewport.
+     */
     const { container } = renderCard();
-    const banner = container.querySelector(".aspect-square.w-full");
+    const banner = container.querySelector(".aspect-\\[4\\/3\\].w-full");
     expect(banner).toBeTruthy();
     expect((banner as HTMLElement).style.height).toBe("");
+    expect(container.querySelector(".aspect-square.w-full")).toBeNull();
   });
 
   it("does not let the rows stretch the row box", () => {
@@ -173,5 +216,59 @@ describe("the card has no self-referential sizing", () => {
     // height — the other half of the loop.
     const { container } = renderCard();
     expect(container.querySelector(".items-start")).toBeTruthy();
+  });
+});
+
+describe("the media column's actions", () => {
+  it("takes copy-link OFF the photo", () => {
+    /*
+     * It was a permanent black band across the bottom of the image, covering
+     * the part of the shot most likely to hold the product, for an action that
+     * has nothing to do with the picture. It is a row now — which is where
+     * every other action on this card already lives.
+     */
+    const { container } = renderCard();
+    const frame = container.querySelector(".aspect-\\[4\\/3\\].w-full") as HTMLElement;
+    expect(frame.textContent).not.toContain("Copy product link");
+    expect(screen.getByText("Copy product link")).toBeInTheDocument();
+  });
+
+  it("still copies the link, and says so", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+
+    renderCard();
+    await userEvent.click(screen.getByText("Copy product link"));
+
+    expect(writeText).toHaveBeenCalledWith("https://avepark.cobuntu.com/marketplace/p1");
+    expect(await screen.findByText("Link copied")).toBeInTheDocument();
+  });
+
+  it("LABELS the manage action instead of showing a bare pencil", () => {
+    // Every other control on this card says what it does; this one made the
+    // reader guess from an icon.
+    renderCard();
+    expect(screen.getByText("Manage images")).toBeInTheDocument();
+  });
+
+  it("routes every media surface to the one media manager", async () => {
+    // Frame, rail thumbnail, add tile and the labelled pill are four ways to
+    // reach ONE destination — that is the point, so pin it.
+    const h = handlers();
+    const { container } = renderCard(undefined, h);
+
+    await userEvent.click(container.querySelector('[aria-label="Manage images"]') as HTMLElement);
+    expect(h.onEditMedia).toHaveBeenCalled();
+
+    h.onEditMedia.mockClear();
+    await userEvent.click(container.querySelector('[aria-label="Add images"]') as HTMLElement);
+    expect(h.onEditMedia).toHaveBeenCalled();
+  });
+
+  it("offers no manage pill when there is no image to manage", () => {
+    // At zero the frame is the add control; a "Manage images" pill over an
+    // empty state would be an action with no object.
+    renderCard({ media: [] });
+    expect(screen.queryByText("Manage images")).not.toBeInTheDocument();
   });
 });

@@ -77,90 +77,129 @@ export function ProductCard({
       <div className="flex items-start p-5 gap-5">
 
         {/*
-          MEDIA COLUMN — banner large, the rest as a strip beneath it.
+          MEDIA COLUMN — the buyer's crop, an honest rail, and one action.
 
-          A product is not an event: it has a banner AND a gallery, at whatever
-          aspect ratios the seller shot them in. The old column showed exactly
-          one square image and its only affordance opened the whole edit
-          drawer, so the other images were invisible here and unmanageable
-          from here.
+          WHY 4/3 AND NOT A SQUARE. A buyer meets this product at 4/3 twice:
+          the grid card on /marketplace and the detail carousel. This column
+          was the only surface showing a square, so a seller framed a photo
+          that looked right here and the storefront then trimmed the top and
+          bottom off it. What you approve is now what ships.
 
-          Every surface in this column opens the SAME media manager. One
-          concept, one destination — matching the rows on the right, where each
-          opens the one editor for that one thing.
+          WHY THE RAIL IS ONLY AS LONG AS THE GALLERY. It used to render four
+          slots always. Most products have one image, so the common case was a
+          photo above four dashed outlines — a column that reads as unfinished
+          when it is in fact done. Worse, the "+" only appeared at one image or
+          fewer, so a three-image product showed two empty tiles you could not
+          add through. Now: one tile per real image, then a single add tile,
+          which is therefore reachable at any count.
+
+          WHY COPY-LINK LEFT THE PHOTO. It was a permanent black band across
+          the bottom of the image — covering the part of the shot most likely
+          to hold the product — for an action that has nothing to do with the
+          picture. It is a row now, which is where every other action on this
+          card already lives.
         */}
         <div className="shrink-0 w-[200px] sm:w-[240px] lg:w-[280px]">
-          <div className="overflow-hidden rounded-xl relative group aspect-square w-full">
+          <div className="overflow-hidden rounded-xl relative group aspect-[4/3] w-full">
             <button
               onClick={onEditMedia}
-              aria-label="Manage images"
+              aria-label={firstMedia ? "Manage images" : "Add images"}
               className="absolute inset-0 w-full h-full z-10 cursor-pointer"
-              style={{ bottom: "40px" }}
             />
             {firstMedia?.url ? (
               <img src={firstMedia.url} alt="" className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full bg-zinc-100 flex flex-col items-center justify-center gap-2 text-zinc-400">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
+              /*
+                THE EMPTY STATE GIVES A REASON, not an instruction. "Add images"
+                told a seller what the button does, which they can already see.
+                No rail is drawn at zero: an add tile beside an add frame is the
+                same offer twice, and the frame IS the add control here.
+              */
+              <div
+                className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-center px-4"
+                style={{ border: "1.5px dashed rgba(128,128,128,0.28)", borderRadius: "0.75rem" }}
+              >
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" className="text-zinc-400">
                   <rect x="3" y="3" width="18" height="18" rx="2" />
                   <circle cx="8.5" cy="8.5" r="1.5" />
                   <path d="m21 15-5-5L5 21" />
                 </svg>
-                <span className="text-[12px] font-medium">Add images</span>
+                <span className="text-[12.5px] font-semibold text-zinc-600">Add your first image</span>
+                <span className="text-[11.5px] leading-snug text-zinc-400 max-w-[22ch]">
+                  Listings with a photo are opened far more often.
+                </span>
               </div>
             )}
-            <div
-              onClick={onEditMedia}
-              className="absolute top-3 right-3 h-8 w-8 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center cursor-pointer hover:bg-black/80 transition-all z-20 opacity-0 group-hover:opacity-100"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-            </div>
-            <button onClick={copyProductLink}
-              className={`absolute bottom-0 left-0 right-0 backdrop-blur-md px-4 py-2.5 flex items-center gap-3 cursor-pointer rounded-b-xl border-t border-white/10 transition-all z-20 ${
-                urlCopied ? "bg-emerald-600/90" : "bg-black/70 hover:bg-black/80"
-              }`}>
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${urlCopied ? "bg-white/20" : "bg-white/10"}`}>
-                {urlCopied ? (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="opacity-80"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                )}
+
+            {/* The count, stated. Nine images and three were indistinguishable
+                before — the extras simply did not appear anywhere. */}
+            {sortedMedia.length > 0 && (
+              <span className="absolute top-2.5 left-2.5 h-7 px-2.5 inline-flex items-center gap-1.5 rounded-full bg-black/60 backdrop-blur-sm text-white text-[11.5px] font-semibold z-20 pointer-events-none">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="m21 15-5-5L5 21" />
+                </svg>
+                {sortedMedia.length}
+              </span>
+            )}
+
+            {/* A LABELLED action, not a bare pencil. Every other control on
+                this card says what it does; this one made the reader guess. */}
+            {firstMedia && (
+              <div
+                onClick={onEditMedia}
+                className="absolute top-2.5 right-2.5 h-7 px-2.5 bg-black/60 backdrop-blur-sm rounded-full flex items-center gap-1.5 cursor-pointer hover:bg-black/80 transition-all z-20 opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                <span className="text-[11.5px] font-semibold text-white">Manage images</span>
               </div>
-              <span className="text-sm font-medium text-white/90">{urlCopied ? "Link copied!" : "Copy product link"}</span>
-            </button>
+            )}
           </div>
 
           {/*
-            The strip. Four slots: the next three images plus an "add" tile, or
-            empty slots when there is nothing yet — the row keeps its height so
-            the column does not jump as images come and go.
+            The rail: one tile per image after the banner, then the add tile.
+            Hidden entirely at zero images — see the empty state above.
           */}
-          <div className="grid grid-cols-4 gap-2 mt-2">
-            {[0, 1, 2, 3].map((i) => {
-              const m = sortedMedia[i + 1];
-              return (
+          {sortedMedia.length > 0 && (
+            <div className="flex gap-2 mt-2 overflow-x-auto scrollbar-hide">
+              {sortedMedia.slice(1).map((m: any) => (
                 <button
-                  key={i}
+                  key={m.id ?? m.url}
                   onClick={onEditMedia}
-                  aria-label={m ? "Manage images" : "Add images"}
-                  className="aspect-square rounded-lg overflow-hidden cursor-pointer transition-colors"
-                  style={
-                    m
-                      ? undefined
-                      : { border: "1.5px dashed rgba(128,128,128,0.28)", background: "rgba(128,128,128,0.04)" }
-                  }
+                  aria-label="Manage images"
+                  className="shrink-0 w-[58px] aspect-square rounded-lg overflow-hidden cursor-pointer"
                 >
-                  {m ? (
-                    <img src={m.url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    i === 0 && sortedMedia.length <= 1 ? (
-                      <span className="grid place-items-center w-full h-full text-zinc-400 text-[16px] leading-none">+</span>
-                    ) : null
-                  )}
+                  <img src={m.url} alt="" className="w-full h-full object-cover" />
                 </button>
-              );
-            })}
-          </div>
+              ))}
+              <button
+                onClick={onEditMedia}
+                aria-label="Add images"
+                className="shrink-0 w-[58px] aspect-square rounded-lg cursor-pointer grid place-items-center text-[17px] leading-none text-zinc-400 hover:text-zinc-600 transition-colors"
+                style={{ border: "1.5px dashed rgba(128,128,128,0.28)", background: "rgba(128,128,128,0.04)" }}
+              >
+                +
+              </button>
+            </div>
+          )}
+
+          {/* Copy link — a row, alongside the rows on the right. */}
+          <button
+            onClick={copyProductLink}
+            className={`mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-[12.5px] transition-colors cursor-pointer text-left ${
+              urlCopied
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-zinc-200 text-zinc-500 hover:bg-zinc-50"
+            }`}
+          >
+            {urlCopied ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="shrink-0"><polyline points="20 6 9 17 4 12"/></svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 opacity-60"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            )}
+            <span className="font-medium">{urlCopied ? "Link copied" : "Copy product link"}</span>
+          </button>
         </div>
 
         {/* Right: Info Rows */}
