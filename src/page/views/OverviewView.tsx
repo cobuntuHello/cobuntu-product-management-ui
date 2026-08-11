@@ -12,6 +12,7 @@ import { ShareModal } from "../../components/ShareModal";
 import { DeleteModal } from "../../components/DeleteModal";
 import { EditProductDrawer } from "../../components/EditProductDrawer";
 import { ProductDistributionModal } from "../../components/ProductDistributionModal";
+import { ProductSettingsDrawer } from "../ProductSettingsDrawer";
 
 /**
  * The Overview tab: quick actions, the product card with its edit rows, and
@@ -66,6 +67,19 @@ export interface OverviewViewProps {
   isOwnerView?: boolean;
 
   /**
+   * Whether this product can have COMMUNITY-SCOPED settings at all — who can
+   * see it, who can buy it, its landing page, its post-checkout behaviour.
+   *
+   * False for a USER-OWNED product, where none of them mean anything: there is
+   * no membership to gate against and no community storefront to redirect. The
+   * backend refuses all four with a 403.
+   *
+   * When false the Settings quick action is NOT RENDERED — not disabled. A
+   * disabled control advertises a capability this product cannot have.
+   */
+  canConfigureSettings?: boolean;
+
+  /**
    * After-checkout config (membership upsell / external redirect) is a LEADER
    * capability — MARKETPLACE_CREATE — and the backend re-enforces it.
    *
@@ -108,6 +122,7 @@ export function OverviewView({
   setShowEditDrawer: setDrawerProp,
   showMemberPricing,
   isOwnerView,
+  canConfigureSettings = true,
   canConfigureAfterCheckout,
   requiresApproval,
   onSaveApproval,
@@ -122,6 +137,7 @@ export function OverviewView({
   // in a test) without a wrapper.
   const [ownModal, setOwnModal] = React.useState<ProductModal>(null);
   const [ownDrawer, setOwnDrawer] = React.useState(false);
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
   const modal = modalProp !== undefined ? modalProp : ownModal;
   const setModal = setModalProp ?? setOwnModal;
   const showEditDrawer = drawerProp !== undefined ? drawerProp : ownDrawer;
@@ -173,7 +189,8 @@ export function OverviewView({
         isPublished={isPublished}
         onShare={() => setModal("share")}
         onEdit={() => setShowEditDrawer(true)}
-        onDistribution={() => setModal("distribution")}
+        onSettings={() => setSettingsOpen(true)}
+        canConfigureSettings={canConfigureSettings}
         onPublish={() => void onPublish()}
         onUnpublish={() => setModal("unpublish")}
         onDelete={() => setModal("delete")}
@@ -187,7 +204,7 @@ export function OverviewView({
         onEditName={() => setModal("name")}
         onEditPrice={() => setModal("price")}
         onEditBanner={() => setShowEditDrawer(true)}
-        onEditProduct={() => setShowEditDrawer(true)}
+        onEditCta={() => setShowEditDrawer(true)}
         onPublish={() => void onPublish()}
         onUnpublish={() => setModal("unpublish")}
       />
@@ -227,20 +244,6 @@ export function OverviewView({
         </div>
       )}
 
-      {canConfigureAfterCheckout && (
-        <AfterCheckoutCard
-          communityTag={communityTag}
-          productId={productId}
-          initial={{
-            afterCheckoutMode: product?.afterCheckoutMode ?? null,
-            upsellSegmentId: product?.upsellSegmentId ?? null,
-            upsellHeadline: product?.upsellHeadline ?? null,
-            upsellCtaLabel: product?.upsellCtaLabel ?? null,
-            postCheckoutUrl: product?.postCheckoutUrl ?? null,
-          }}
-          showToast={showToast}
-        />
-      )}
 
       {extras}
 
@@ -313,6 +316,24 @@ export function OverviewView({
             </button>
           </div>
         </ModalShell>
+      )}
+
+      {/*
+        The settings drawer renders only when the product can have these
+        settings. `canConfigureSettings` also removes the action that opens it,
+        so this is belt and braces against a stale open state.
+      */}
+      {canConfigureSettings && (
+        <ProductSettingsDrawer
+          product={product}
+          communityTag={communityTag}
+          productId={productId}
+          isOpen={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={() => void onUpdate()}
+          showToast={showToast}
+          hideAfterCheckout={!canConfigureAfterCheckout}
+        />
       )}
 
       <EditProductDrawer

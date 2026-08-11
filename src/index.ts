@@ -111,6 +111,8 @@ export {
   type ProductModal,
 } from "./page/ProductManagePage";
 export { ProductManageHeader, type ProductManageHeaderProps } from "./page/ProductManageHeader";
+export { ProductSettingsDrawer, type ProductSettingsDrawerProps } from "./page/ProductSettingsDrawer";
+export { ProductVisibilityEditModal, type VisibilityAxis } from "./components/ProductVisibilityEditModal";
 export { OverviewView as ProductOverviewView } from "./page/views/OverviewView";
 export { CollaboratorsView } from "./page/views/CollaboratorsView";
 export { ProductActivityTab, type ProductActivityTabProps } from "./components/activity/ProductActivityTab";
