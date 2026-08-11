@@ -125,7 +125,7 @@ export function ListingDetailDrawer({ listing, communityTag, onClose, onRefresh 
   if (!visible) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-[120]">
       <div className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${animating ? "opacity-100" : "opacity-0"}`} onClick={handleClose} />
       <div className={`absolute inset-y-0 right-0 w-full max-w-lg bg-white shadow-2xl rounded-l-2xl flex flex-col transition-transform duration-300 ease-out ${animating ? "translate-x-0" : "translate-x-full"}`}>
         {listing && (

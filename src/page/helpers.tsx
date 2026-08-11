@@ -44,7 +44,12 @@ export const CURRENCIES = [
 // Reusable modal wrapper — portaled to body to escape overflow containers
 export function ModalShell({ children, onClose, width = "w-[420px]" }: { children: React.ReactNode; onClose: () => void; width?: string }) {
   return createPortal(
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={onClose}>
+    <div /*
+        z-[120], not z-50. The community app's sidebar and header sit at
+        z-[52], so at the Tailwind default this overlay dimmed the page while
+        the navigation stayed bright and clickable on top of it.
+      */
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-[120]" onClick={onClose}>
       <div className={`bg-white rounded-xl shadow-xl ${width} p-6 text-zinc-900`} onClick={e => e.stopPropagation()}>
         {children}
       </div>

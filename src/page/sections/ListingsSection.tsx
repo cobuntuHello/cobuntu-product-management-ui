@@ -118,7 +118,7 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
   if (!inline && !visible) return null;
 
   const tree = (
-    <div className={inline ? "" : "fixed inset-0 z-50"}>
+    <div className={inline ? "" : "fixed inset-0 z-[120]"}>
       {!inline && (
         <div className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${animating ? "opacity-100" : "opacity-0"}`} onClick={handleClose} />
       )}
@@ -190,7 +190,7 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
       </div>
 
       {showAddModal && createPortal(
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center" onClick={() => setShowAddModal(false)}>
+        <div className="fixed inset-0 z-[120] bg-black/40 flex items-center justify-center" onClick={() => setShowAddModal(false)}>
           <div className="bg-white rounded-xl shadow-xl w-[calc(100vw-2rem)] md:w-[440px] max-h-[70vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-zinc-100">
               <h3 className="text-[15px] font-semibold text-zinc-900">List in Community</h3>
