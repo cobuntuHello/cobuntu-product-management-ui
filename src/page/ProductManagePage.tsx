@@ -132,6 +132,13 @@ export interface ProductManagePageProps {
   forceModerator?: boolean;
   showMemberPricing?: boolean;
 
+  /**
+   * Whether this product can have community-scoped settings at all. False for
+   * a user-owned product; the Settings action then does not render.
+   * Defaults to "community-owned?" derived from the product itself.
+   */
+  canConfigureSettings?: boolean;
+
   /** Leader capability (MARKETPLACE_CREATE), resolved by the host app. */
   canConfigureAfterCheckout?: boolean;
 
@@ -167,6 +174,7 @@ export function ProductManagePage({
   viewerUserId,
   forceModerator,
   showMemberPricing,
+  canConfigureSettings,
   canConfigureAfterCheckout,
   requiresApproval,
   onSaveApproval,
@@ -240,6 +248,13 @@ export function ProductManagePage({
           setShowEditDrawer={setShowEditDrawer}
           showMemberPricing={showMemberPricing}
           isOwnerView={isSeller}
+          /*
+           * Derived from the product when the host app says nothing, so an app
+           * that forgets the prop still gets the right answer rather than
+           * offering settings the backend will 403. Community-owned is the
+           * whole condition — `communityId` is exactly what the server checks.
+           */
+          canConfigureSettings={canConfigureSettings ?? !!product?.communityId}
           canConfigureAfterCheckout={canConfigureAfterCheckout}
           requiresApproval={requiresApproval}
           onSaveApproval={onSaveApproval}

@@ -109,30 +109,13 @@ describe("OverviewView — approval toggle", () => {
   });
 });
 
-describe("OverviewView — after-checkout gate", () => {
-  it("is a PERMISSION, not ownership", async () => {
-    // Gating on ownership is wrong in both directions: it offers the card to a
-    // member who gets a 403 on save, and hides it from the leader meant to
-    // configure it.
-    const { rerender } = renderView({ isOwnerView: true, canConfigureAfterCheckout: false });
-    expect(screen.queryByText(/after checkout/i)).not.toBeInTheDocument();
-
-    rerender(
-      <OverviewView
-        product={product}
-        communityTag="avepark"
-        productId="p1"
-        isPublished={false}
-        listingId={null}
-        onPublish={vi.fn()}
-        onUnpublish={vi.fn()}
-        onUpdate={vi.fn()}
-        onDelete={vi.fn()}
-        showToast={vi.fn()}
-        isOwnerView={false}
-        canConfigureAfterCheckout
-      />,
-    );
-    await waitFor(() => expect(screen.getByText(/after checkout/i)).toBeInTheDocument());
-  });
-});
+/*
+ * The after-checkout gate moved with the card.
+ *
+ * AfterCheckoutCard is no longer rendered by OverviewView — it is a row inside
+ * ProductSettingsDrawer now, alongside the other three community-scoped
+ * settings. Its gating is therefore tested where it lives:
+ * ProductSettingsGating.test.tsx pins that `hideAfterCheckout` drops that row
+ * ALONE while the other three stay, which is the real rule (community-owned
+ * for all four, plus MARKETPLACE_CREATE for this one).
+ */

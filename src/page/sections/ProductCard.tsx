@@ -13,14 +13,15 @@ interface Props {
   onEditName: () => void;
   onEditPrice: () => void;
   onEditBanner: () => void;
-  onEditProduct: () => void;
+  /** Opens the CTA-text editor. Omit to hide the row. */
+  onEditCta?: () => void;
   onPublish: () => void;
   onUnpublish: () => void;
 }
 
 export function ProductCard({
   product, communityTag, isPublished, listingId,
-  onEditName, onEditPrice, onEditBanner, onEditProduct, onPublish, onUnpublish,
+  onEditName, onEditPrice, onEditBanner, onEditCta, onPublish, onUnpublish,
 }: Props) {
   // Injected by the host app; the package ships its own fallback so no host
   // is forced to supply one.
@@ -120,13 +121,20 @@ export function ProductCard({
               <p className="text-sm font-medium text-zinc-900">{getTypeLabel()}</p>
             </InfoRow>
 
-            {/* CTA Text */}
-            {product.ctaText && (
-              <InfoRow
+            {/*
+              CTA text — always rendered, even when empty. It used to appear
+              only once set, so there was no way to set it from here: the row
+              you would click did not exist until after you had used another
+              surface to fill it in.
+            */}
+            {onEditCta && (
+              <InfoRow onClick={onEditCta}
                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>}>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-zinc-400">CTA Text</p>
-                  <p className="text-sm font-medium text-zinc-900 truncate">{product.ctaText}</p>
+                  <p className="text-xs text-zinc-400">Button text</p>
+                  <p className={`text-sm font-medium truncate ${product.ctaText ? "text-zinc-900" : "text-zinc-400"}`}>
+                    {product.ctaText || "Buy now (default)"}
+                  </p>
                 </div>
               </InfoRow>
             )}
@@ -150,9 +158,15 @@ export function ProductCard({
               );
             })()}
 
-            {/* Publish Status */}
-            <div onClick={!isPublished ? onPublish : undefined}
-              className={`flex items-start gap-3 rounded-lg py-1 ${!isPublished ? "hover:bg-zinc-50 cursor-pointer" : ""}`}>
+            {/*
+              Publish status — a ROW, and the only place publishing happens.
+              It used to be click-to-publish one way and a BUTTON the other,
+              so unpublishing lived somewhere the publishing did not. Both
+              directions are the row now: the card is a list of properties and
+              publish is one of them.
+            */}
+            <div onClick={isPublished ? onUnpublish : onPublish}
+              className="flex items-start gap-3 rounded-lg py-1 hover:bg-zinc-50 cursor-pointer">
               <div className={`shrink-0 w-11 h-11 rounded-lg border flex items-center justify-center ${
                 isPublished ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"
               }`}>
@@ -164,7 +178,10 @@ export function ProductCard({
               </div>
               <div className="flex-1 min-w-0 flex flex-col justify-center min-h-[2.75rem]">
                 {isPublished ? (
-                  <p className="text-sm font-medium text-emerald-600">Product is published</p>
+                  <>
+                    <p className="text-sm font-medium text-emerald-600">Product is published</p>
+                    <p className="text-xs text-zinc-500">Click to unpublish</p>
+                  </>
                 ) : (
                   <>
                     <p className="text-sm font-medium text-zinc-900">Product is not published yet</p>
@@ -175,17 +192,14 @@ export function ProductCard({
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 pt-4 shrink-0">
-            <button onClick={onEditProduct}
-              className="flex-1 px-4 py-2.5 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer">
-              Edit Product
-            </button>
-            <button onClick={isPublished ? onUnpublish : onPublish}
-              className="flex-1 px-4 py-2.5 text-[13px] font-medium rounded-lg cursor-pointer transition-colors bg-zinc-900 text-white hover:bg-zinc-800">
-              {isPublished ? "Unpublish Product" : "Publish Product"}
-            </button>
-          </div>
+          {/*
+            NO BUTTONS. The card is a list of the product's properties, each
+            row opening the editor for that one thing — the event card's
+            shape. "Edit Product" was a second, competing way to reach the same
+            fields, and a button labelled with the whole noun invites a
+            full-form edit where a row edit is what people actually want.
+            Publishing is the row above; the drawer is a quick action.
+          */}
         </div>
       </div>
     </div>
