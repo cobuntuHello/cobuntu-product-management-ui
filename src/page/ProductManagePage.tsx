@@ -217,6 +217,12 @@ export function ProductManagePage({
         <ListingsSection
           productId={product?.id ?? productId}
           communityTag={communityTag}
+          /*
+            INLINE. Mounted as a drawer, this slid its content over the page
+            and left the tab panel empty — the tab looked broken because the
+            content was somewhere else entirely.
+          */
+          inline
           isOpen
           onClose={() => onViewChange("overview")}
           onShowDetail={setDetailListing}
