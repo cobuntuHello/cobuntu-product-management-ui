@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { PencilIcon } from "../helpers";
 import { useProductManagementConfig } from "../../config";
 import { UserAvatarFallback } from "../../ui/user-avatar-fallback";
@@ -32,15 +32,20 @@ export function ProductCard({
   const { UserAvatar: ConfigAvatar } = useProductManagementConfig();
   const UserAvatar = ConfigAvatar ?? UserAvatarFallback;
   const [urlCopied, setUrlCopied] = useState(false);
-  const [imgSize, setImgSize] = useState(280);
-  const rightRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!rightRef.current) return;
-    const observer = new ResizeObserver(([entry]) => { setImgSize(entry.contentRect.height); });
-    observer.observe(rightRef.current);
-    return () => observer.disconnect();
-  }, []);
+  /*
+   * NO MEASUREMENT. The media column used to size itself from the RIGHT
+   * column's measured height, so a square image matched the rows beside it.
+   *
+   * That had a fixed point only while the left column was exactly one square.
+   * Adding the thumbnail strip broke it into a runaway: left = image + strip,
+   * so left > right; the row takes the taller side; the right column stretches
+   * to the row; the observer reads the taller right column and grows the image
+   * again. The card inflated until it filled the viewport.
+   *
+   * A fixed column width has no such loop, and "as tall as the rows happen to
+   * be" was never a real design requirement — it was a way to avoid choosing
+   * a size.
+   */
 
   async function copyProductLink() {
     const url = `https://${communityTag}.cobuntu.com/marketplace/${product.id}`;
@@ -69,7 +74,7 @@ export function ProductCard({
 
   return (
     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
-      <div className="flex p-5 gap-5">
+      <div className="flex items-start p-5 gap-5">
 
         {/*
           MEDIA COLUMN — banner large, the rest as a strip beneath it.
@@ -84,8 +89,8 @@ export function ProductCard({
           concept, one destination — matching the rows on the right, where each
           opens the one editor for that one thing.
         */}
-        <div className="shrink-0" style={{ width: imgSize }}>
-          <div className="overflow-hidden rounded-xl relative group" style={{ width: imgSize, height: imgSize }}>
+        <div className="shrink-0 w-[200px] sm:w-[240px] lg:w-[280px]">
+          <div className="overflow-hidden rounded-xl relative group aspect-square w-full">
             <button
               onClick={onEditMedia}
               aria-label="Manage images"
@@ -159,7 +164,7 @@ export function ProductCard({
         </div>
 
         {/* Right: Info Rows */}
-        <div ref={rightRef} className="flex-1 flex flex-col justify-between min-h-0">
+        <div className="flex-1 flex flex-col gap-1 min-w-0">
           <div className="flex flex-col gap-1 flex-1">
             {/* Name */}
             <InfoRow onClick={onEditName}

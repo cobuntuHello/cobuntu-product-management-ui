@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithConfig, mockFetch } from "./test-utils";
@@ -86,8 +88,11 @@ describe("the media column", () => {
   });
 
   it("keeps the strip's height with no images, so the column does not jump", () => {
+    // Counted INSIDE the grid: the banner is aspect-square too now that it no
+    // longer takes a measured height, so a document-wide count would be 5.
     const { container } = renderCard({ media: [] });
-    expect(container.querySelectorAll(".aspect-square").length).toBe(4);
+    const strip = container.querySelector(".grid-cols-4");
+    expect(strip?.querySelectorAll(".aspect-square").length).toBe(4);
   });
 });
 
@@ -131,5 +136,42 @@ describe("the edit rows", () => {
     renderCard();
     expect(screen.queryByText(/^Edit Product$/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Publish Product/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * The card must not size itself from its own height.
+ *
+ * The media column used to derive its size from the RIGHT column's measured
+ * height via a ResizeObserver — stable only while the left column was exactly
+ * one square. Adding the thumbnail strip made left = image + strip, so the row
+ * took the taller left side, the right column stretched to match, the observer
+ * read the taller right column, and the image grew again. The card inflated
+ * until it filled the viewport.
+ */
+describe("the card has no self-referential sizing", () => {
+  it("does not observe its own layout", () => {
+    const src = readFileSync(resolve(__dirname, "../page/sections/ProductCard.tsx"), "utf8");
+    expect(src).not.toContain("ResizeObserver");
+    expect(src).not.toContain("imgSize");
+  });
+
+  it("gives the media column a fixed width", () => {
+    const { container } = renderCard();
+    expect(container.querySelector(".w-\\[200px\\]")).toBeTruthy();
+  });
+
+  it("keeps the banner square without a measured height", () => {
+    const { container } = renderCard();
+    const banner = container.querySelector(".aspect-square.w-full");
+    expect(banner).toBeTruthy();
+    expect((banner as HTMLElement).style.height).toBe("");
+  });
+
+  it("does not let the rows stretch the row box", () => {
+    // `items-start` is what stops the right column growing to the left one's
+    // height — the other half of the loop.
+    const { container } = renderCard();
+    expect(container.querySelector(".items-start")).toBeTruthy();
   });
 });
