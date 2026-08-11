@@ -57,6 +57,21 @@ export interface ProductSettingsDrawerProps {
    * product be community-owned.
    */
   hideAfterCheckout?: boolean;
+
+  /**
+   * Approval + escrow on this product's purchases.
+   *
+   * It used to be a full-width card under the product card — a configuration
+   * switch sitting in the middle of the page's content. It is a setting, so it
+   * lives with the settings, which is how the event page is arranged.
+   *
+   * Unlike the four rows above it, this one is NOT community-scoped: a
+   * user-owned product can be approval-gated too. It renders whenever a
+   * handler is supplied.
+   */
+  requiresApproval?: boolean;
+  onSaveApproval?: (next: boolean) => void | Promise<void>;
+  approvalCopy?: { title: string; body: string };
 }
 
 export function ProductSettingsDrawer({
@@ -68,7 +83,33 @@ export function ProductSettingsDrawer({
   onSaved,
   showToast,
   hideAfterCheckout,
+  requiresApproval,
+  onSaveApproval,
+  approvalCopy,
 }: ProductSettingsDrawerProps) {
+  /*
+   * Optimistic, and it REVERTS on failure. A toggle that stays flipped after a
+   * failed save tells a seller their purchases are gated when the server never
+   * agreed — a money question, not a cosmetic one.
+   */
+  const [approvalOn, setApprovalOn] = React.useState(!!requiresApproval);
+  const [savingApproval, setSavingApproval] = React.useState(false);
+  React.useEffect(() => { setApprovalOn(!!requiresApproval); }, [requiresApproval]);
+
+  async function toggleApproval(next: boolean) {
+    if (savingApproval || !onSaveApproval) return;
+    const prev = approvalOn;
+    setApprovalOn(next);
+    setSavingApproval(true);
+    try {
+      await onSaveApproval(next);
+    } catch {
+      setApprovalOn(prev);
+    } finally {
+      setSavingApproval(false);
+    }
+  }
+
   const [visible, setVisible] = React.useState(false);
   const [animating, setAnimating] = React.useState(false);
   const [modal, setModal] = React.useState<ModalKey>(null);
@@ -242,6 +283,40 @@ export function ProductSettingsDrawer({
               </svg>
             }
           />
+          {onSaveApproval && (
+            <div className="w-full flex items-center gap-3 px-5 py-4 border-b border-zinc-100">
+              <span className="shrink-0 w-9 h-9 rounded-lg border border-zinc-200 bg-white flex items-center justify-center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-zinc-400" aria-hidden>
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" />
+                </svg>
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-medium text-zinc-900">
+                  {approvalCopy?.title ?? "Require approval"}
+                </span>
+                <span className="block text-[12px] text-zinc-500 leading-snug">
+                  {approvalCopy?.body ?? "Hold each purchase until you approve it."}
+                </span>
+              </span>
+              {/* A switch, not a chevron: this row changes state in place
+                  rather than opening an editor, so it must not look like the
+                  rows that do. */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={approvalOn}
+                aria-label={approvalCopy?.title ?? "Require approval"}
+                disabled={savingApproval}
+                onClick={() => void toggleApproval(!approvalOn)}
+                className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full border transition-colors disabled:opacity-50 ${
+                  approvalOn ? "bg-zinc-900 border-zinc-900" : "bg-zinc-200 border-zinc-300"
+                }`}
+              >
+                <span className={`absolute top-[3px] h-[18px] w-[18px] rounded-full bg-white shadow transition-all ${approvalOn ? "left-[22px]" : "left-[3px]"}`} />
+              </button>
+            </div>
+          )}
+
           {!hideAfterCheckout && (
             <SettingsRow
               label="After checkout"
