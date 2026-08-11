@@ -97,3 +97,32 @@ export { cn } from "./ui/utils";
 // Category picker — the consumer loads the options and passes them to
 // ProductForm; the type is exported so it can shape that fetch.
 export { CategoryPickerRow, type CategoryOption } from "./components/CategoryPickerRow";
+
+/**
+ * The product manage PAGE pieces. Both apps mount these rather than each
+ * assembling its own — the reason the two product pages diverged is that the
+ * package shipped only the parts.
+ */
+export { ProductSectionsNav, type ProductViewKey } from "./page/ProductSectionsNav";
+export {
+  ProductManagePage,
+  visibleProductViews,
+  type ProductManagePageProps,
+  type ProductModal,
+} from "./page/ProductManagePage";
+export { ProductManageHeader, type ProductManageHeaderProps } from "./page/ProductManageHeader";
+export { OverviewView as ProductOverviewView } from "./page/views/OverviewView";
+export { CollaboratorsView } from "./page/views/CollaboratorsView";
+export { ProductActivityTab, type ProductActivityTabProps } from "./components/activity/ProductActivityTab";
+export {
+  renderProductActivitySentence,
+  formatRelativeTime as formatProductActivityTime,
+  type ProductActivityEntryForRender,
+} from "./components/activity/productActivitySentences";
+export { ProductCard as ProductOverviewCard } from "./page/sections/ProductCard";
+export { ListingsSection as ProductListingsSection } from "./page/sections/ListingsSection";
+export { ListingDetailDrawer as ProductListingDetailDrawer } from "./page/sections/ListingDetailDrawer";
+export { OverviewActionCards as ProductOverviewActionCards } from "./page/sections/OverviewActionCards";
+export { AfterCheckoutCard } from "./page/sections/AfterCheckoutCard";
+export { getProductManagementConfig } from "./config";
+export { UserAvatarFallback } from "./ui/user-avatar-fallback";

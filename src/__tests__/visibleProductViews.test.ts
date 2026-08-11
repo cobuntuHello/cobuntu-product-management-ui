@@ -1,0 +1,77 @@
+import { describe, it, expect } from "vitest";
+import { visibleProductViews } from "../page/ProductManagePage";
+
+/**
+ * Which tabs a viewer gets. The rule that matters is the FAILURE direction:
+ * dropping a tab the owner needs is the same class of bug as the manage route
+ * 404ing on someone who could manage — the page silently loses features for
+ * the person it belongs to, and nothing surfaces an error.
+ */
+
+const SELLER_SET = ["overview", "collaborators", "listings", "activity"];
+const MODERATOR_SET = ["overview", "activity"];
+
+describe("visibleProductViews", () => {
+  it("gives the owner every tab", () => {
+    expect(visibleProductViews({ product: { ownerId: "u1" }, viewerUserId: "u1" })).toEqual(SELLER_SET);
+  });
+
+  it("gives a co-seller every tab", () => {
+    expect(
+      visibleProductViews({
+        product: { ownerId: "u1", collaborators: [{ userId: "u2" }] },
+        viewerUserId: "u2",
+      }),
+    ).toEqual(SELLER_SET);
+  });
+
+  it("gives a leader reviewing someone else's product the moderator set", () => {
+    // Not their bench to rewrite, not their listings to place.
+    expect(visibleProductViews({ product: { ownerId: "u1" }, viewerUserId: "leader" })).toEqual(MODERATOR_SET);
+  });
+
+  it("defaults an UNKNOWN viewer to the full set, not the reduced one", () => {
+    // A host app that forgets viewerUserId must not silently strip the
+    // owner's own tabs. Reaching this page already required canManageProduct,
+    // so the permissive answer is never a leak.
+    expect(visibleProductViews({ product: { ownerId: "u1" } })).toEqual(SELLER_SET);
+    expect(visibleProductViews({ product: { ownerId: "u1" }, viewerUserId: null })).toEqual(SELLER_SET);
+  });
+
+  it("honours forceModerator as an explicit assertion", () => {
+    // The only way to get the reduced set without knowing the viewer — it has
+    // to be said, it cannot happen by omission.
+    expect(visibleProductViews({ product: { ownerId: "u1" }, forceModerator: true })).toEqual(MODERATOR_SET);
+  });
+
+  it("lets forceModerator win even over the owner", () => {
+    // The app is asserting "this surface is review", and a surface that shows
+    // one leader the seller tools and another the review tools on the same
+    // route is worse than one that is consistently a review surface.
+    expect(
+      visibleProductViews({ product: { ownerId: "u1" }, viewerUserId: "u1", forceModerator: true }),
+    ).toEqual(MODERATOR_SET);
+  });
+
+  it("survives a product shape it does not recognise", () => {
+    // owner may arrive nested or missing entirely depending on which endpoint
+    // loaded it; neither should throw or blank the page.
+    expect(visibleProductViews({ product: { owner: { id: "u1" } }, viewerUserId: "u1" })).toEqual(SELLER_SET);
+    expect(visibleProductViews({ product: null, viewerUserId: "u1" })).toEqual(MODERATOR_SET);
+    expect(visibleProductViews({ product: undefined })).toEqual(SELLER_SET);
+  });
+
+  it("always includes overview and activity", () => {
+    // Overview is where every route lands; activity answers "who changed
+    // this", which is the moderator's main question.
+    for (const opts of [
+      { product: { ownerId: "u1" }, viewerUserId: "u1" },
+      { product: { ownerId: "u1" }, viewerUserId: "other" },
+      { product: { ownerId: "u1" }, forceModerator: true },
+    ]) {
+      const views = visibleProductViews(opts);
+      expect(views).toContain("overview");
+      expect(views).toContain("activity");
+    }
+  });
+});

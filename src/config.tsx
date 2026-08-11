@@ -24,6 +24,22 @@ export interface ProductManagementConfig {
   authHeaders: () => Record<string, string>;
 
   /**
+   * The host app's avatar component. Optional — the package ships
+   * UserAvatarFallback — but passing yours keeps the seeded-persona look
+   * consistent with the rest of that app. Mirrors the event package.
+   */
+  UserAvatar?: React.ComponentType<{
+    user: {
+      name?: string | null;
+      imageUrl?: string | null;
+      profileImage?: string | null;
+      usertag?: string | null;
+      email?: string | null;
+    };
+    className?: string;
+  }>;
+
+  /**
    * Returns the path the user should be sent to in order to connect
    * Stripe for this community. Different host apps point at different
    * routes — admin's connect-stripe page vs community-app's
@@ -35,6 +51,25 @@ export interface ProductManagementConfig {
 
 const Ctx = React.createContext<ProductManagementConfig | null>(null);
 
+/*
+ * The same config, reachable without a hook — mirrors the event package.
+ * The page shell moved in from the admin app brings module-level helpers
+ * (authHeaders/jsonHeaders) that views and modals both import; rewriting each
+ * into a hook would restructure files whose only sin is not being components.
+ * The provider mirrors on render; components still read the CONTEXT.
+ */
+let currentConfig: ProductManagementConfig | null = null;
+
+/** Non-hook accessor for module-level helpers. */
+export function getProductManagementConfig(): ProductManagementConfig {
+  if (!currentConfig) {
+    throw new Error(
+      "getProductManagementConfig() called before <ProductManagementConfigProvider> rendered",
+    );
+  }
+  return currentConfig;
+}
+
 export function ProductManagementConfigProvider({
   value,
   children,
@@ -42,6 +77,7 @@ export function ProductManagementConfigProvider({
   value: ProductManagementConfig;
   children: React.ReactNode;
 }) {
+  currentConfig = value;
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
