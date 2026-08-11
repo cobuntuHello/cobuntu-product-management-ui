@@ -104,6 +104,14 @@ export { CategoryPickerRow, type CategoryOption } from "./components/CategoryPic
  * package shipped only the parts.
  */
 export { ProductSectionsNav, type ProductViewKey } from "./page/ProductSectionsNav";
+export {
+  ProductManagePage,
+  visibleProductViews,
+  type ProductManagePageProps,
+  type ProductModal,
+} from "./page/ProductManagePage";
+export { ProductManageHeader, type ProductManageHeaderProps } from "./page/ProductManageHeader";
+export { OverviewView as ProductOverviewView } from "./page/views/OverviewView";
 export { CollaboratorsView } from "./page/views/CollaboratorsView";
 export { ProductActivityTab, type ProductActivityTabProps } from "./components/activity/ProductActivityTab";
 export {
