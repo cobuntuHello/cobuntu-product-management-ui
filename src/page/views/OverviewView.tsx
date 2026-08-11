@@ -188,6 +188,114 @@ export function OverviewView({
         onUnpublish={() => setModal("unpublish")}
       />
 
+      {modal === "name" && (
+        <NameEditModal
+          currentName={product.name}
+          onSave={(name: string) => quickUpdate({ name })}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {modal === "price" && (
+        <PriceEditModal
+          product={product}
+          communityTag={communityTag}
+          productId={productId}
+          onClose={() => setModal(null)}
+          onSaved={() => { setModal(null); void onUpdate(); }}
+          showToast={showToast}
+          showMemberPricing={showMemberPricing}
+        />
+      )}
+
+      {modal === "share" && (
+        <ShareModal
+          productId={productId}
+          communityTag={communityTag}
+          productName={product.name}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {modal === "distribution" && (
+        <ProductDistributionModal
+          product={product}
+          communityTag={communityTag}
+          productId={productId}
+          onClose={() => setModal(null)}
+          onSaved={() => { setModal(null); void onUpdate(); }}
+          showToast={showToast}
+        />
+      )}
+
+      {modal === "delete" && (
+        <DeleteModal
+          productName={product.name}
+          onDelete={async () => { await onDelete(); }}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {modal === "unpublish" && (
+        <ModalShell onClose={() => setModal(null)}>
+          <h3 className="text-[15px] font-semibold text-zinc-900 mb-2">Unpublish product?</h3>
+          <p className="text-[13px] text-zinc-500 mb-5">
+            &ldquo;{product.name}&rdquo; will be hidden from the community marketplace. You can republish it anytime.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setModal(null)}
+              className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={async () => { await onUnpublish(); setModal(null); }}
+              className="px-4 py-2 text-[13px] font-medium bg-amber-500 text-white rounded-lg hover:bg-amber-600 cursor-pointer"
+            >
+              Unpublish
+            </button>
+          </div>
+        </ModalShell>
+      )}
+
+      {modal === "description" && (
+        <ProductDescriptionEditModal
+          product={product}
+          productId={productId}
+          onClose={() => setModal(null)}
+          onSaved={() => { setModal(null); void onUpdate(); }}
+          showToast={showToast}
+        />
+      )}
+
+      {modal === "cta" && (
+        <ProductCtaEditModal
+          product={product}
+          productId={productId}
+          onClose={() => setModal(null)}
+          onSaved={() => { setModal(null); void onUpdate(); }}
+          showToast={showToast}
+        />
+      )}
+
+      {modal === "media" && (
+        <ProductMediaModal
+          product={product}
+          onClose={() => setModal(null)}
+          onSaved={() => { setModal(null); void onUpdate(); }}
+          showToast={showToast}
+        />
+      )}
+
+      <EditProductDrawer
+        product={product}
+        communityTag={communityTag}
+        isOpen={showEditDrawer}
+        onClose={() => setShowEditDrawer(false)}
+        onSaved={() => { setShowEditDrawer(false); void onUpdate(); }}
+      />
+
       {/*
         REQUIRE APPROVAL MOVED INTO THE SETTINGS DRAWER.
 
