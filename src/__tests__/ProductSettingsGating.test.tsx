@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { renderWithConfig, mockFetch } from "./test-utils";
 import { OverviewActionCards } from "../page/sections/OverviewActionCards";
 import { ProductSettingsDrawer } from "../page/ProductSettingsDrawer";
+import { ListingsSection } from "../page/sections/ListingsSection";
 
 /**
  * Community-scoped settings are HIDDEN, not disabled, on a user-owned product.
@@ -197,5 +198,65 @@ describe("ProductSettingsDrawer — approval row", () => {
     // The four community-scoped rows do not apply there, but approval does.
     renderDrawer({ requiresApproval: true, onSaveApproval: vi.fn() });
     expect(await screen.findByRole("switch")).toHaveAttribute("aria-checked", "true");
+  });
+});
+
+/**
+ * Listings is a TAB, not a drawer.
+ *
+ * The section predates the tabbed page and was built as a slide-over. Mounted
+ * as the tab's content it portalled itself over the page, so the panel behind
+ * it was empty and the tab read as broken.
+ */
+describe("ListingsSection — inline mode", () => {
+  // The file-level mock answers every GET with {}; this section fetches a
+  // LIST, so it needs an array or it throws before it can render.
+  beforeEach(() => {
+    mockFetch([
+      { method: "GET", url: /\/listings\/product\//, body: [] },
+      { method: "GET", url: /.*/, body: {} },
+    ]);
+  });
+
+  it("does NOT portal or dim the page when inline", async () => {
+    const { container } = renderWithConfig(
+      <ListingsSection
+        productId="p1"
+        communityTag="avepark"
+        inline
+        isOpen
+        onClose={vi.fn()}
+        onShowDetail={vi.fn()}
+        onListingsChange={vi.fn()}
+        showToast={vi.fn()}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText("Listings")).toBeInTheDocument());
+    // Rendered in place, not into document.body.
+    expect(container.textContent).toContain("Listings");
+    expect(container.querySelector(".fixed.inset-0")).toBeNull();
+    expect(container.querySelector(".bg-black\\/50")).toBeNull();
+  });
+
+  it("drops the close button, which has no meaning in a tab", async () => {
+    renderWithConfig(
+      <ListingsSection
+        productId="p1" communityTag="avepark" inline isOpen
+        onClose={vi.fn()} onShowDetail={vi.fn()} onListingsChange={vi.fn()} showToast={vi.fn()}
+      />,
+    );
+    await waitFor(() => expect(screen.getByText("Listings")).toBeInTheDocument());
+    expect(screen.queryByLabelText(/close/i)).not.toBeInTheDocument();
+  });
+
+  it("still slides over when NOT inline", async () => {
+    // The drawer is still used elsewhere; inline must be additive.
+    const { baseElement } = renderWithConfig(
+      <ListingsSection
+        productId="p1" communityTag="avepark" isOpen
+        onClose={vi.fn()} onShowDetail={vi.fn()} onListingsChange={vi.fn()} showToast={vi.fn()}
+      />,
+    );
+    await waitFor(() => expect(baseElement.querySelector(".fixed.inset-0")).toBeTruthy());
   });
 });

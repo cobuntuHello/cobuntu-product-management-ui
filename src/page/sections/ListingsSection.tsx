@@ -8,6 +8,17 @@ interface Props {
   productId: string;
   communityTag: string;
   isOpen: boolean;
+  /**
+   * Render INLINE rather than as a slide-over.
+   *
+   * This predates the tabbed manage page and was built as a drawer. When
+   * Listings became a TAB, the page mounted the drawer and passed isOpen — so
+   * the tab's content slid in OVER the page while the panel behind it sat
+   * empty. Inline keeps the same tree and only drops the frame: no portal, no
+   * overlay, no close button, none of which mean anything when the content IS
+   * the panel.
+   */
+  inline?: boolean;
   onClose: () => void;
   onShowDetail: (listing: any) => void;
   onListingsChange: (listings: any[]) => void;
@@ -23,7 +34,7 @@ interface Props {
   }>;
 }
 
-export function ListingsSection({ productId, communityTag, isOpen, onClose, onShowDetail, onListingsChange, showToast, hubs = [] }: Props) {
+export function ListingsSection({ productId, communityTag, isOpen, onClose, onShowDetail, onListingsChange, showToast, hubs = [], inline = false }: Props) {
   // hubs arrives as a prop — see the Props type.
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,20 +115,26 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
 
   const activeListings = listings.filter(l => l.status !== "CANCELLED");
 
-  if (!visible) return null;
+  if (!inline && !visible) return null;
 
-  return createPortal(
-    <div className="fixed inset-0 z-50">
-      <div className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${animating ? "opacity-100" : "opacity-0"}`} onClick={handleClose} />
-      <div className={`absolute inset-y-0 right-0 w-full max-w-lg bg-white shadow-2xl rounded-l-2xl flex flex-col transition-transform duration-300 ease-out ${animating ? "translate-x-0" : "translate-x-full"}`}>
+  const tree = (
+    <div className={inline ? "" : "fixed inset-0 z-50"}>
+      {!inline && (
+        <div className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${animating ? "opacity-100" : "opacity-0"}`} onClick={handleClose} />
+      )}
+      <div className={inline
+        ? "flex flex-col"
+        : `absolute inset-y-0 right-0 w-full max-w-lg bg-white shadow-2xl rounded-l-2xl flex flex-col transition-transform duration-300 ease-out ${animating ? "translate-x-0" : "translate-x-full"}`}>
 
         {/* Header */}
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-zinc-100">
+        <div className={`flex items-center gap-3 border-b border-zinc-100 ${inline ? "pb-4" : "px-6 py-5"}`}>
+          {!inline && (
           <button onClick={handleClose} className="w-8 h-8 rounded-lg hover:bg-zinc-100 flex items-center justify-center cursor-pointer shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-400">
               <polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/>
             </svg>
           </button>
+          )}
           <div className="flex-1">
             <h2 className="text-[15px] font-semibold text-zinc-900">Listings</h2>
             <p className="text-[12px] text-zinc-400">Communities where this product is listed</p>
@@ -129,7 +146,7 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
         </div>
 
         {/* Listings list */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-2">
+        <div className={inline ? "space-y-2 pt-4" : "flex-1 overflow-y-auto p-5 space-y-2"}>
         {activeListings.length > 0 ? (
           activeListings.map((l: any) => {
             const sc = getStatusConfig(l);
@@ -237,7 +254,9 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
         document.body
       )}
       </div>
-    </div>,
-    document.body
+    </div>
   );
+
+  // Inline is the tab panel itself; the drawer keeps its portal.
+  return inline ? tree : createPortal(tree, document.body);
 }
