@@ -76,10 +76,23 @@ export function ProductActivityTab({ product, communityTag, pageSize = 25 }: Pro
       setLoading(true);
       setError(null);
       try {
-        const url = new URL(`${API}/api/communities/${communityTag}/products/${productRef}/activity`);
-        url.searchParams.set("limit", String(pageSize));
-        if (pageCursor) url.searchParams.set("cursor", pageCursor);
-        const res = await fetch(url.toString(), { headers: config.authHeaders() });
+        /*
+         * Built as a STRING, not with `new URL()`.
+         *
+         * The community app passes apiBaseUrl: "" — its API is same-origin, so
+         * the session cookie rides along and no Bearer is read from JS. `new
+         * URL("/api/...")` with no base throws "Failed to construct 'URL':
+         * Invalid URL", so the tab rendered an error instead of the log for
+         * every seller on that app. URLSearchParams still handles the encoding;
+         * only the base-resolution is dropped, and that is the part that
+         * assumed an absolute origin.
+         */
+        const qs = new URLSearchParams({ limit: String(pageSize) });
+        if (pageCursor) qs.set("cursor", pageCursor);
+        const res = await fetch(
+          `${API}/api/communities/${communityTag}/products/${productRef}/activity?${qs.toString()}`,
+          { headers: config.authHeaders() },
+        );
         if (!res.ok) {
           if (res.status === 401) throw new Error("Sign in to view this product's activity.");
           // 404 covers both "no such product" and "not yours" — see the
@@ -130,7 +143,10 @@ export function ProductActivityTab({ product, communityTag, pageSize = 25 }: Pro
   }, [cursor, exhausted, loading, error, loadPage]);
 
   return (
-    <section className="max-w-2xl">
+    /* Full width, like the other tabs. max-w-2xl made Activity a narrow
+       column under a full-width tab row — the only tab that did not line up
+       with its own header. */
+    <section>
       <div className="mb-4">
         <h2 className="text-[15px] font-semibold text-zinc-900">Activity</h2>
         <p className="text-[12px] text-zinc-400 mt-0.5">
