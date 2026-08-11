@@ -126,3 +126,76 @@ describe("ProductSettingsDrawer", () => {
     expect(container.textContent).toBe("");
   });
 });
+
+
+/**
+ * The approval toggle, now a row in this drawer.
+ *
+ * NOT community-scoped, unlike the four rows above it: a user-owned product
+ * can be approval-gated too, so it renders whenever a handler is supplied.
+ */
+describe("ProductSettingsDrawer — approval row", () => {
+  const product = { id: "p1", name: "Thing", communityId: "c1", viewability: "PUBLIC", accessibility: "PUBLIC" };
+
+  function renderDrawer(over: Record<string, any> = {}) {
+    return renderWithConfig(
+      <ProductSettingsDrawer
+        product={product}
+        communityTag="avepark"
+        productId="p1"
+        isOpen
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        showToast={vi.fn()}
+        {...over}
+      />,
+    );
+  }
+
+  it("is absent when the viewer cannot change it", async () => {
+    renderDrawer();
+    await screen.findByText("Who can see this");
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+  });
+
+  it("renders as a SWITCH, not a chevron row", async () => {
+    // It changes state in place rather than opening an editor, so it must not
+    // look like the rows that do.
+    renderDrawer({ requiresApproval: false, onSaveApproval: vi.fn() });
+    expect(await screen.findByRole("switch")).toBeInTheDocument();
+  });
+
+  it("saves the new value", async () => {
+    const onSaveApproval = vi.fn().mockResolvedValue(undefined);
+    renderDrawer({ requiresApproval: false, onSaveApproval });
+    await userEvent.click(await screen.findByRole("switch"));
+    expect(onSaveApproval).toHaveBeenCalledWith(true);
+    await waitFor(() => expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "true"));
+  });
+
+  it("REVERTS when the save fails", async () => {
+    // Leaving it flipped tells a seller their purchases are gated when the
+    // server refused — a money question, not a cosmetic one.
+    const onSaveApproval = vi.fn().mockRejectedValue(new Error("nope"));
+    renderDrawer({ requiresApproval: false, onSaveApproval });
+    await userEvent.click(await screen.findByRole("switch"));
+    await waitFor(() => expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "false"));
+  });
+
+  it("ignores a second click while a save is in flight", async () => {
+    let resolve: () => void = () => {};
+    const onSaveApproval = vi.fn(() => new Promise<void>((r) => { resolve = r; }));
+    renderDrawer({ requiresApproval: false, onSaveApproval });
+    const sw = await screen.findByRole("switch");
+    await userEvent.click(sw);
+    await userEvent.click(sw);
+    expect(onSaveApproval).toHaveBeenCalledTimes(1);
+    resolve();
+  });
+
+  it("shows for a USER-OWNED product too", async () => {
+    // The four community-scoped rows do not apply there, but approval does.
+    renderDrawer({ requiresApproval: true, onSaveApproval: vi.fn() });
+    expect(await screen.findByRole("switch")).toHaveAttribute("aria-checked", "true");
+  });
+});

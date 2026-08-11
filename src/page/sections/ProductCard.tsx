@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { useState, useRef, useEffect } from "react";
 import { PencilIcon } from "../helpers";
 import { useProductManagementConfig } from "../../config";
@@ -12,16 +13,19 @@ interface Props {
   listingId: string | null;
   onEditName: () => void;
   onEditPrice: () => void;
-  onEditBanner: () => void;
+  /** Opens the media manager — banner and gallery are one surface. */
+  onEditMedia: () => void;
   /** Opens the CTA-text editor. Omit to hide the row. */
   onEditCta?: () => void;
+  /** Opens the description editor. Omit to hide the row. */
+  onEditDescription?: () => void;
   onPublish: () => void;
   onUnpublish: () => void;
 }
 
 export function ProductCard({
   product, communityTag, isPublished, listingId,
-  onEditName, onEditPrice, onEditBanner, onEditCta, onPublish, onUnpublish,
+  onEditName, onEditPrice, onEditMedia, onEditCta, onEditDescription, onPublish, onUnpublish,
 }: Props) {
   // Injected by the host app; the package ships its own fallback so no host
   // is forced to supply one.
@@ -47,6 +51,15 @@ export function ProductCard({
     } catch { /* */ }
   }
 
+  /*
+   * The row shows a one-line preview, so the markup has to come off first —
+   * a raw "<p>Two days…" in a card row is a bug the reader can see.
+   */
+  const plainDescription = React.useMemo(() => {
+    const raw: string = product?.description || "";
+    return raw.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+  }, [product?.description]);
+
   const isPaid = product?.price > 0;
   const currency = product?.currency || "EUR";
 
@@ -54,48 +67,95 @@ export function ProductCard({
   const sortedMedia = [...(product?.media || [])].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0));
   const firstMedia = sortedMedia[0];
 
-  // Determine product type label
-  function getTypeLabel() {
-    if (product?.recurringInterval === "monthly") return "Recurring (monthly)";
-    if (product?.recurringInterval === "yearly") return "Recurring (yearly)";
-    return "Digital Product";
-  }
-
   return (
     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
       <div className="flex p-5 gap-5">
 
-        {/* Left: Product Image -- 1:1 square, sized to right column height */}
-        <div className="shrink-0 overflow-hidden rounded-xl relative group" style={{ width: imgSize, height: imgSize }}>
-          <button onClick={onEditBanner} className="absolute inset-0 w-full h-full z-10 cursor-pointer" style={{ bottom: "40px" }} />
-          {firstMedia?.url ? (
-            <img src={firstMedia.url} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-zinc-100 flex items-center justify-center">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-zinc-300">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                <line x1="12" y1="22.08" x2="12" y2="12"/>
-              </svg>
+        {/*
+          MEDIA COLUMN — banner large, the rest as a strip beneath it.
+
+          A product is not an event: it has a banner AND a gallery, at whatever
+          aspect ratios the seller shot them in. The old column showed exactly
+          one square image and its only affordance opened the whole edit
+          drawer, so the other images were invisible here and unmanageable
+          from here.
+
+          Every surface in this column opens the SAME media manager. One
+          concept, one destination — matching the rows on the right, where each
+          opens the one editor for that one thing.
+        */}
+        <div className="shrink-0" style={{ width: imgSize }}>
+          <div className="overflow-hidden rounded-xl relative group" style={{ width: imgSize, height: imgSize }}>
+            <button
+              onClick={onEditMedia}
+              aria-label="Manage images"
+              className="absolute inset-0 w-full h-full z-10 cursor-pointer"
+              style={{ bottom: "40px" }}
+            />
+            {firstMedia?.url ? (
+              <img src={firstMedia.url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-zinc-100 flex flex-col items-center justify-center gap-2 text-zinc-400">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="m21 15-5-5L5 21" />
+                </svg>
+                <span className="text-[12px] font-medium">Add images</span>
+              </div>
+            )}
+            <div
+              onClick={onEditMedia}
+              className="absolute top-3 right-3 h-8 w-8 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center cursor-pointer hover:bg-black/80 transition-all z-20 opacity-0 group-hover:opacity-100"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
             </div>
-          )}
-          <div onClick={onEditBanner}
-            className="absolute top-3 right-3 h-8 w-8 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center cursor-pointer hover:bg-black/80 transition-all z-20 opacity-0 group-hover:opacity-100">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+            <button onClick={copyProductLink}
+              className={`absolute bottom-0 left-0 right-0 backdrop-blur-md px-4 py-2.5 flex items-center gap-3 cursor-pointer rounded-b-xl border-t border-white/10 transition-all z-20 ${
+                urlCopied ? "bg-emerald-600/90" : "bg-black/70 hover:bg-black/80"
+              }`}>
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${urlCopied ? "bg-white/20" : "bg-white/10"}`}>
+                {urlCopied ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="opacity-80"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                )}
+              </div>
+              <span className="text-sm font-medium text-white/90">{urlCopied ? "Link copied!" : "Copy product link"}</span>
+            </button>
           </div>
-          <button onClick={copyProductLink}
-            className={`absolute bottom-0 left-0 right-0 backdrop-blur-md px-4 py-2.5 flex items-center gap-3 cursor-pointer rounded-b-xl border-t border-white/10 transition-all z-20 ${
-              urlCopied ? "bg-emerald-600/90" : "bg-black/70 hover:bg-black/80"
-            }`}>
-            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${urlCopied ? "bg-white/20" : "bg-white/10"}`}>
-              {urlCopied ? (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-              ) : (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="opacity-80"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              )}
-            </div>
-            <span className="text-sm font-medium text-white/90">{urlCopied ? "Link copied!" : "Copy product link"}</span>
-          </button>
+
+          {/*
+            The strip. Four slots: the next three images plus an "add" tile, or
+            empty slots when there is nothing yet — the row keeps its height so
+            the column does not jump as images come and go.
+          */}
+          <div className="grid grid-cols-4 gap-2 mt-2">
+            {[0, 1, 2, 3].map((i) => {
+              const m = sortedMedia[i + 1];
+              return (
+                <button
+                  key={i}
+                  onClick={onEditMedia}
+                  aria-label={m ? "Manage images" : "Add images"}
+                  className="aspect-square rounded-lg overflow-hidden cursor-pointer transition-colors"
+                  style={
+                    m
+                      ? undefined
+                      : { border: "1.5px dashed rgba(128,128,128,0.28)", background: "rgba(128,128,128,0.04)" }
+                  }
+                >
+                  {m ? (
+                    <img src={m.url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    i === 0 && sortedMedia.length <= 1 ? (
+                      <span className="grid place-items-center w-full h-full text-zinc-400 text-[16px] leading-none">+</span>
+                    ) : null
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Right: Info Rows */}
@@ -115,11 +175,27 @@ export function ProductCard({
               </p>
             </InfoRow>
 
-            {/* Type */}
-            <InfoRow
-              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>}>
-              <p className="text-sm font-medium text-zinc-900">{getTypeLabel()}</p>
-            </InfoRow>
+            {/*
+              Description — the product manage page had NO way to edit one.
+              The only route was the full edit drawer, which reopens the entire
+              create form for one paragraph. Events have had a single-field
+              modal since the quick-edit set shipped.
+
+              Rendered even when empty, for the same reason the button-text row
+              is: a row that only appears once the field has a value cannot be
+              the thing you use to give it one.
+            */}
+            {onEditDescription && (
+              <InfoRow onClick={onEditDescription}
+                icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><line x1="21" y1="6" x2="3" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="15" y1="18" x2="3" y2="18"/></svg>}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-zinc-400">Description</p>
+                  <p className={`text-sm truncate ${plainDescription ? "font-medium text-zinc-900" : "text-zinc-400"}`}>
+                    {plainDescription || "Add a description"}
+                  </p>
+                </div>
+              </InfoRow>
+            )}
 
             {/*
               CTA text — always rendered, even when empty. It used to appear
