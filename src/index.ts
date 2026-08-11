@@ -105,6 +105,12 @@ export { CategoryPickerRow, type CategoryOption } from "./components/CategoryPic
  */
 export { ProductSectionsNav, type ProductViewKey } from "./page/ProductSectionsNav";
 export { CollaboratorsView } from "./page/views/CollaboratorsView";
+export { ProductActivityTab, type ProductActivityTabProps } from "./components/activity/ProductActivityTab";
+export {
+  renderProductActivitySentence,
+  formatRelativeTime as formatProductActivityTime,
+  type ProductActivityEntryForRender,
+} from "./components/activity/productActivitySentences";
 export { ProductCard as ProductOverviewCard } from "./page/sections/ProductCard";
 export { ListingsSection as ProductListingsSection } from "./page/sections/ListingsSection";
 export { ListingDetailDrawer as ProductListingDetailDrawer } from "./page/sections/ListingDetailDrawer";

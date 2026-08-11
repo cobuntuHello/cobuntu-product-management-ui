@@ -12,16 +12,17 @@ import * as React from "react";
  * of its own. This is view-state, like events, so tabs are cheap to add.
  */
 
-export type ProductViewKey = "overview" | "collaborators" | "listings";
+export type ProductViewKey = "overview" | "collaborators" | "listings" | "activity";
 
 const SECTIONS: Array<{ key: ProductViewKey; label: string }> = [
   { key: "overview", label: "Overview" },
   { key: "collaborators", label: "Collaborators" },
   { key: "listings", label: "Listings" },
-  // "activity" is deliberately absent: there is no product audit trail in the
-  // backend yet — no product_audits table, no endpoint — so a tab would lead
-  // to a surface that cannot be built. Events have one; products will need
-  // the same groundwork first.
+  // Activity landed with feat/product-audits (product_audits + the
+  // /activity endpoint), so the tab this file used to say could not exist
+  // now can. It is last on purpose: it answers questions about the other
+  // three rather than being somewhere work starts.
+  { key: "activity", label: "Activity" },
 ];
 
 export function ProductSectionsNav({
