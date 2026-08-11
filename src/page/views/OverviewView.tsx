@@ -65,6 +65,28 @@ export interface OverviewViewProps {
   /** True when the viewer owns this product, rather than moderating it. */
   isOwnerView?: boolean;
 
+  /**
+   * After-checkout config (membership upsell / external redirect) is a LEADER
+   * capability — MARKETPLACE_CREATE — and the backend re-enforces it.
+   *
+   * Gating this on ownership instead, as an earlier pass did, is wrong in both
+   * directions: it offers the card to a member selling their own product (who
+   * gets a 403 on save) and hides it from the leader who is supposed to
+   * configure it. The host app resolves the permission and answers here.
+   */
+  canConfigureAfterCheckout?: boolean;
+
+  /**
+   * Approval + escrow on this product's purchases.
+   *
+   * USER-OWNED products can be approval-gated too — this is not a
+   * community-owned-only setting. Omit `onSaveApproval` to hide the card
+   * entirely on a surface where the viewer may not change it.
+   */
+  requiresApproval?: boolean;
+  onSaveApproval?: (next: boolean) => void | Promise<void>;
+  approvalCopy?: { title: string; body: string };
+
   /** App-specific cards (sales, donations) rendered under the product card. */
   extras?: React.ReactNode;
 }
@@ -86,6 +108,10 @@ export function OverviewView({
   setShowEditDrawer: setDrawerProp,
   showMemberPricing,
   isOwnerView,
+  canConfigureAfterCheckout,
+  requiresApproval,
+  onSaveApproval,
+  approvalCopy,
   extras,
 }: OverviewViewProps) {
   const { apiBaseUrl } = useProductManagementConfig();
@@ -100,6 +126,30 @@ export function OverviewView({
   const setModal = setModalProp ?? setOwnModal;
   const showEditDrawer = drawerProp !== undefined ? drawerProp : ownDrawer;
   const setShowEditDrawer = setDrawerProp ?? setOwnDrawer;
+
+  /*
+   * Optimistic, and it REVERTS on failure. A toggle that stays flipped after a
+   * failed save is worse than one that never moved: the seller believes
+   * purchases are gated when they are not, which is a money question, not a
+   * cosmetic one.
+   */
+  const [approvalOn, setApprovalOn] = React.useState(!!requiresApproval);
+  const [savingApproval, setSavingApproval] = React.useState(false);
+  React.useEffect(() => { setApprovalOn(!!requiresApproval); }, [requiresApproval]);
+
+  async function toggleApproval(next: boolean) {
+    if (savingApproval || !onSaveApproval) return;
+    const prev = approvalOn;
+    setApprovalOn(next);
+    setSavingApproval(true);
+    try {
+      await onSaveApproval(next);
+    } catch {
+      setApprovalOn(prev);
+    } finally {
+      setSavingApproval(false);
+    }
+  }
 
   /**
    * The one-field saves (rename) go through the PERSONAL products route, not
@@ -142,10 +192,42 @@ export function OverviewView({
         onUnpublish={() => setModal("unpublish")}
       />
 
-      {/* Upsell config is the seller's own funnel, so it shows for an owner.
-          A moderator reviewing someone else's listing has no business
-          rewriting what the buyer sees after paying them. */}
-      {isOwnerView !== false && (
+      {onSaveApproval && (
+        <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="shrink-0 w-10 h-10 rounded-lg border border-zinc-200 bg-white flex items-center justify-center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400" aria-hidden>
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-zinc-900">
+                  {approvalCopy?.title ?? "Require approval"}
+                </p>
+                <p className="text-[13px] text-zinc-500 leading-snug mt-0.5">
+                  {approvalCopy?.body ?? "Hold each purchase until you approve it. The buyer is charged up front and refunded in full if you decline."}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={approvalOn}
+              aria-label={approvalCopy?.title ?? "Require approval"}
+              disabled={savingApproval}
+              onClick={() => void toggleApproval(!approvalOn)}
+              className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full border transition-colors disabled:opacity-50 ${
+                approvalOn ? "bg-zinc-900 border-zinc-900" : "bg-zinc-200 border-zinc-300"
+              }`}
+            >
+              <span className={`absolute top-[3px] h-[18px] w-[18px] rounded-full bg-white shadow transition-all ${approvalOn ? "left-[22px]" : "left-[3px]"}`} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {canConfigureAfterCheckout && (
         <AfterCheckoutCard
           communityTag={communityTag}
           productId={productId}

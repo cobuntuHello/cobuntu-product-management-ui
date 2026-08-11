@@ -132,6 +132,14 @@ export interface ProductManagePageProps {
   forceModerator?: boolean;
   showMemberPricing?: boolean;
 
+  /** Leader capability (MARKETPLACE_CREATE), resolved by the host app. */
+  canConfigureAfterCheckout?: boolean;
+
+  /** Approval + escrow. Omit onSaveApproval to hide the card. */
+  requiresApproval?: boolean;
+  onSaveApproval?: (next: boolean) => void | Promise<void>;
+  approvalCopy?: { title: string; body: string };
+
   /** App-specific cards under the product card on Overview. */
   overviewExtras?: React.ReactNode;
 }
@@ -159,6 +167,10 @@ export function ProductManagePage({
   viewerUserId,
   forceModerator,
   showMemberPricing,
+  canConfigureAfterCheckout,
+  requiresApproval,
+  onSaveApproval,
+  approvalCopy,
   overviewExtras,
 }: ProductManagePageProps) {
   // Touch the config early so a host app that forgot the provider fails here,
@@ -228,6 +240,10 @@ export function ProductManagePage({
           setShowEditDrawer={setShowEditDrawer}
           showMemberPricing={showMemberPricing}
           isOwnerView={isSeller}
+          canConfigureAfterCheckout={canConfigureAfterCheckout}
+          requiresApproval={requiresApproval}
+          onSaveApproval={onSaveApproval}
+          approvalCopy={approvalCopy}
           extras={overviewExtras}
         />
       );
