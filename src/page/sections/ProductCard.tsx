@@ -70,8 +70,15 @@ export function ProductCard({
     return raw.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
   }, [product?.description]);
 
-  /* Row summaries — the value is stated on the row, so opening the editor is
-     for CHANGING it, never for finding out what it is. */
+  /*
+   * Row summaries — the value is stated on the row, so opening the editor is
+   * for CHANGING it, never for finding out what it is.
+   *
+   * AN UNSET VALUE IS NOT A DISABLED ONE. Empty rows print their placeholder
+   * at zinc-500 against a zinc-400 label; both were zinc-400, which left the
+   * whole row one flat grey and reading as inert. "Add a description" is an
+   * invitation — it has to look clickable.
+   */
   const tagNames: string = (product?.tags || [])
     .map((t: any) => (typeof t === "string" ? t : t?.name))
     .filter(Boolean)
@@ -263,7 +270,7 @@ export function ProductCard({
                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><line x1="21" y1="6" x2="3" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="15" y1="18" x2="3" y2="18"/></svg>}>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-zinc-400">Description</p>
-                  <p className={`text-sm truncate ${plainDescription ? "font-medium text-zinc-900" : "text-zinc-400"}`}>
+                  <p className={`text-sm truncate ${plainDescription ? "font-medium text-zinc-900" : "text-zinc-500"}`}>
                     {plainDescription || "Add a description"}
                   </p>
                 </div>
@@ -281,7 +288,7 @@ export function ProductCard({
                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>}>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-zinc-400">Button text</p>
-                  <p className={`text-sm font-medium truncate ${product.ctaText ? "text-zinc-900" : "text-zinc-400"}`}>
+                  <p className={`text-sm font-medium truncate ${product.ctaText ? "text-zinc-900" : "text-zinc-500"}`}>
                     {product.ctaText || "Buy now (default)"}
                   </p>
                 </div>
@@ -300,7 +307,7 @@ export function ProductCard({
                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>}>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-zinc-400">Tags</p>
-                  <p className={`text-sm truncate ${tagNames ? "font-medium text-zinc-900" : "text-zinc-400"}`}>
+                  <p className={`text-sm truncate ${tagNames ? "font-medium text-zinc-900" : "text-zinc-500"}`}>
                     {tagNames || "Add tags"}
                   </p>
                 </div>
@@ -312,7 +319,7 @@ export function ProductCard({
                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>}>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-zinc-400">Category</p>
-                  <p className={`text-sm truncate ${categoryLabel ? "font-medium text-zinc-900" : "text-zinc-400"}`}>
+                  <p className={`text-sm truncate ${categoryLabel ? "font-medium text-zinc-900" : "text-zinc-500"}`}>
                     {categoryLabel || "Uncategorised"}
                   </p>
                 </div>
