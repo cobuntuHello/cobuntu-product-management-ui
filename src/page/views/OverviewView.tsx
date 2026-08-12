@@ -10,12 +10,13 @@ import { PriceEditModal } from "../../components/PriceEditModal";
 import { NameEditModal } from "../../components/NameEditModal";
 import { ShareModal } from "../../components/ShareModal";
 import { DeleteModal } from "../../components/DeleteModal";
-import { EditProductDrawer } from "../../components/EditProductDrawer";
 import { ProductDistributionModal } from "../../components/ProductDistributionModal";
 import { ProductSettingsDrawer } from "../ProductSettingsDrawer";
 import { ProductDescriptionEditModal, ProductCtaEditModal } from "../../components/ProductDescriptionEditModal";
 import { ProductMediaModal } from "../../components/ProductMediaModal";
 import { TagsEditModal } from "../../components/TagsEditModal";
+import { CategoryEditModal } from "../../components/CategoryEditModal";
+import type { CategoryOption } from "../../components/CategoryPickerRow";
 
 /**
  * The Overview tab: quick actions, the product card with its edit rows, and
@@ -49,6 +50,12 @@ export interface OverviewViewProps {
   onUpdate: () => void | Promise<void>;
   onDelete: () => void | Promise<void>;
   showToast: (msg: string) => void;
+  /**
+   * The community's product taxonomy. Loaded by the HOST APP — these packages
+   * make no API calls of their own so they can be embedded without provider
+   * wiring. Omit it and the Category row is hidden rather than dead.
+   */
+  categories?: CategoryOption[];
 
   /**
    * Modal state is LIFTED so the host app's page header can drive the same
@@ -121,6 +128,7 @@ export function OverviewView({
   onUpdate,
   onDelete,
   showToast,
+  categories,
   modal: modalProp,
   setModal: setModalProp,
   showEditDrawer: drawerProp,
@@ -169,7 +177,6 @@ export function OverviewView({
       <OverviewActionCards
         isPublished={isPublished}
         onShare={() => setModal("share")}
-        onEdit={() => setShowEditDrawer(true)}
         onSettings={() => setSettingsOpen(true)}
         canConfigureSettings={canConfigureSettings}
         onPublish={() => void onPublish()}
@@ -188,7 +195,7 @@ export function OverviewView({
         onEditCta={() => setModal("cta")}
         onEditDescription={() => setModal("description")}
         onEditTags={() => setModal("tags")}
-        onEditCategory={() => setModal("category")}
+        onEditCategory={categories?.length ? () => setModal("category") : undefined}
         onPublish={() => void onPublish()}
         onUnpublish={() => setModal("unpublish")}
       />
@@ -205,6 +212,18 @@ export function OverviewView({
         <TagsEditModal
           productId={product.id}
           currentTags={product.tags || []}
+          onClose={() => setModal(null)}
+          onSaved={() => { setModal(null); void onUpdate(); }}
+          showToast={showToast}
+        />
+      )}
+
+      {modal === "category" && (
+        <CategoryEditModal
+          productId={product.id}
+          categories={categories ?? []}
+          categoryId={product.categoryId ?? null}
+          subCategoryId={product.subCategoryId ?? null}
           onClose={() => setModal(null)}
           onSaved={() => { setModal(null); void onUpdate(); }}
           showToast={showToast}
@@ -303,13 +322,6 @@ export function OverviewView({
         />
       )}
 
-      <EditProductDrawer
-        product={product}
-        communityTag={communityTag}
-        isOpen={showEditDrawer}
-        onClose={() => setShowEditDrawer(false)}
-        onSaved={() => { setShowEditDrawer(false); void onUpdate(); }}
-      />
 
       {/*
         REQUIRE APPROVAL MOVED INTO THE SETTINGS DRAWER.
@@ -336,13 +348,6 @@ export function OverviewView({
         />
       )}
 
-      <EditProductDrawer
-        product={product}
-        communityTag={communityTag}
-        isOpen={showEditDrawer}
-        onClose={() => setShowEditDrawer(false)}
-        onSaved={() => { setShowEditDrawer(false); void onUpdate(); }}
-      />
     </div>
   );
 }
