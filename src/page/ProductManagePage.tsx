@@ -265,7 +265,13 @@ export function ProductManagePage({
            * offering settings the backend will 403. Community-owned is the
            * whole condition — `communityId` is exactly what the server checks.
            */
-          canConfigureSettings={canConfigureSettings ?? !!product?.communityId}
+          /*
+           * Default to ON. This used to fall back to `!!product?.communityId`,
+           * which hid the whole button on a user-owned product — and with it
+           * Approval, which is the SELLER's own setting and which the backend
+           * allows there. The drawer scopes its own rows now.
+           */
+          canConfigureSettings={canConfigureSettings ?? true}
           canConfigureAfterCheckout={canConfigureAfterCheckout}
           requiresApproval={requiresApproval}
           onSaveApproval={onSaveApproval}

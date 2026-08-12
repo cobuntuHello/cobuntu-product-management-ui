@@ -103,6 +103,18 @@ export function ProductSettingsDrawer({
    * failed save tells a seller their purchases are gated when the server never
    * agreed — a money question, not a cosmetic one.
    */
+  /*
+   * Which rows this drawer may show.
+   *
+   * Visibility, Access, Distribution and After checkout are statements about a
+   * COMMUNITY, and the backend refuses them outright on a user-owned product
+   * (COMMUNITY_SCOPED_PRODUCT_FIELDS → 403). Approval is the SELLER's own —
+   * deliberately left out of that list — so it stays on both ownership kinds.
+   *
+   * Matches the event drawer exactly; see cobuntu-event-management-ui
+   * fix/settings-always-visible for the full reasoning.
+   */
+  const isCommunityOwned = !!product?.communityId;
   const [approvalOn, setApprovalOn] = React.useState(!!requiresApproval);
   const [savingApproval, setSavingApproval] = React.useState(false);
   React.useEffect(() => { setApprovalOn(!!requiresApproval); }, [requiresApproval]);
@@ -167,7 +179,9 @@ export function ProductSettingsDrawer({
   }
 
   // ─── Active sub-modal (mutually exclusive with the drawer) ────────
-  if (modal === "viewability" || modal === "accessibility") {
+  // Gated identically to the rows that open them, so a stale `modal` can't
+  // surface an editor the backend would 403.
+  if ((modal === "viewability" || modal === "accessibility") && isCommunityOwned) {
     return (
       <ProductVisibilityEditModal
         product={product}
@@ -179,7 +193,7 @@ export function ProductSettingsDrawer({
       />
     );
   }
-  if (modal === "distribution") {
+  if (modal === "distribution" && isCommunityOwned) {
     return (
       <ProductDistributionModal
         product={product}
@@ -259,6 +273,7 @@ export function ProductSettingsDrawer({
         </div>
 
         <div className="flex-1 overflow-y-auto">
+          {isCommunityOwned && (
           <SettingsRow
             label="Visibility"
             summary={viewLabel}
@@ -270,6 +285,8 @@ export function ProductSettingsDrawer({
               </svg>
             }
           />
+          )}
+          {isCommunityOwned && (
           <SettingsRow
             label="Access"
             summary={buyLabel}
@@ -281,6 +298,8 @@ export function ProductSettingsDrawer({
               </svg>
             }
           />
+          )}
+          {isCommunityOwned && (
           <SettingsRow
             label="Distribution"
             summary={landingLabel}
@@ -294,6 +313,7 @@ export function ProductSettingsDrawer({
               </svg>
             }
           />
+          )}
           {onSaveApproval && (
             <div className="w-full flex items-center gap-3 px-5 py-4 border-b border-zinc-100">
               <span className="shrink-0 w-9 h-9 rounded-lg border border-zinc-200 bg-white flex items-center justify-center">
