@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { screen } from "@testing-library/react";
+import { screen, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithConfig, mockFetch } from "./test-utils";
 import { ProductCard } from "../page/sections/ProductCard";
@@ -182,17 +182,26 @@ describe("the edit rows", () => {
  */
 describe("the card has no self-referential sizing", () => {
   it("does not observe its own layout", () => {
-    const src = readFileSync(resolve(__dirname, "../page/sections/ProductCard.tsx"), "utf8");
-    expect(src).not.toContain("ResizeObserver");
-    expect(src).not.toContain("imgSize");
+    /*
+     * Comments stripped first. The file now EXPLAINS why it does not use a
+     * ResizeObserver, and matching that prose would fail the very assertion
+     * the prose exists to justify.
+     */
+    const code = readFileSync(resolve(__dirname, "../page/sections/ProductCard.tsx"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(code).not.toContain("ResizeObserver");
+    expect(code).not.toContain("imgSize");
   });
 
-  it("gives the media column a fixed width", () => {
+  it("gives the media column the events card's fixed 280", () => {
+    // Events derive 280 by measuring; we hardcode it. Same footprint at rest,
+    // no feedback loop — see the note in the component.
     const { container } = renderCard();
-    expect(container.querySelector(".w-\\[200px\\]")).toBeTruthy();
+    expect(container.querySelector(".w-\\[280px\\]")).toBeTruthy();
   });
 
-  it("frames the banner at the BUYER's 4/3, not a square", () => {
+  it("frames the banner as a SQUARE, matching the events card", () => {
     /*
      * REVERSED DELIBERATELY (direction A). A buyer meets this product at 4/3
      * twice — the /marketplace grid card and the detail carousel — and this
@@ -205,10 +214,20 @@ describe("the card has no self-referential sizing", () => {
      * until it filled the viewport.
      */
     const { container } = renderCard();
-    const banner = container.querySelector(".aspect-\\[4\\/3\\].w-full");
+    /*
+     * REVERSED AGAIN, and this time toward the events card. 4/3 was chosen to
+     * match the buyer's crop, but the two manage pages reading as different
+     * products cost more than the crop parity gained — and the seller sees the
+     * real crop on the storefront anyway.
+     *
+     * The no-measured-height half of the original assertion is KEPT: that is
+     * what stops the ResizeObserver loop.
+     */
+    const banner = container.querySelector(".w-\\[280px\\].h-\\[280px\\]");
     expect(banner).toBeTruthy();
     expect((banner as HTMLElement).style.height).toBe("");
-    expect(container.querySelector(".aspect-square.w-full")).toBeNull();
+    // Mobile still drops to the events card's 16/9.
+    expect(banner!.className).toContain("max-sm:aspect-[16/9]");
   });
 
   it("does not let the rows stretch the row box", () => {
@@ -220,17 +239,21 @@ describe("the card has no self-referential sizing", () => {
 });
 
 describe("the media column's actions", () => {
-  it("takes copy-link OFF the photo", () => {
+  it("puts copy-link ON the photo, where events puts it", () => {
     /*
      * It was a permanent black band across the bottom of the image, covering
      * the part of the shot most likely to hold the product, for an action that
      * has nothing to do with the picture. It is a row now — which is where
      * every other action on this card already lives.
      */
+    /*
+     * ALSO REVERSED. Moving it out was defensible on its own — a black band
+     * across the bottom of every photo is a real cost — but events keeps it
+     * there, and one card looking like the other won here.
+     */
     const { container } = renderCard();
-    const frame = container.querySelector(".aspect-\\[4\\/3\\].w-full") as HTMLElement;
-    expect(frame.textContent).not.toContain("Copy product link");
-    expect(screen.getByText("Copy product link")).toBeInTheDocument();
+    const frame = container.querySelector(".w-\\[280px\\].h-\\[280px\\]") as HTMLElement;
+    expect(frame.textContent).toContain("Copy product link");
   });
 
   it("still copies the link, and says so", async () => {
@@ -241,14 +264,22 @@ describe("the media column's actions", () => {
     await userEvent.click(screen.getByText("Copy product link"));
 
     expect(writeText).toHaveBeenCalledWith("https://avepark.cobuntu.com/marketplace/p1");
-    expect(await screen.findByText("Link copied")).toBeInTheDocument();
+    expect(await screen.findByText("Link copied!")).toBeInTheDocument();
   });
 
-  it("LABELS the manage action instead of showing a bare pencil", () => {
-    // Every other control on this card says what it does; this one made the
-    // reader guess from an icon.
-    renderCard();
-    expect(screen.getByText("Manage images")).toBeInTheDocument();
+  it("uses the events card's bare pencil, with the label on aria-label", () => {
+    /*
+     * REVERSED for parity. The visible "Manage images" pill was clearer, but
+     * events shows a bare pencil and the two cards sitting side by side with
+     * different affordances was the complaint.
+     *
+     * Nothing is lost for assistive tech: the full-frame button underneath
+     * still carries the accessible name, so the control is announced even
+     * though the pill is gone.
+     */
+    const { container } = renderCard();
+    expect(screen.queryByText("Manage images")).not.toBeInTheDocument();
+    expect(container.querySelector('[aria-label="Manage images"]')).toBeTruthy();
   });
 
   it("routes every media surface to the one media manager", async () => {
@@ -270,5 +301,73 @@ describe("the media column's actions", () => {
     // empty state would be an action with no object.
     renderCard({ media: [] });
     expect(screen.queryByText("Manage images")).not.toBeInTheDocument();
+  });
+});
+
+describe("which image is the banner", () => {
+  /*
+   * THE BUG THIS FIXES. The card read `media[]` and nothing else, so a product
+   * whose banner lives on `bannerImageUrl` rendered "Add your first image"
+   * while the storefront displayed that banner quite happily.
+   *
+   * Order is the storefront's own:
+   *   media.find(isBanner) → media[0] → cardImageUrl → bannerImageUrl
+   */
+  const img = (id: string, order: number, isBanner = false) =>
+    ({ id, url: `https://x.test/${id}.jpg`, order, isBanner });
+
+  it("honours isBanner over position, as events already do", () => {
+    // The column exists and events read it in five places; products ignored
+    // it, so "which one is the banner" had two answers.
+    const { container } = renderCard({ media: [img("a", 0), img("b", 1, true)] });
+    const banner = container.querySelector(".w-\\[280px\\].h-\\[280px\\] img") as HTMLImageElement;
+    expect(banner.src).toContain("b.jpg");
+  });
+
+  it("falls back to the first by order when nothing is flagged", () => {
+    const { container } = renderCard({ media: [img("b", 1), img("a", 0)] });
+    const banner = container.querySelector(".w-\\[280px\\].h-\\[280px\\] img") as HTMLImageElement;
+    expect(banner.src).toContain("a.jpg");
+  });
+
+  it("shows a legacy bannerImageUrl when there are NO media rows", () => {
+    // Exactly the case that rendered an empty state over a real banner.
+    const { container } = renderCard({ media: [], bannerImageUrl: "https://x.test/legacy.jpg" });
+    const banner = container.querySelector(".w-\\[280px\\].h-\\[280px\\] img") as HTMLImageElement;
+    expect(banner.src).toContain("legacy.jpg");
+    expect(screen.queryByText("Add your first image")).not.toBeInTheDocument();
+  });
+
+  it("prefers cardImageUrl over bannerImageUrl, matching the storefront", () => {
+    const { container } = renderCard({
+      media: [], cardImageUrl: "https://x.test/card.jpg", bannerImageUrl: "https://x.test/legacy.jpg",
+    });
+    const banner = container.querySelector(".w-\\[280px\\].h-\\[280px\\] img") as HTMLImageElement;
+    expect(banner.src).toContain("card.jpg");
+  });
+
+  it("keeps the banner OUT of the rail", () => {
+    // It is already the big image; repeating it as a thumbnail is a lie about
+    // how many images there are.
+    const { container } = renderCard({ media: [img("a", 0), img("b", 1), img("c", 2)] });
+    const rail = container.querySelector(".overflow-x-auto")!;
+    const thumbs = rail.querySelectorAll("img");
+    expect(thumbs.length).toBe(2);
+    expect(Array.from(thumbs).some((t) => (t as HTMLImageElement).src.includes("a.jpg"))).toBe(false);
+  });
+
+  it("offers a rail with just the add tile when a legacy banner is all there is", () => {
+    const { container } = renderCard({ media: [], bannerImageUrl: "https://x.test/legacy.jpg" });
+    const rail = container.querySelector(".overflow-x-auto")!;
+    expect(rail.querySelectorAll("img").length).toBe(0);
+    expect(rail.querySelector('[aria-label="Add images"]')).toBeTruthy();
+  });
+
+  it("states the count only when there is more than one", () => {
+    const one = renderCard({ media: [img("a", 0)] });
+    expect(one.container.textContent).not.toMatch(/^1$/m);
+    cleanup();
+    const many = renderCard({ media: [img("a", 0), img("b", 1), img("c", 2)] });
+    expect(many.getByText("3")).toBeInTheDocument();
   });
 });
