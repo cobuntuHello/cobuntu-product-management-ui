@@ -9,13 +9,19 @@ import { ListingsSection } from "../page/sections/ListingsSection";
 /**
  * Community-scoped settings are HIDDEN, not disabled, on a user-owned product.
  *
- * Everything behind Settings — who can see it, who can buy it, its landing
- * page, its post-checkout behaviour — is a statement about a COMMUNITY. A
- * personal product has no membership to gate against and no community
- * storefront, and the backend refuses all four with a 403.
+ * Visibility, Access, Distribution and After checkout are statements about a
+ * COMMUNITY: who among its members may see or buy this, where its storefront
+ * sends people, what it promotes after a sale. A personal product has no
+ * membership to gate against and no storefront, and the backend refuses all
+ * four with a 403 (COMMUNITY_SCOPED_PRODUCT_FIELDS).
  *
- * So the control must not be rendered at all. A disabled control advertises a
- * capability this product cannot have and asks a question with no answer.
+ * So those ROWS must not render. A disabled control advertises a capability
+ * this product cannot have and asks a question with no answer.
+ *
+ * The BUTTON is a different matter, and used to be hidden by the same rule.
+ * Approval is the SELLER's own setting — deliberately outside that field list
+ * — so hiding the entry point made it unreachable on exactly the products
+ * where a member seller needs it. The drawer scopes its own rows now.
  */
 
 const actions = {
@@ -261,5 +267,38 @@ describe("ListingsSection — inline mode", () => {
       />,
     );
     await waitFor(() => expect(baseElement.querySelector(".fixed.inset-0")).toBeTruthy());
+  });
+});
+
+describe("a personal (user-owned) product still has settings", () => {
+  const personal = { id: "p2", name: "Thing", communityId: null, viewability: "PUBLIC", accessibility: "PUBLIC" };
+
+  const drawer = (extra: Record<string, unknown> = {}) =>
+    renderWithConfig(
+      <ProductSettingsDrawer
+        product={personal}
+        communityTag="acme"
+        productId="p2"
+        isOpen
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        showToast={vi.fn()}
+        {...extra}
+      />,
+    );
+
+  it("drops the rows the backend would 403", () => {
+    drawer();
+    expect(screen.queryByText("Visibility")).not.toBeInTheDocument();
+    expect(screen.queryByText("Access")).not.toBeInTheDocument();
+    expect(screen.queryByText("Distribution")).not.toBeInTheDocument();
+  });
+
+  it("keeps Approval, which is the seller's own", () => {
+    // Reachable only through this drawer, so hiding the button hid the
+    // setting — on precisely the products a member seller owns.
+    drawer({ requiresApproval: false, onSaveApproval: vi.fn() });
+    expect(screen.getByText("Settings")).toBeInTheDocument();
+    expect(document.body.textContent).toMatch(/approv/i);
   });
 });
