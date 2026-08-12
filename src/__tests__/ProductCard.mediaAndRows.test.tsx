@@ -87,25 +87,23 @@ describe("the media column", () => {
     expect(h.onEditMedia).toHaveBeenCalled();
   });
 
-  it("draws NO rail at zero images", () => {
+  it("draws the rail even at zero images", () => {
     /*
-     * REVERSED DELIBERATELY (direction A). This used to assert four dashed
-     * slots always render, to keep the column's height constant.
+     * REVERSED. I had the rail appear only once a banner existed, arguing
+     * that an add tile beside an add frame is the same offer twice.
      *
-     * Constant height was not worth what it cost: most products have exactly
-     * one image, so the common case was a photo above four empty outlines, and
-     * a column that is finished read as unfinished. At ZERO images it was
-     * worse — an add tile sitting beside a frame that is itself the add
-     * control, i.e. the same offer made twice.
-     *
-     * The frame carries the empty state now, and the rail says nothing when
-     * there is nothing to say.
+     * That was wrong. A seller opening a new product then sees one empty
+     * square and nothing telling them a product HAS a gallery — the rail is
+     * the only thing that says "more than one image lives here", so hiding it
+     * until you already have one means you never learn it exists.
      */
     const { container } = renderCard({ media: [] });
-    expect(container.querySelector(".grid-cols-4")).toBeNull();
+    const rail = container.querySelector(".overflow-x-auto");
+    expect(rail).toBeTruthy();
+    expect(rail!.querySelector('[aria-label="Add images"]')).toBeTruthy();
+    // Still the empty state in the frame, and still no wall of dashed slots.
     expect(screen.getByText("Add your first image")).toBeInTheDocument();
-    // A REASON, not a restatement of what the button does.
-    expect(screen.getByText(/opened far more often/)).toBeInTheDocument();
+    expect(rail!.querySelectorAll("button").length).toBe(1);
   });
 
   it("gives one rail tile per image after the banner, plus one add tile", () => {

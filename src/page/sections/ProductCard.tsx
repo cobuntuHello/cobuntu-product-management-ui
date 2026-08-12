@@ -182,8 +182,16 @@ export function ProductCard({
           {/* The rail: one tile per image after the banner, then a single add
               tile. It used to be four fixed slots whose "+" only appeared at
               one image or fewer, so a three-image product showed two dead
-              tiles you could not add through. */}
-          {bannerUrl && (
+              tiles you could not add through.
+
+              IT IS ALWAYS DRAWN, including at zero images. I had it appear
+              only once a banner existed, on the argument that an add tile
+              beside an add frame is the same offer twice. That was wrong: a
+              seller opening a new product then sees one empty square and no
+              sign that a product HAS a gallery. The rail is what says "there
+              is more than one image here" — hiding it until you already have
+              one means you never find out. */}
+          {(
             <div className="flex gap-2 mt-2 overflow-x-auto scrollbar-hide">
               {railMedia.map((m: any) => (
                 <button
