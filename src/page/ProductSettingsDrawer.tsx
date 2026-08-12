@@ -74,6 +74,17 @@ export interface ProductSettingsDrawerProps {
   approvalCopy?: { title: string; body: string };
 }
 
+/*
+ * ROW LABELS ARE THE EVENTS ONES, VERBATIM.
+ *
+ * These read "Who can see this" / "Who can buy this" / "Landing page" while
+ * the events drawer says Visibility / Access / Distribution — the same four
+ * settings, the same drawer, different words. A leader who manages both saw
+ * two products.
+ *
+ * The events wording wins because it is shorter and already the one written
+ * into the docs. Do not "improve" one side without the other.
+ */
 export function ProductSettingsDrawer({
   product,
   communityTag,
@@ -249,7 +260,7 @@ export function ProductSettingsDrawer({
 
         <div className="flex-1 overflow-y-auto">
           <SettingsRow
-            label="Who can see this"
+            label="Visibility"
             summary={viewLabel}
             onClick={() => openModal("viewability")}
             icon={
@@ -260,7 +271,7 @@ export function ProductSettingsDrawer({
             }
           />
           <SettingsRow
-            label="Who can buy this"
+            label="Access"
             summary={buyLabel}
             onClick={() => openModal("accessibility")}
             icon={
@@ -271,7 +282,7 @@ export function ProductSettingsDrawer({
             }
           />
           <SettingsRow
-            label="Landing page"
+            label="Distribution"
             summary={landingLabel}
             onClick={() => openModal("distribution")}
             icon={

@@ -15,6 +15,7 @@ import { ProductDistributionModal } from "../../components/ProductDistributionMo
 import { ProductSettingsDrawer } from "../ProductSettingsDrawer";
 import { ProductDescriptionEditModal, ProductCtaEditModal } from "../../components/ProductDescriptionEditModal";
 import { ProductMediaModal } from "../../components/ProductMediaModal";
+import { TagsEditModal } from "../../components/TagsEditModal";
 
 /**
  * The Overview tab: quick actions, the product card with its edit rows, and
@@ -32,7 +33,9 @@ import { ProductMediaModal } from "../../components/ProductMediaModal";
  * rather than being imported here — a slot, not a fork.
  */
 
-export type ProductModal = "name" | "price" | "share" | "distribution" | "delete" | "unpublish" | "description" | "cta" | "media" | null;
+export type ProductModal = "name" | "price" | "share" | "distribution" | "delete" | "unpublish" | "description" | "cta" | "media" | null
+  | "tags"
+  | "category";
 
 export interface OverviewViewProps {
   product: any;
@@ -184,6 +187,8 @@ export function OverviewView({
         onEditMedia={() => setModal("media")}
         onEditCta={() => setModal("cta")}
         onEditDescription={() => setModal("description")}
+        onEditTags={() => setModal("tags")}
+        onEditCategory={() => setModal("category")}
         onPublish={() => void onPublish()}
         onUnpublish={() => setModal("unpublish")}
       />
@@ -193,6 +198,16 @@ export function OverviewView({
           currentName={product.name}
           onSave={(name: string) => quickUpdate({ name })}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {modal === "tags" && (
+        <TagsEditModal
+          productId={product.id}
+          currentTags={product.tags || []}
+          onClose={() => setModal(null)}
+          onSaved={() => { setModal(null); void onUpdate(); }}
+          showToast={showToast}
         />
       )}
 

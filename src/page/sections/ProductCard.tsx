@@ -19,13 +19,18 @@ interface Props {
   onEditCta?: () => void;
   /** Opens the description editor. Omit to hide the row. */
   onEditDescription?: () => void;
+  /** Opens the tags editor. Omit to hide the row. */
+  onEditTags?: () => void;
+  /** Opens the category picker. Omit to hide the row. */
+  onEditCategory?: () => void;
   onPublish: () => void;
   onUnpublish: () => void;
 }
 
 export function ProductCard({
   product, communityTag, isPublished, listingId,
-  onEditName, onEditPrice, onEditMedia, onEditCta, onEditDescription, onPublish, onUnpublish,
+  onEditName, onEditPrice, onEditMedia, onEditCta, onEditDescription, onEditTags, onEditCategory,
+  onPublish, onUnpublish,
 }: Props) {
   // Injected by the host app; the package ships its own fallback so no host
   // is forced to supply one.
@@ -64,6 +69,16 @@ export function ProductCard({
     const raw: string = product?.description || "";
     return raw.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
   }, [product?.description]);
+
+  /* Row summaries — the value is stated on the row, so opening the editor is
+     for CHANGING it, never for finding out what it is. */
+  const tagNames: string = (product?.tags || [])
+    .map((t: any) => (typeof t === "string" ? t : t?.name))
+    .filter(Boolean)
+    .join(", ");
+  const categoryLabel: string = [product?.category?.name, product?.subCategory?.name]
+    .filter(Boolean)
+    .join(" · ");
 
   const isPaid = product?.price > 0;
   const currency = product?.currency || "EUR";
@@ -268,6 +283,37 @@ export function ProductCard({
                   <p className="text-xs text-zinc-400">Button text</p>
                   <p className={`text-sm font-medium truncate ${product.ctaText ? "text-zinc-900" : "text-zinc-400"}`}>
                     {product.ctaText || "Buy now (default)"}
+                  </p>
+                </div>
+              </InfoRow>
+            )}
+
+            {/*
+              TAGS AND CATEGORY were reachable ONLY through the Edit Product
+              drawer — the entire create form reopened to change one chip.
+              Every other property here has a one-field editor; these two were
+              the exception because nobody had given them a row, not because
+              they needed the form. Adding them is what lets the drawer go.
+            */}
+            {onEditTags && (
+              <InfoRow onClick={onEditTags}
+                icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-zinc-400">Tags</p>
+                  <p className={`text-sm truncate ${tagNames ? "font-medium text-zinc-900" : "text-zinc-400"}`}>
+                    {tagNames || "Add tags"}
+                  </p>
+                </div>
+              </InfoRow>
+            )}
+
+            {onEditCategory && (
+              <InfoRow onClick={onEditCategory}
+                icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-zinc-400">Category</p>
+                  <p className={`text-sm truncate ${categoryLabel ? "font-medium text-zinc-900" : "text-zinc-400"}`}>
+                    {categoryLabel || "Uncategorised"}
                   </p>
                 </div>
               </InfoRow>

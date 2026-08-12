@@ -25,6 +25,8 @@ const handlers = () => ({
   onEditMedia: vi.fn(),
   onEditCta: vi.fn(),
   onEditDescription: vi.fn(),
+  onEditTags: vi.fn(),
+  onEditCategory: vi.fn(),
   onPublish: vi.fn(),
   onUnpublish: vi.fn(),
 });
@@ -367,5 +369,62 @@ describe("which image is the banner", () => {
     cleanup();
     const many = renderCard({ media: [img("a", 0), img("b", 1), img("c", 2)] });
     expect(many.getByText("3")).toBeInTheDocument();
+  });
+});
+
+describe("tags and category as rows", () => {
+  /*
+   * Both were reachable ONLY through the Edit Product drawer — the whole
+   * create form reopened to change one chip. Every other property on this
+   * card has a one-field editor; these two were the exception because nobody
+   * had given them a row, not because they needed the form.
+   */
+  it("shows the tags on the row, so opening it is for CHANGING them", () => {
+    renderCard({ tags: [{ id: "1", name: "coaching" }, { id: "2", name: "career" }] });
+    expect(screen.getByText("coaching, career")).toBeInTheDocument();
+  });
+
+  it("still offers the row when there are none", () => {
+    // A row that only appears once set cannot be used to set it — the same
+    // trap the CTA row had.
+    const h = handlers();
+    renderCard({ tags: [] }, h);
+    expect(screen.getByText("Add tags")).toBeInTheDocument();
+  });
+
+  it("opens the tags editor", async () => {
+    const h = handlers();
+    renderCard({ tags: [] }, h);
+    await userEvent.click(screen.getByText("Add tags"));
+    expect(h.onEditTags).toHaveBeenCalled();
+  });
+
+  it("names the category, and says so plainly when there is none", () => {
+    cleanup();
+    renderCard({ category: { name: "Coaching" }, subCategory: { name: "1:1" } });
+    expect(screen.getByText("Coaching · 1:1")).toBeInTheDocument();
+    cleanup();
+    renderCard({});
+    expect(screen.getByText("Uncategorised")).toBeInTheDocument();
+  });
+
+  it("hides each row when the host does not supply a handler", () => {
+    // Category needs the community's taxonomy, which only the host app has.
+    // Until it passes one, the row must not render as a dead control.
+    const { container } = renderWithConfig(
+      <ProductCard
+        product={{ ...product, tags: [] }}
+        communityTag="avepark"
+        isPublished={false}
+        listingId={null}
+        onEditName={vi.fn()}
+        onEditPrice={vi.fn()}
+        onEditMedia={vi.fn()}
+        onPublish={vi.fn()}
+        onUnpublish={vi.fn()}
+      />,
+    );
+    expect(container.textContent).not.toContain("Add tags");
+    expect(container.textContent).not.toContain("Uncategorised");
   });
 });
