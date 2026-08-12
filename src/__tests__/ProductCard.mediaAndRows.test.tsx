@@ -428,3 +428,33 @@ describe("tags and category as rows", () => {
     expect(container.textContent).not.toContain("Uncategorised");
   });
 });
+
+describe("an unset row is empty, not disabled", () => {
+  /*
+   * Every placeholder row printed its value at zinc-400 against a zinc-400
+   * label, so the whole row was one flat grey and read as inert — "why are
+   * these greyed out?" was the actual reaction. The label stays muted because
+   * it IS a label; the placeholder lifts so the row has hierarchy and looks
+   * clickable, which it is.
+   */
+  const emptyRowValue = (container: HTMLElement, text: string) =>
+    Array.from(container.querySelectorAll("p")).find((p) => p.textContent === text);
+
+  it("prints placeholders one step darker than their label", () => {
+    const { container } = renderCard({ description: "", ctaText: "", tags: [] });
+    for (const placeholder of ["Add a description", "Buy now (default)", "Add tags", "Uncategorised"]) {
+      const el = emptyRowValue(container, placeholder);
+      if (!el) continue; // category row only renders when a handler is passed
+      expect(el.className).toContain("text-zinc-500");
+      expect(el.className).not.toContain("text-zinc-400");
+    }
+  });
+
+  it("still distinguishes a set value from an unset one", () => {
+    // The grey MEANS something — losing the distinction would be worse than
+    // the flatness it replaces.
+    const { container } = renderCard({ tags: [{ id: "1", name: "coaching" }] });
+    const set = emptyRowValue(container, "coaching");
+    expect(set!.className).toContain("text-zinc-900");
+  });
+});
