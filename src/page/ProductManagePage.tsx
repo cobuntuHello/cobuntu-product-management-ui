@@ -92,6 +92,8 @@ export function visibleProductViews(opts: {
 }
 
 export interface ProductManagePageProps {
+  /** The community's product taxonomy, loaded by the host app. */
+  categories?: import("../components/CategoryPickerRow").CategoryOption[];
   communityTag: string;
   /** Id or sku, whichever the host app routes on. */
   productId: string;
@@ -152,6 +154,7 @@ export interface ProductManagePageProps {
 }
 
 export function ProductManagePage({
+  categories,
   communityTag,
   productId,
   product,
@@ -239,6 +242,7 @@ export function ProductManagePage({
     default:
       content = (
         <OverviewView
+          categories={categories}
           product={product}
           communityTag={communityTag}
           productId={productId}

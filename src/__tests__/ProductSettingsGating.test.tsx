@@ -92,9 +92,12 @@ describe("ProductSettingsDrawer", () => {
 
   it("lists the four community-scoped settings", async () => {
     renderDrawer();
-    expect(await screen.findByText("Who can see this")).toBeInTheDocument();
-    expect(screen.getByText("Who can buy this")).toBeInTheDocument();
-    expect(screen.getByText("Landing page")).toBeInTheDocument();
+    /* The events drawer's wording, verbatim. These used to read "Who can see
+       this" / "Who can buy this" / "Landing page" — the same four settings as
+       events, under different names, in the same drawer. */
+    expect(await screen.findByText("Visibility")).toBeInTheDocument();
+    expect(screen.getByText("Access")).toBeInTheDocument();
+    expect(screen.getByText("Distribution")).toBeInTheDocument();
     expect(screen.getByText("After checkout")).toBeInTheDocument();
   });
 
@@ -103,13 +106,13 @@ describe("ProductSettingsDrawer", () => {
     // MARKETPLACE_CREATE on top of community-ownership. The other three rows
     // stay.
     renderDrawer({ hideAfterCheckout: true });
-    expect(await screen.findByText("Who can see this")).toBeInTheDocument();
+    expect(await screen.findByText("Visibility")).toBeInTheDocument();
     expect(screen.queryByText("After checkout")).not.toBeInTheDocument();
   });
 
   it("summarises each row's current value without opening it", async () => {
     renderDrawer({}, { viewability: "MEMBERS_ONLY", externalDetailUrl: "https://example.com" });
-    await screen.findByText("Who can see this");
+    await screen.findByText("Visibility");
     expect(screen.getByText("Members only")).toBeInTheDocument();
     expect(screen.getByText("Custom landing page")).toBeInTheDocument();
   });
@@ -118,7 +121,7 @@ describe("ProductSettingsDrawer", () => {
     // "Public" reads as a switch position; "Anyone" answers the question the
     // row asks.
     renderDrawer();
-    await screen.findByText("Who can see this");
+    await screen.findByText("Visibility");
     expect(screen.getAllByText("Anyone").length).toBeGreaterThanOrEqual(2);
   });
 
@@ -155,7 +158,7 @@ describe("ProductSettingsDrawer — approval row", () => {
 
   it("is absent when the viewer cannot change it", async () => {
     renderDrawer();
-    await screen.findByText("Who can see this");
+    await screen.findByText("Visibility");
     expect(screen.queryByRole("switch")).not.toBeInTheDocument();
   });
 

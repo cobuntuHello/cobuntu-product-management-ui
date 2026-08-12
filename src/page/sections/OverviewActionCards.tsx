@@ -13,7 +13,9 @@ interface Card {
 interface Props {
   isPublished: boolean;
   onShare: () => void;
-  onEdit: () => void;
+  /** Unused since the Edit Product tile went. Optional so a host that still
+   *  passes it does not break; drop it once both apps have. */
+  onEdit?: () => void;
   onSettings: () => void;
   onPublish: () => void;
   onUnpublish: () => void;
@@ -45,13 +47,18 @@ export function OverviewActionCards({
       disabled: !isPublished,
       onClick: onShare,
     },
-    {
-      label: "Edit Product",
-      icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>,
-      iconBg: "bg-zinc-100",
-      iconColor: "text-zinc-700",
-      onClick: onEdit,
-    },
+    /*
+     * "EDIT PRODUCT" IS GONE.
+     *
+     * It opened the whole create form to change one field, and every property
+     * it held now has its own row on the card: name, price, description,
+     * button text, media, tags and category. A second, competing route to the
+     * same edits is how the two pages drifted apart in the first place — the
+     * rows say what the value IS, the drawer only ever said "edit".
+     *
+     * The `onEdit` prop is kept and ignored so a host that still passes it
+     * does not break; it can go once both apps have dropped it.
+     */
     // "Distribution" opened one modal. It is now "Settings", opening the
     // drawer that holds distribution alongside the other three
     // community-scoped settings — the same consolidation the event page made.

@@ -25,6 +25,8 @@ const handlers = () => ({
   onEditMedia: vi.fn(),
   onEditCta: vi.fn(),
   onEditDescription: vi.fn(),
+  onEditTags: vi.fn(),
+  onEditCategory: vi.fn(),
   onPublish: vi.fn(),
   onUnpublish: vi.fn(),
 });
@@ -87,25 +89,23 @@ describe("the media column", () => {
     expect(h.onEditMedia).toHaveBeenCalled();
   });
 
-  it("draws NO rail at zero images", () => {
+  it("draws the rail even at zero images", () => {
     /*
-     * REVERSED DELIBERATELY (direction A). This used to assert four dashed
-     * slots always render, to keep the column's height constant.
+     * REVERSED. I had the rail appear only once a banner existed, arguing
+     * that an add tile beside an add frame is the same offer twice.
      *
-     * Constant height was not worth what it cost: most products have exactly
-     * one image, so the common case was a photo above four empty outlines, and
-     * a column that is finished read as unfinished. At ZERO images it was
-     * worse — an add tile sitting beside a frame that is itself the add
-     * control, i.e. the same offer made twice.
-     *
-     * The frame carries the empty state now, and the rail says nothing when
-     * there is nothing to say.
+     * That was wrong. A seller opening a new product then sees one empty
+     * square and nothing telling them a product HAS a gallery — the rail is
+     * the only thing that says "more than one image lives here", so hiding it
+     * until you already have one means you never learn it exists.
      */
     const { container } = renderCard({ media: [] });
-    expect(container.querySelector(".grid-cols-4")).toBeNull();
+    const rail = container.querySelector(".overflow-x-auto");
+    expect(rail).toBeTruthy();
+    expect(rail!.querySelector('[aria-label="Add images"]')).toBeTruthy();
+    // Still the empty state in the frame, and still no wall of dashed slots.
     expect(screen.getByText("Add your first image")).toBeInTheDocument();
-    // A REASON, not a restatement of what the button does.
-    expect(screen.getByText(/opened far more often/)).toBeInTheDocument();
+    expect(rail!.querySelectorAll("button").length).toBe(1);
   });
 
   it("gives one rail tile per image after the banner, plus one add tile", () => {
@@ -369,5 +369,62 @@ describe("which image is the banner", () => {
     cleanup();
     const many = renderCard({ media: [img("a", 0), img("b", 1), img("c", 2)] });
     expect(many.getByText("3")).toBeInTheDocument();
+  });
+});
+
+describe("tags and category as rows", () => {
+  /*
+   * Both were reachable ONLY through the Edit Product drawer — the whole
+   * create form reopened to change one chip. Every other property on this
+   * card has a one-field editor; these two were the exception because nobody
+   * had given them a row, not because they needed the form.
+   */
+  it("shows the tags on the row, so opening it is for CHANGING them", () => {
+    renderCard({ tags: [{ id: "1", name: "coaching" }, { id: "2", name: "career" }] });
+    expect(screen.getByText("coaching, career")).toBeInTheDocument();
+  });
+
+  it("still offers the row when there are none", () => {
+    // A row that only appears once set cannot be used to set it — the same
+    // trap the CTA row had.
+    const h = handlers();
+    renderCard({ tags: [] }, h);
+    expect(screen.getByText("Add tags")).toBeInTheDocument();
+  });
+
+  it("opens the tags editor", async () => {
+    const h = handlers();
+    renderCard({ tags: [] }, h);
+    await userEvent.click(screen.getByText("Add tags"));
+    expect(h.onEditTags).toHaveBeenCalled();
+  });
+
+  it("names the category, and says so plainly when there is none", () => {
+    cleanup();
+    renderCard({ category: { name: "Coaching" }, subCategory: { name: "1:1" } });
+    expect(screen.getByText("Coaching · 1:1")).toBeInTheDocument();
+    cleanup();
+    renderCard({});
+    expect(screen.getByText("Uncategorised")).toBeInTheDocument();
+  });
+
+  it("hides each row when the host does not supply a handler", () => {
+    // Category needs the community's taxonomy, which only the host app has.
+    // Until it passes one, the row must not render as a dead control.
+    const { container } = renderWithConfig(
+      <ProductCard
+        product={{ ...product, tags: [] }}
+        communityTag="avepark"
+        isPublished={false}
+        listingId={null}
+        onEditName={vi.fn()}
+        onEditPrice={vi.fn()}
+        onEditMedia={vi.fn()}
+        onPublish={vi.fn()}
+        onUnpublish={vi.fn()}
+      />,
+    );
+    expect(container.textContent).not.toContain("Add tags");
+    expect(container.textContent).not.toContain("Uncategorised");
   });
 });

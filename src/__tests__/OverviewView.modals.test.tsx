@@ -124,9 +124,21 @@ describe("the branches exist at all", () => {
     const { readFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
     const src = readFileSync(resolve(__dirname, "../page/views/OverviewView.tsx"), "utf8");
-    for (const key of ["name", "price", "share", "distribution", "delete", "unpublish", "description", "cta", "media"]) {
+    for (const key of [
+      "name", "price", "share", "distribution", "delete", "unpublish",
+      "description", "cta", "media", "tags", "category",
+    ]) {
       expect(src).toContain(`modal === "${key}"`);
     }
-    expect(src).toContain("<EditProductDrawer");
+
+    /*
+     * REVERSED: the drawer must now be ABSENT.
+     *
+     * "Edit Product" opened the whole create form to change one field, and
+     * every property it held has its own row now. It was also mounted TWICE
+     * in this component — two live drawers over one product — which is the
+     * sort of thing a second, competing edit route hides.
+     */
+    expect(src).not.toContain("<EditProductDrawer");
   });
 });
