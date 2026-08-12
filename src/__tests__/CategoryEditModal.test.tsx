@@ -15,7 +15,8 @@ import { CategoryEditModal } from "../components/CategoryEditModal";
 const CATEGORIES = [
   { id: "c1", name: "Coaching", subcategories: [{ id: "s1", name: "1:1" }, { id: "s2", name: "Group" }] },
   { id: "c2", name: "Courses", subcategories: [{ id: "s3", name: "Self-paced" }] },
-  { id: "c3", name: "Templates" }, // deliberately childless
+  { id: "c3", name: "Templates", iconId: "mdi:file-document" },
+  { id: "c4", name: "Retreats", imageUrl: "https://x.test/r.png" },
 ];
 
 function render(over: Partial<React.ComponentProps<typeof CategoryEditModal>> = {}) {
@@ -41,6 +42,7 @@ describe("CategoryEditModal", () => {
     expect(screen.getByText("Coaching")).toBeInTheDocument();
     expect(screen.getByText("Courses")).toBeInTheDocument();
     expect(screen.getByText("Templates")).toBeInTheDocument();
+    expect(screen.getByText("Retreats")).toBeInTheDocument();
     // Sub-categories stay folded until asked for.
     expect(screen.queryByText("1:1")).not.toBeInTheDocument();
   });
@@ -106,5 +108,33 @@ describe("CategoryEditModal", () => {
     await userEvent.click(screen.getByText("Save"));
     const body = JSON.parse((fetchMock.mock.calls[0][1] as any).body);
     expect(body).toEqual({ categoryId: "c1", subCategoryId: "s1" });
+  });
+});
+
+describe("category icons", () => {
+  /*
+   * Categories carry `imageUrl`, an Iconify `iconId` and an `iconColor` — and
+   * sub-categories carry all three too. None were rendered here, so an admin
+   * could set an icon in the admin app and never see it in the product flow.
+   */
+  it("renders an uploaded image when there is one", () => {
+    render();
+    expect(document.querySelector('img[src="https://x.test/r.png"]')).not.toBeNull();
+  });
+
+  it("falls back to a folder rather than a broken glyph", () => {
+    // An id without a colon is not an Iconify id. "Coaching" has neither
+    // field, so it must still get something.
+    const { container } = render();
+    const row = screen.getByText("Coaching").closest("button")!;
+    expect(row.querySelector("svg")).not.toBeNull();
+    expect(container).toBeTruthy();
+  });
+
+  it("gives sub-categories their own icon slot", async () => {
+    render();
+    await userEvent.click(screen.getByText("Coaching"));
+    const sub = screen.getByText("1:1").closest("button")!;
+    expect(sub.querySelector("svg,img")).not.toBeNull();
   });
 });

@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { ModalShell } from "../ui/modal-shell";
-import { Check, ChevronRight } from "lucide-react";
-import type { CategoryOption } from "./CategoryPickerRow";
+import { Check, ChevronRight, Folder } from "lucide-react";
+import { Icon } from "@iconify/react";
+import type { CategoryOption, CategoryIconFields } from "./CategoryPickerRow";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
 
 /**
@@ -102,6 +103,29 @@ export function CategoryEditModal({
 }
 
 /**
+ * A category's own icon.
+ *
+ * Categories carry three icon fields the admin app sets — `imageUrl`, and an
+ * Iconify `iconId` with an `iconColor`. Sub-categories carry the SAME three,
+ * which is more than Atlas gives its own. None of them were rendered here, so
+ * an admin could pick an icon and never see it anywhere in the product flow.
+ *
+ * Resolution matches the storefront filter exactly, including the colon test:
+ * an Iconify id looks like "mdi:cup", and an id without one is not an Iconify
+ * id — rendering it would produce a broken glyph rather than nothing.
+ */
+function CatIcon({ cat, size = 16, muted }: { cat: CategoryIconFields; size?: number; muted?: boolean }) {
+  const color = muted ? "currentColor" : (cat.iconColor || "var(--brand-color, #18181b)");
+  if (cat.imageUrl) {
+    return <img src={cat.imageUrl} alt="" className="rounded object-cover shrink-0" style={{ width: size, height: size }} />;
+  }
+  if (cat.iconId?.includes(":")) {
+    return <Icon icon={cat.iconId} width={size} height={size} style={{ color }} className="shrink-0" />;
+  }
+  return <Folder style={{ width: size, height: size, color }} className="shrink-0" strokeWidth={1.8} />;
+}
+
+/**
  * The community's taxonomy, expanded in place.
  *
  * A category row toggles open to show its sub-categories. Tapping a
@@ -128,12 +152,14 @@ function CategoryTree({
   const [openId, setOpenId] = useState<string | null>(categoryId);
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-0.5">
       {categories.map((c) => {
         const subs = c.subcategories ?? [];
         const isOpen = openId === c.id;
         const isPicked = categoryId === c.id;
         const leaf = subs.length === 0;
+        // A branch counts as chosen when one of its children is.
+        const branchActive = isPicked || subs.some((sub) => sub.id === subCategoryId);
 
         return (
           <div key={c.id}>
@@ -141,7 +167,6 @@ function CategoryTree({
               type="button"
               onClick={() => {
                 if (leaf) {
-                  // No children — the category IS the choice.
                   onChange(isPicked ? { categoryId: null, subCategoryId: null } : { categoryId: c.id, subCategoryId: null });
                   return;
                 }
@@ -149,26 +174,37 @@ function CategoryTree({
                 if (!isPicked) onChange({ categoryId: c.id, subCategoryId: null });
               }}
               aria-expanded={leaf ? undefined : isOpen}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-colors cursor-pointer ${
-                isPicked ? "bg-zinc-100" : "hover:bg-zinc-50"
+              className={`w-full flex items-center gap-2.5 pl-2 pr-3 py-2 rounded-lg text-left transition-colors cursor-pointer ${
+                branchActive ? "bg-zinc-100" : "hover:bg-zinc-50"
               }`}
             >
-              {!leaf && (
-                <ChevronRight
-                  className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform ${isOpen ? "rotate-90" : ""}`}
-                />
-              )}
-              <span className={`flex-1 min-w-0 truncate text-[13.5px] ${isPicked ? "font-medium text-zinc-900" : "text-zinc-700"}`}>
+              {/* Fixed-width slot so every label starts on the same line,
+                  whether or not the row can expand. */}
+              <span className="w-4 shrink-0 flex justify-center">
+                {!leaf && (
+                  <ChevronRight
+                    className={`h-3.5 w-3.5 text-zinc-400 transition-transform duration-150 ${isOpen ? "rotate-90" : ""}`}
+                  />
+                )}
+              </span>
+
+              <span className="w-7 h-7 shrink-0 rounded-md bg-white border border-zinc-200 grid place-items-center">
+                <CatIcon cat={c} size={15} />
+              </span>
+
+              <span className={`flex-1 min-w-0 truncate text-[13.5px] ${branchActive ? "font-medium text-zinc-900" : "text-zinc-700"}`}>
                 {c.name}
               </span>
-              {!leaf && (
-                <span className="shrink-0 text-[11px] text-zinc-400 tabular-nums">{subs.length}</span>
-              )}
-              {isPicked && leaf && <Check className="h-4 w-4 shrink-0 text-zinc-900" strokeWidth={2.5} />}
+
+              {leaf
+                ? isPicked && <Check className="h-4 w-4 shrink-0 text-zinc-900" strokeWidth={2.5} />
+                : <span className="shrink-0 text-[11px] text-zinc-400 tabular-nums">{subs.length}</span>}
             </button>
 
             {isOpen && subs.length > 0 && (
-              <div className="ml-6 pl-3 border-l border-zinc-100 space-y-0.5 py-1">
+              /* Indented to sit under the parent's icon, so the nesting is
+                 legible without a heavy rail. */
+              <div className="ml-[26px] pl-3 border-l border-zinc-200 py-0.5 space-y-0.5">
                 {subs.map((sub) => {
                   const picked = subCategoryId === sub.id;
                   return (
@@ -183,12 +219,17 @@ function CategoryTree({
                         )
                       }
                       aria-pressed={picked}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors cursor-pointer ${
-                        picked ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-zinc-50"
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                        picked ? "bg-zinc-900" : "hover:bg-zinc-50"
                       }`}
                     >
-                      <span className="flex-1 min-w-0 truncate text-[13px]">{sub.name}</span>
-                      {picked && <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />}
+                      <span className={picked ? "text-white" : "text-zinc-400"}>
+                        <CatIcon cat={sub} size={14} muted={picked} />
+                      </span>
+                      <span className={`flex-1 min-w-0 truncate text-[13px] ${picked ? "text-white font-medium" : "text-zinc-600"}`}>
+                        {sub.name}
+                      </span>
+                      {picked && <Check className="h-3.5 w-3.5 shrink-0 text-white" strokeWidth={3} />}
                     </button>
                   );
                 })}
@@ -200,13 +241,15 @@ function CategoryTree({
 
       {/* Clearing has to be reachable, or a mis-tap is permanent. */}
       {(categoryId || subCategoryId) && (
-        <button
-          type="button"
-          onClick={() => { onChange({ categoryId: null, subCategoryId: null }); setOpenId(null); }}
-          className="mt-2 px-3 py-2 text-[12.5px] text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer bg-transparent border-0"
-        >
-          Clear selection
-        </button>
+        <div className="pt-2 mt-1 border-t border-zinc-100">
+          <button
+            type="button"
+            onClick={() => { onChange({ categoryId: null, subCategoryId: null }); setOpenId(null); }}
+            className="px-2 py-1.5 text-[12px] font-medium text-zinc-400 hover:text-zinc-900 transition-colors cursor-pointer bg-transparent border-0"
+          >
+            Clear selection
+          </button>
+        </div>
       )}
     </div>
   );
