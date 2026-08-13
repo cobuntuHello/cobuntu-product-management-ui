@@ -487,8 +487,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           what they are, and the label was the only thing separating this card
           from the detail rows above it. */}
       {(showTiers || !hideVisibility || !hideApproval) && (
-        <div>
-          <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
+        <div className="space-y-6">
+          {showTiers && (
+            <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
             {/* Pricing — identical treatment to the event "Tickets" row:
                 summary + tier cards + a dashed button into the shared wizard. */}
             {showTiers && (
@@ -548,8 +549,25 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 </button>
               </div>
             )}
-            {!hideVisibility && (
-              <>
+            </div>
+          )}
+
+          {/* ─── Community access ───
+              Visibility and Purchase exist ONLY because a community owns this
+              product: the backend refuses both on a personal one
+              (COMMUNITY_SCOPED_PRODUCT_FIELDS, 403). They used to sit in the
+              card above and simply vanish for a member seller, which read as
+              two missing features rather than one rule.
+
+              No eyebrow on the Pricing card above: that label was removed
+              deliberately on 2026-08-09 because it was the only thing
+              separating the card from the detail rows. These two are new
+              groups, and the label IS the explanation. */}
+          {!hideVisibility && (
+            <div>
+              <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Community access</p>
+              <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
+
                 {/* Visibility — who can SEE the listing */}
                 <div
                   onClick={() => setViewability(viewability === "PUBLIC" ? "MEMBERS_ONLY" : "PUBLIC")}
@@ -576,9 +594,22 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                   </div>
                   <Switch checked={accessibility === "MEMBERS_ONLY"} onCheckedChange={v => setAccessibility(v ? "MEMBERS_ONLY" : "PUBLIC")} onClick={e => e.stopPropagation()} />
                 </div>
-              </>
-            )}
-            {!hideApproval && (
+              </div>
+              <p className="text-[11px] text-zinc-400 mt-2 px-1">
+                Available because this community owns this product.
+              </p>
+            </div>
+          )}
+
+          {/* ─── Approval ───
+              NOT community-scoped. requiresApproval is outside
+              COMMUNITY_SCOPED_PRODUCT_FIELDS, so a member selling their own
+              product may set it. Its own card, never the community one. */}
+          {!hideApproval && (
+            <div>
+              <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Approval</p>
+              <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
+
               /* Require approval — buyer applies, seller approves (escrow held) */
               <div
                 onClick={() => setRequiresApproval(!requiresApproval)}
@@ -592,8 +623,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 </div>
                 <Switch checked={requiresApproval} onCheckedChange={setRequiresApproval} onClick={e => e.stopPropagation()} />
               </div>
-            )}
-          </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
