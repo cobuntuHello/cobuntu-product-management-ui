@@ -105,11 +105,18 @@ describe("ProductForm", () => {
     expect(emitted.accessibility).toBe("PUBLIC");
   });
 
-  it("narrowing who can see it flips viewability, leaving the buy gate alone", async () => {
+  it("narrowing who can see it drags the buy gate in with it", async () => {
     /*
      * The binary "Visibility: Everyone" switch became a membership-tier list
      * whose top row is Public. Unticking Public is the same intent, expressed
      * through the control that replaced it.
+     *
+     * This asserted `accessibility` stayed PUBLIC - "leaving the buy gate
+     * alone" - and so pinned the bug as behaviour. Buying is a SUBSET of
+     * seeing: a members-only product anyone can buy is not permissive, it is
+     * unreachable, because the view gate runs first and the non-members that
+     * PUBLIC invites never see the page. Narrowing view now pulls buying to
+     * the widest state still honourable, which is view itself.
      */
     const onChange = vi.fn();
     const user = userEvent.setup();
@@ -121,7 +128,27 @@ describe("ProductForm", () => {
     await waitFor(() => {
       const last = onChange.mock.calls.at(-1)?.[0] as ProductFormData;
       expect(last.viewability).toBe("MEMBERS_ONLY");
-      expect(last.accessibility).toBe("PUBLIC");
+      expect(last.accessibility).toBe("MEMBERS_ONLY");
+    });
+  });
+
+  it("still lets the buy gate be NARROWER than the view gate", async () => {
+    // The ceiling only stops buying going wider. Seen by everyone and sold to
+    // one tier is the case the whole feature exists for.
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    renderWithConfig(<ProductForm {...baseProps({ onChange })} />);
+    onChange.mockClear();
+
+    // Under Public, "All members" is implied and carries a tag rather than a
+    // checkbox - so the buy axis narrows via its OWN Public row.
+    const publicRows = screen.getAllByRole("checkbox", { name: /Public/ });
+    await user.click(publicRows[publicRows.length - 1]);
+
+    await waitFor(() => {
+      const last = onChange.mock.calls.at(-1)?.[0] as ProductFormData;
+      expect(last.viewability).toBe("PUBLIC");
+      expect(last.accessibility).toBe("MEMBERS_ONLY");
     });
   });
 

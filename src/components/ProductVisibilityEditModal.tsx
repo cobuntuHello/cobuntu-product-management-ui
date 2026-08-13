@@ -7,6 +7,7 @@ import {
   MembershipTierPicker,
   toTierAccessValue,
   fromTierAccessValue,
+  ceilingFor,
   type TierAccessValue,
 } from "@cobuntu/management-ui-shared";
 
@@ -67,6 +68,7 @@ export function ProductVisibilityEditModal({
   axis,
   membershipTiers = [],
   initialTierIds,
+  viewTierIds,
   onClose,
   onSaved,
   showToast,
@@ -78,6 +80,15 @@ export function ProductVisibilityEditModal({
   membershipTiers?: { id: string; name: string }[];
   /** Tier ids currently granted this axis. */
   initialTierIds?: string[];
+  /*
+   * Tier ids granted the VIEW axis, whatever axis this modal is editing.
+   *
+   * Buying is a subset of seeing, and this modal edits one axis at a time - so
+   * the buy modal has to be told what the stored view setting already allows,
+   * or it would happily offer "Anyone can buy it" on a product only one tier
+   * can see. The form has both values in state; here one of them is offscreen.
+   */
+  viewTierIds?: string[];
   onClose: () => void;
   onSaved: () => void;
   showToast: (msg: string) => void;
@@ -95,6 +106,16 @@ export function ProductVisibilityEditModal({
     toTierAccessValue(product?.[axis] ?? "PUBLIC", initialTierIds),
   );
   const [saving, setSaving] = React.useState(false);
+
+  /*
+   * Only the buy axis has a ceiling. Editing viewability is editing the
+   * ceiling itself, so it is unconstrained - and passing one there would be a
+   * self-reference that could only ever narrow the product further.
+   */
+  const ceiling =
+    axis === "accessibility"
+      ? ceilingFor(toTierAccessValue(product?.viewability ?? "PUBLIC", viewTierIds))
+      : undefined;
 
   async function save() {
     const resolved = fromTierAccessValue(access);
@@ -142,6 +163,7 @@ export function ProductVisibilityEditModal({
           onChange={setAccess}
           tiers={membershipTiers}
           publicLabel={copy.publicBody}
+          ceiling={ceiling}
         />
       </div>
 

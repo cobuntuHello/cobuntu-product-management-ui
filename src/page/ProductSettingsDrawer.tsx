@@ -198,6 +198,9 @@ export function ProductSettingsDrawer({
         axis={modal}
         membershipTiers={membershipTiers}
         initialTierIds={modal === "viewability" ? viewTierIds : buyTierIds}
+        // Always the VIEW grants, whichever axis is open: the buy modal needs
+        // its ceiling, and the view modal ignores it.
+        viewTierIds={viewTierIds}
         onClose={closeModalAndReopenDrawer}
         onSaved={modalSaved}
         showToast={showToast}
