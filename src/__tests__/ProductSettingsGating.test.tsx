@@ -119,16 +119,23 @@ describe("ProductSettingsDrawer", () => {
   it("summarises each row's current value without opening it", async () => {
     renderDrawer({}, { viewability: "MEMBERS_ONLY", externalDetailUrl: "https://example.com" });
     await screen.findByText("Visibility");
-    expect(screen.getByText("Members only")).toBeInTheDocument();
+    // "Members only" became "All members" with the tier picker: no tier
+    // grants means every tier, and the summary now says which.
+    expect(screen.getByText("All members")).toBeInTheDocument();
     expect(screen.getByText("Custom landing page")).toBeInTheDocument();
   });
 
-  it("says Anyone, not Public, when ungated", async () => {
-    // "Public" reads as a switch position; "Anyone" answers the question the
-    // row asks.
+  it("says Everyone, not Public, when ungated", async () => {
+    /*
+     * The original point stands and is why this test exists: "Public" reads as
+     * a switch position, and the row should answer the question it asks. The
+     * word moved from "Anyone" to "Everyone" only so one shared summary serves
+     * products, events, both create forms and both drawers - "Everyone" is
+     * what the create-form card already said.
+     */
     renderDrawer();
     await screen.findByText("Visibility");
-    expect(screen.getAllByText("Anyone").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("Everyone").length).toBeGreaterThanOrEqual(2);
   });
 
   it("renders nothing when closed", () => {
@@ -300,5 +307,45 @@ describe("a personal (user-owned) product still has settings", () => {
     drawer({ requiresApproval: false, onSaveApproval: vi.fn() });
     expect(screen.getByText("Settings")).toBeInTheDocument();
     expect(document.body.textContent).toMatch(/approv/i);
+  });
+});
+
+describe("the drawer summaries are tier-aware", () => {
+  /*
+   * "Members only" while three of five tiers are excluded describes something
+   * that is not true. The summary follows the picker: Everyone / All members /
+   * the tier names.
+   */
+  const TIERS = [{ id: "t1", name: "Founding" }, { id: "t2", name: "Alumni" }];
+
+  const openDrawer = (extra: Record<string, unknown> = {}) =>
+    renderWithConfig(
+      <ProductSettingsDrawer
+        product={{ id: "p1", communityId: "c1", viewability: "MEMBERS_ONLY", accessibility: "PUBLIC" }}
+        communityTag="acme"
+        productId="p1"
+        isOpen
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        showToast={vi.fn()}
+        membershipTiers={TIERS}
+        {...extra}
+      />,
+    );
+
+  it("says All members when MEMBERS_ONLY has no tier grants", () => {
+    // The no-backfill rule surfacing in the summary.
+    openDrawer();
+    expect(screen.getByText("All members")).toBeInTheDocument();
+  });
+
+  it("names the tier when only one is granted", () => {
+    openDrawer({ viewTierIds: ["t1"] });
+    expect(screen.getByText("Founding")).toBeInTheDocument();
+  });
+
+  it("says Everyone for a PUBLIC axis", () => {
+    openDrawer();
+    expect(screen.getByText("Everyone")).toBeInTheDocument();
   });
 });
