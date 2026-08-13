@@ -105,14 +105,18 @@ describe("ProductForm", () => {
     expect(emitted.accessibility).toBe("PUBLIC");
   });
 
-  it("toggling Visibility flips viewability to MEMBERS_ONLY (action gate stays untouched)", async () => {
+  it("narrowing who can see it flips viewability, leaving the buy gate alone", async () => {
+    /*
+     * The binary "Visibility: Everyone" switch became a membership-tier list
+     * whose top row is Public. Unticking Public is the same intent, expressed
+     * through the control that replaced it.
+     */
     const onChange = vi.fn();
     const user = userEvent.setup();
     renderWithConfig(<ProductForm {...baseProps({ onChange })} />);
     onChange.mockClear();
 
-    // Click the Visibility row label to toggle.
-    await user.click(screen.getByText(/Visibility: Everyone/i));
+    await user.click(screen.getAllByRole("checkbox", { name: /Public/ })[0]);
 
     await waitFor(() => {
       const last = onChange.mock.calls.at(-1)?.[0] as ProductFormData;
@@ -121,13 +125,14 @@ describe("ProductForm", () => {
     });
   });
 
-  it("toggling Purchase flips accessibility independently", async () => {
+  it("narrowing who can buy it flips accessibility independently", async () => {
+    // Second picker on the page, hence [1]: the axes stay separate.
     const onChange = vi.fn();
     const user = userEvent.setup();
     renderWithConfig(<ProductForm {...baseProps({ onChange })} />);
     onChange.mockClear();
 
-    await user.click(screen.getByText(/Purchase: Everyone/i));
+    await user.click(screen.getAllByRole("checkbox", { name: /Public/ })[1]);
 
     await waitFor(() => {
       const last = onChange.mock.calls.at(-1)?.[0] as ProductFormData;
