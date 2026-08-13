@@ -6,7 +6,8 @@ import { ProductVisibilityEditModal, type VisibilityAxis } from "../components/P
 import { ProductDistributionModal } from "../components/ProductDistributionModal";
 import { AfterCheckoutCard } from "./sections/AfterCheckoutCard";
 import { ModalShell } from "./helpers";
-import { tierAccessSummary, toTierAccessValue } from "@cobuntu/management-ui-shared";
+import { tierAccessSummary, toTierAccessValue, fetchMembershipTiers } from "@cobuntu/management-ui-shared";
+import { useProductManagementConfig } from "../config";
 
 /**
  * Settings drawer for the product manage page — the product answer to the
@@ -101,12 +102,36 @@ export function ProductSettingsDrawer({
   showToast,
   hideAfterCheckout,
   requiresApproval,
-  membershipTiers = [],
+  membershipTiers: membershipTiersProp,
   viewTierIds,
   buyTierIds,
   onSaveApproval,
   approvalCopy,
 }: ProductSettingsDrawerProps) {
+  /*
+   * ── The drawer loads its own tiers ────────────────────────────────
+   *
+   * It accepted a `membershipTiers` prop, OverviewView never passed one, and
+   * ProductManagePage did not have the prop at all - so the chain was severed
+   * inside this package and no consumer could repair it. Every access picker
+   * on a manage page said "This community has no membership tiers yet" for
+   * communities with several. The events twin was broken identically.
+   *
+   * Fetching here fixes both apps at once and keeps the prop as an override
+   * for anyone who already has the list.
+   */
+  const [fetchedTiers, setFetchedTiers] = React.useState<{ id: string; name: string }[]>([]);
+  const { apiBaseUrl } = useProductManagementConfig();
+  React.useEffect(() => {
+    if (membershipTiersProp || !isOpen || !communityTag) return;
+    let cancelled = false;
+    fetchMembershipTiers(apiBaseUrl, communityTag).then((t) => {
+      if (!cancelled) setFetchedTiers(t);
+    });
+    return () => { cancelled = true; };
+  }, [membershipTiersProp, isOpen, communityTag, apiBaseUrl]);
+  const membershipTiers = membershipTiersProp ?? fetchedTiers;
+
   /*
    * Optimistic, and it REVERTS on failure. A toggle that stays flipped after a
    * failed save tells a seller their purchases are gated when the server never
