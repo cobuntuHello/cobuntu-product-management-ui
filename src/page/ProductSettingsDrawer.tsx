@@ -6,6 +6,7 @@ import { ProductVisibilityEditModal, type VisibilityAxis } from "../components/P
 import { ProductDistributionModal } from "../components/ProductDistributionModal";
 import { AfterCheckoutCard } from "./sections/AfterCheckoutCard";
 import { ModalShell } from "./helpers";
+import { tierAccessSummary, toTierAccessValue } from "@cobuntu/management-ui-shared";
 
 /**
  * Settings drawer for the product manage page — the product answer to the
@@ -70,6 +71,11 @@ export interface ProductSettingsDrawerProps {
    * handler is supplied.
    */
   requiresApproval?: boolean;
+  /** The community's membership tiers, for the access pickers. */
+  membershipTiers?: { id: string; name: string }[];
+  /** Tier ids currently granted each axis. */
+  viewTierIds?: string[];
+  buyTierIds?: string[];
   onSaveApproval?: (next: boolean) => void | Promise<void>;
   approvalCopy?: { title: string; body: string };
 }
@@ -95,6 +101,9 @@ export function ProductSettingsDrawer({
   showToast,
   hideAfterCheckout,
   requiresApproval,
+  membershipTiers = [],
+  viewTierIds,
+  buyTierIds,
   onSaveApproval,
   approvalCopy,
 }: ProductSettingsDrawerProps) {
@@ -187,6 +196,8 @@ export function ProductSettingsDrawer({
         product={product}
         productId={productId}
         axis={modal}
+        membershipTiers={membershipTiers}
+        initialTierIds={modal === "viewability" ? viewTierIds : buyTierIds}
         onClose={closeModalAndReopenDrawer}
         onSaved={modalSaved}
         showToast={showToast}
@@ -237,8 +248,13 @@ export function ProductSettingsDrawer({
   if (!visible) return null;
   if (typeof document === "undefined") return null;
 
-  const viewLabel = product?.viewability === "MEMBERS_ONLY" ? "Members only" : "Anyone";
-  const buyLabel = product?.accessibility === "MEMBERS_ONLY" ? "Members only" : "Anyone";
+  /*
+   * Tier-aware summaries. "Members only" while three of five tiers are
+   * excluded describes something that is not true, so the row now says
+   * Everyone / All members / the tier names.
+   */
+  const viewLabel = tierAccessSummary(toTierAccessValue(product?.viewability ?? "PUBLIC", viewTierIds), membershipTiers);
+  const buyLabel = tierAccessSummary(toTierAccessValue(product?.accessibility ?? "PUBLIC", buyTierIds), membershipTiers);
   const landingLabel = product?.externalDetailUrl ? "Custom landing page" : "Cobuntu product page";
 
   return createPortal(

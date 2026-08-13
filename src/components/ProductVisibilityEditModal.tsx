@@ -3,6 +3,12 @@
 import * as React from "react";
 import { ModalShell } from "../page/helpers";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
+import {
+  MembershipTierPicker,
+  toTierAccessValue,
+  fromTierAccessValue,
+  type TierAccessValue,
+} from "@cobuntu/management-ui-shared";
 
 /**
  * The two visibility axes on a product, in one component.
@@ -59,6 +65,8 @@ export function ProductVisibilityEditModal({
   product,
   productId,
   axis,
+  membershipTiers = [],
+  initialTierIds,
   onClose,
   onSaved,
   showToast,
@@ -66,6 +74,10 @@ export function ProductVisibilityEditModal({
   product: any;
   productId: string;
   axis: VisibilityAxis;
+  /** The community's membership tiers, for the picker. */
+  membershipTiers?: { id: string; name: string }[];
+  /** Tier ids currently granted this axis. */
+  initialTierIds?: string[];
   onClose: () => void;
   onSaved: () => void;
   showToast: (msg: string) => void;
@@ -74,18 +86,32 @@ export function ProductVisibilityEditModal({
   const jsonHeaders = useJsonHeaders();
   const copy = COPY[axis];
 
-  const [value, setValue] = React.useState<"PUBLIC" | "MEMBERS_ONLY">(
-    product?.[axis] === "MEMBERS_ONLY" ? "MEMBERS_ONLY" : "PUBLIC",
+  /*
+   * MEMBERS_ONLY with no granted tiers reads as "all members", never as an
+   * empty selection - so a product created before tier access opens with
+   * everything ticked rather than with nothing.
+   */
+  const [access, setAccess] = React.useState<TierAccessValue>(
+    toTierAccessValue(product?.[axis] ?? "PUBLIC", initialTierIds),
   );
   const [saving, setSaving] = React.useState(false);
 
   async function save() {
+    const resolved = fromTierAccessValue(access);
     setSaving(true);
     try {
       const res = await fetch(`${apiBaseUrl}/api/users/me/products/${productId}`, {
         method: "PATCH",
         headers: jsonHeaders(),
-        body: JSON.stringify({ [axis]: value }),
+        /*
+         * Both halves of the answer. The enum is the coarse gate and the tier
+         * ids refine it; sending one without the other would leave the two
+         * describing different things.
+         */
+        body: JSON.stringify({
+          [axis]: resolved.visibility,
+          [axis === "viewability" ? "viewTierIds" : "buyTierIds"]: resolved.tierIds,
+        }),
       });
       if (!res.ok) {
         // The server refuses this on a user-owned product and for non-leaders.
@@ -108,18 +134,14 @@ export function ProductVisibilityEditModal({
       <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">{copy.title}</h3>
       <p className="text-[12px] text-zinc-500 mb-4">{copy.blurb}</p>
 
-      <div className="space-y-2 mb-4">
-        <RadioRow
-          selected={value === "PUBLIC"}
-          onClick={() => setValue("PUBLIC")}
-          title={copy.publicTitle}
-          subtitle={copy.publicBody}
-        />
-        <RadioRow
-          selected={value === "MEMBERS_ONLY"}
-          onClick={() => setValue("MEMBERS_ONLY")}
-          title={copy.membersTitle}
-          subtitle={copy.membersBody}
+      {/* The same picker the create form uses: Public and All members are
+          shortcuts that imply every membership tier below them. */}
+      <div className="mb-4">
+        <MembershipTierPicker
+          value={access}
+          onChange={setAccess}
+          tiers={membershipTiers}
+          publicLabel={copy.publicBody}
         />
       </div>
 
