@@ -273,6 +273,15 @@ export function ProductSettingsDrawer({
         </div>
 
         <div className="flex-1 overflow-y-auto">
+          {/* Grouped, not just gated. These are refused on a user-owned
+              product (COMMUNITY_SCOPED_PRODUCT_FIELDS, 403), and hiding them
+              unlabelled read as missing features rather than one rule.
+              Approval below is the SELLER's own and stays on both kinds. */}
+          {isCommunityOwned && (
+            <p className="px-5 pt-4 pb-1 text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
+              Community access
+            </p>
+          )}
           {isCommunityOwned && (
           <SettingsRow
             label="Visibility"
@@ -313,6 +322,11 @@ export function ProductSettingsDrawer({
               </svg>
             }
           />
+          )}
+          {onSaveApproval && (
+            <p className="px-5 pt-4 pb-1 text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
+              Your settings
+            </p>
           )}
           {onSaveApproval && (
             <div className="w-full flex items-center gap-3 px-5 py-4 border-b border-zinc-100">
