@@ -25,6 +25,9 @@ import {
   toTierAccessValue,
   fromTierAccessValue,
   tierAccessSummary,
+  ceilingFor,
+  clampToCeiling,
+  tierAccessConsequence,
   type TierAccessValue,
   type MembershipTier,
 } from "@cobuntu/management-ui-shared";
@@ -212,6 +215,25 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   /* One translation for both the payload and the icons, so they cannot drift. */
   const viewResolved = fromTierAccessValue(viewAccess);
   const buyResolved = fromTierAccessValue(buyAccess);
+  /*
+   * ── Buying is a subset of seeing ──────────────────────────────────
+   *
+   * These were two independent pieces of state, so "visible to Founding
+   * only" plus "anyone can buy it" was reachable and saveable. Not a hole -
+   * the view gate runs first, so a non-member never reaches the buy button -
+   * but the card asserted something untrue, and whoever set it believed they
+   * had opened sales to the public.
+   *
+   * The buy picker is handed a ceiling instead of being validated after the
+   * fact: an option the view setting excludes is never offered. Narrowing
+   * view drags buy back with it, which is why view goes through a setter
+   * rather than being set directly.
+   */
+  const buyCeiling = ceilingFor(viewAccess);
+  const changeViewAccess = (next: TierAccessValue) => {
+    setViewAccess(next);
+    setBuyAccess((prev) => clampToCeiling(prev, ceilingFor(next)));
+  };
   const [accessibility, setAccessibility] = useState<"PUBLIC" | "MEMBERS_ONLY">(initialData?.accessibility || "PUBLIC");
   const [requiresApproval, setRequiresApproval] = useState(initialData?.requiresApproval || false);
 
@@ -659,7 +681,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                   </div>
                   <MembershipTierPicker
                     value={viewAccess}
-                    onChange={setViewAccess}
+                    onChange={changeViewAccess}
                     tiers={membershipTiers}
                     publicLabel="Anyone, including people who are not members"
                   />
@@ -681,9 +703,19 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                     onChange={setBuyAccess}
                     tiers={membershipTiers}
                     publicLabel="Anyone can buy it, members or not"
+                    ceiling={buyCeiling}
                   />
                 </div>
               </div>
+              {/* The two questions read back as ONE rule. The card asks them in
+                  two groups and never stated the combined result, which is
+                  exactly where "visible to Founding, buyable by anyone" hid.
+                  Null for a fully public product - that needs no narrating. */}
+              {tierAccessConsequence(viewAccess, buyAccess, membershipTiers) && (
+                <p className="text-[11px] text-zinc-500 mt-2 px-1 leading-relaxed">
+                  {tierAccessConsequence(viewAccess, buyAccess, membershipTiers)}
+                </p>
+              )}
               <p className="text-[11px] text-zinc-400 mt-2 px-1">
                 Available because this community owns this product.
               </p>
