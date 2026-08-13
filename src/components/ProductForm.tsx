@@ -610,7 +610,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Approval</p>
               <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
 
-              /* Require approval — buyer applies, seller approves (escrow held) */
+              {/* Buyer applies, seller approves; the payment is held meanwhile. */}
               <div
                 onClick={() => setRequiresApproval(!requiresApproval)}
                 className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-100/60 transition-colors">
