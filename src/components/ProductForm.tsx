@@ -21,6 +21,14 @@ import { type DraftTier, type DonationDraft } from "./PriceEditModal/types";
 import { blankTier, blankDonation } from "./PriceEditModal/helpers";
 import { CategoryPickerRow, type CategoryOption } from "./CategoryPickerRow";
 import {
+  MembershipTierPicker,
+  toTierAccessValue,
+  fromTierAccessValue,
+  tierAccessSummary,
+  type TierAccessValue,
+  type MembershipTier,
+} from "@cobuntu/management-ui-shared";
+import {
   FileText, Tag as TagIcon, Package,
   DollarSign, MousePointerClick, ChevronRight,
   Eye, EyeOff, UserCheck, Lock, ClipboardCheck,
@@ -84,6 +92,15 @@ export interface ProductFormData {
   // resolution as viewability.
   accessibility: "PUBLIC" | "MEMBERS_ONLY";
   /**
+   * Membership tiers granted view / buy access, refining the two gates above.
+   *
+   * EMPTY means "every tier", not "nobody" - the same rule the backend
+   * applies, where no rows means unrestricted. That is what lets every
+   * listing predating this feature keep working with no backfill.
+   */
+  viewTierIds: string[];
+  buyTierIds: string[];
+  /**
    * Buyer-approval gate. When true, a purchase lands in PENDING escrow until
    * the seller approves (paid → funds held; free → entitlement gate). Mirrors
    * the event Require-Approval toggle; backend column products.requiresApproval.
@@ -135,6 +152,15 @@ interface ProductFormProps {
    */
   hideVisibility?: boolean;
   /**
+   * The community's membership tiers, for the access picker. Passed in, not
+   * fetched: the form makes no API calls of its own, and an empty list simply
+   * renders "no membership tiers yet".
+   */
+  membershipTiers?: MembershipTier[];
+  /** Tier ids currently granted view / buy access, from the listing. */
+  initialViewTierIds?: string[];
+  initialBuyTierIds?: string[];
+  /**
    * When true, the built-in Buyer-approval section is NOT rendered — the
    * consumer owns the requireApproval toggle elsewhere (e.g. a shared
    * "Product Options" config card) and stamps it at submit. The form still
@@ -153,7 +179,7 @@ const AUTO_SEED_NAME = /^(Standard|Tier \d+)$/;
 
 // ─── Component ─────────────────────────────────────────────────
 
-export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, categories }: ProductFormProps) {
+export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds }: ProductFormProps) {
   // Form state
   const [name, setName] = useState(initialData?.name || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -172,6 +198,20 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const [recurringInterval, setRecurringInterval] = useState<"monthly" | "yearly">(initialData?.recurringInterval || "monthly");
   const [ctaText, setCtaText] = useState(initialData?.ctaText || "");
   const [viewability, setViewability] = useState<"PUBLIC" | "MEMBERS_ONLY">(initialData?.viewability || "PUBLIC");
+  /*
+   * The picker's own shape. MEMBERS_ONLY with no granted tiers reads as "all
+   * members", never as an empty selection - the no-backfill rule surfacing in
+   * the UI, and why every product that predates this opens as All members.
+   */
+  const [viewAccess, setViewAccess] = useState<TierAccessValue>(
+    toTierAccessValue(initialData?.viewability ?? "PUBLIC", initialViewTierIds),
+  );
+  const [buyAccess, setBuyAccess] = useState<TierAccessValue>(
+    toTierAccessValue(initialData?.accessibility ?? "PUBLIC", initialBuyTierIds),
+  );
+  /* One translation for both the payload and the icons, so they cannot drift. */
+  const viewResolved = fromTierAccessValue(viewAccess);
+  const buyResolved = fromTierAccessValue(buyAccess);
   const [accessibility, setAccessibility] = useState<"PUBLIC" | "MEMBERS_ONLY">(initialData?.accessibility || "PUBLIC");
   const [requiresApproval, setRequiresApproval] = useState(initialData?.requiresApproval || false);
 
@@ -331,12 +371,22 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       currency,
       isRecurring: false,
       recurringInterval, ctaText,
-      viewability, accessibility, requiresApproval,
+      /*
+       * Derived from the picker, which is the source of truth for both axes.
+       * The stored shape is an enum plus grant rows; deriving here rather than
+       * tracking the enum separately is what stops the summary and the rows
+       * disagreeing.
+       */
+      viewability: viewResolved.visibility,
+      accessibility: buyResolved.visibility,
+      viewTierIds: viewResolved.tierIds,
+      buyTierIds: buyResolved.tierIds,
+      requiresApproval,
       // Every configured tier, free or paid — not only the paid ones.
       tiers: configured.length > 0 ? named : [],
       donation,
     });
-  }, [name, description, tags, categoryId, subCategoryId, mediaItems, productFiles, currency, recurringInterval, ctaText, viewability, accessibility, requiresApproval, tiers, donation]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [name, description, tags, categoryId, subCategoryId, mediaItems, productFiles, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, tiers, donation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Configured tiers drive the Pricing row summary + tier cards. A blank
   // seed tier ("Standard") counts once the user has named it.
@@ -552,55 +602,6 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             </div>
           )}
 
-          {/* ─── Community access ───
-              Visibility and Purchase exist ONLY because a community owns this
-              product: the backend refuses both on a personal one
-              (COMMUNITY_SCOPED_PRODUCT_FIELDS, 403). They used to sit in the
-              card above and simply vanish for a member seller, which read as
-              two missing features rather than one rule.
-
-              No eyebrow on the Pricing card above: that label was removed
-              deliberately on 2026-08-09 because it was the only thing
-              separating the card from the detail rows. These two are new
-              groups, and the label IS the explanation. */}
-          {!hideVisibility && (
-            <div>
-              <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Community access</p>
-              <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
-
-                {/* Visibility — who can SEE the listing */}
-                <div
-                  onClick={() => setViewability(viewability === "PUBLIC" ? "MEMBERS_ONLY" : "PUBLIC")}
-                  className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-100/60 transition-colors">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {viewability === "PUBLIC" ? <Eye className="h-[18px] w-[18px] text-zinc-400 shrink-0" /> : <EyeOff className="h-[18px] w-[18px] text-zinc-400 shrink-0" />}
-                    <div className="min-w-0">
-                      <span className="text-sm font-medium text-zinc-800">Visibility: {viewability === "PUBLIC" ? "Everyone" : "Members only"}</span>
-                      <p className="text-[11px] text-zinc-400 mt-0.5">Who can see this product listing</p>
-                    </div>
-                  </div>
-                  <Switch checked={viewability === "MEMBERS_ONLY"} onCheckedChange={v => setViewability(v ? "MEMBERS_ONLY" : "PUBLIC")} onClick={e => e.stopPropagation()} />
-                </div>
-                {/* Purchase — who can BUY */}
-                <div
-                  onClick={() => setAccessibility(accessibility === "PUBLIC" ? "MEMBERS_ONLY" : "PUBLIC")}
-                  className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-100/60 transition-colors">
-                  <div className="flex items-center gap-3 min-w-0">
-                    {accessibility === "PUBLIC" ? <UserCheck className="h-[18px] w-[18px] text-zinc-400 shrink-0" /> : <Lock className="h-[18px] w-[18px] text-zinc-400 shrink-0" />}
-                    <div className="min-w-0">
-                      <span className="text-sm font-medium text-zinc-800">Purchase: {accessibility === "PUBLIC" ? "Everyone" : "Members only"}</span>
-                      <p className="text-[11px] text-zinc-400 mt-0.5">Who can buy this product</p>
-                    </div>
-                  </div>
-                  <Switch checked={accessibility === "MEMBERS_ONLY"} onCheckedChange={v => setAccessibility(v ? "MEMBERS_ONLY" : "PUBLIC")} onClick={e => e.stopPropagation()} />
-                </div>
-              </div>
-              <p className="text-[11px] text-zinc-400 mt-2 px-1">
-                Available because this community owns this product.
-              </p>
-            </div>
-          )}
-
           {/* ─── Approval ───
               NOT community-scoped. requiresApproval is outside
               COMMUNITY_SCOPED_PRODUCT_FIELDS, so a member selling their own
@@ -626,6 +627,69 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               </div>
             </div>
           )}
+
+          {/* ─── Community access ───
+              Visibility and Purchase exist ONLY because a community owns this
+              product: the backend refuses both on a personal one
+              (COMMUNITY_SCOPED_PRODUCT_FIELDS, 403). They used to sit in the
+              card above and simply vanish for a member seller, which read as
+              two missing features rather than one rule.
+
+              No eyebrow on the Pricing card above: that label was removed
+              deliberately on 2026-08-09 because it was the only thing
+              separating the card from the detail rows. These two are new
+              groups, and the label IS the explanation. */}
+          {!hideVisibility && (
+            <div>
+              <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Community access</p>
+              <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
+
+                {/* Who can SEE it. Public and All members are shortcuts that
+                    imply every membership tier below them, so picking either
+                    ticks and freezes the rows - "frozen" there means already
+                    included, unlike the card-level rule where a capability you
+                    cannot have is not rendered at all. */}
+                <div className="px-5 py-4">
+                  <div className="flex items-center gap-3 mb-3 min-w-0">
+                    {viewResolved.visibility === "PUBLIC" ? <Eye className="h-[18px] w-[18px] text-zinc-400 shrink-0" /> : <EyeOff className="h-[18px] w-[18px] text-zinc-400 shrink-0" />}
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium text-zinc-800">Who can see it</span>
+                      <p className="text-[11px] text-zinc-400 mt-0.5">{tierAccessSummary(viewAccess, membershipTiers)}</p>
+                    </div>
+                  </div>
+                  <MembershipTierPicker
+                    value={viewAccess}
+                    onChange={setViewAccess}
+                    tiers={membershipTiers}
+                    publicLabel="Anyone, including people who are not members"
+                  />
+                </div>
+
+                {/* Who can BUY. Separate axis on purpose: showing a product to
+                    every member while selling it to one tier is the case the
+                    feature exists for. */}
+                <div className="px-5 py-4">
+                  <div className="flex items-center gap-3 mb-3 min-w-0">
+                    {buyResolved.visibility === "PUBLIC" ? <UserCheck className="h-[18px] w-[18px] text-zinc-400 shrink-0" /> : <Lock className="h-[18px] w-[18px] text-zinc-400 shrink-0" />}
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium text-zinc-800">Who can buy it</span>
+                      <p className="text-[11px] text-zinc-400 mt-0.5">{tierAccessSummary(buyAccess, membershipTiers)}</p>
+                    </div>
+                  </div>
+                  <MembershipTierPicker
+                    value={buyAccess}
+                    onChange={setBuyAccess}
+                    tiers={membershipTiers}
+                    publicLabel="Anyone can buy it, members or not"
+                  />
+                </div>
+              </div>
+              <p className="text-[11px] text-zinc-400 mt-2 px-1">
+                Available because this community owns this product.
+              </p>
+            </div>
+          )}
+
         </div>
       )}
 
