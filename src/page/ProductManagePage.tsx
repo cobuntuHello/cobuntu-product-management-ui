@@ -110,6 +110,8 @@ export interface ProductManagePageProps {
   onViewChange: (v: ProductViewKey) => void;
 
   isPublished: boolean;
+  /** Optional lifecycle state; absent keeps the legacy boolean copy. See ProductCard. */
+  listingStatus?: "PENDING" | "ACTIVE" | "PAUSED" | "CANCELLED" | "REVOKED" | null;
   listingId: string | null;
 
   /**
@@ -166,6 +168,7 @@ export function ProductManagePage({
   view,
   onViewChange,
   isPublished,
+  listingStatus,
   listingId,
   headerProps,
   header,
@@ -247,6 +250,7 @@ export function ProductManagePage({
           communityTag={communityTag}
           productId={productId}
           isPublished={isPublished}
+          listingStatus={listingStatus}
           listingId={listingId}
           onPublish={onPublish}
           onUnpublish={onUnpublish}

@@ -43,6 +43,8 @@ export interface OverviewViewProps {
   communityTag: string;
   productId: string;
   isPublished: boolean;
+  /** Optional lifecycle state; absent keeps the legacy boolean copy. See ProductCard. */
+  listingStatus?: "PENDING" | "ACTIVE" | "PAUSED" | "CANCELLED" | "REVOKED" | null;
   listingId: string | null;
 
   onPublish: () => void | Promise<void>;
@@ -122,6 +124,7 @@ export function OverviewView({
   communityTag,
   productId,
   isPublished,
+  listingStatus,
   listingId,
   onPublish,
   onUnpublish,
@@ -188,6 +191,7 @@ export function OverviewView({
         product={product}
         communityTag={communityTag}
         isPublished={isPublished}
+        listingStatus={listingStatus}
         listingId={listingId}
         onEditName={() => setModal("name")}
         onEditPrice={() => setModal("price")}

@@ -10,6 +10,20 @@ interface Props {
   product: any;
   communityTag: string;
   isPublished: boolean;
+  /**
+   * The listing's actual lifecycle state, when the host app knows it.
+   *
+   * `isPublished` is a boolean over a five-value enum, so every state that is
+   * not live collapsed into "not published yet" — including CANCELLED and
+   * REVOKED, where the row also invited the seller to "Click to publish". That
+   * click cannot succeed: a listing the community ended is not something the
+   * seller can put back by pressing a button, and the API refuses it.
+   *
+   * OPTIONAL, and absent means "behave exactly as before". The admin app does
+   * not pass it and must not change, so this widens the vocabulary only where
+   * the caller knows enough to use it.
+   */
+  listingStatus?: "PENDING" | "ACTIVE" | "PAUSED" | "CANCELLED" | "REVOKED" | null;
   listingId: string | null;
   onEditName: () => void;
   onEditPrice: () => void;
@@ -28,7 +42,7 @@ interface Props {
 }
 
 export function ProductCard({
-  product, communityTag, isPublished, listingId,
+  product, communityTag, isPublished, listingStatus, listingId,
   onEditName, onEditPrice, onEditMedia, onEditCta, onEditDescription, onEditTags, onEditCategory,
   onPublish, onUnpublish,
 }: Props) {
@@ -37,6 +51,53 @@ export function ProductCard({
   const { UserAvatar: ConfigAvatar } = useProductManagementConfig();
   const UserAvatar = ConfigAvatar ?? UserAvatarFallback;
   const [urlCopied, setUrlCopied] = useState(false);
+
+  /*
+   * What this row says, and whether it is a control at all.
+   *
+   * It used to be a boolean: published, or "not published yet, click to
+   * publish". Five lifecycle states collapsed into two sentences, and the
+   * false half was wrong in three different ways — a listing awaiting review
+   * is not something the seller failed to publish, a paused one they paused
+   * themselves, and an ended one cannot be published by clicking at all.
+   *
+   * `listingStatus` is optional, so a caller that does not pass it (the admin
+   * app) keeps the exact two-sentence behaviour it has today.
+   */
+  const listingClosed = listingStatus === "CANCELLED" || listingStatus === "REVOKED";
+  const listingCopy: { title: string; hint: string; tone: string } = (() => {
+    switch (listingStatus) {
+      case "PENDING":
+        return {
+          title: "Waiting on the community",
+          hint: "A leader reviews it before it goes live.",
+          tone: "text-amber-600",
+        };
+      case "PAUSED":
+        return {
+          title: "You took it off the shelf",
+          hint: "Click to put it back.",
+          tone: "text-zinc-900",
+        };
+      case "CANCELLED":
+        return {
+          title: "This listing was withdrawn",
+          hint: "Ask the community again from the Listings tab.",
+          tone: "text-zinc-900",
+        };
+      case "REVOKED":
+        return {
+          title: "The community ended this listing",
+          hint: "Nobody is reviewing it. You would need them to carry it again.",
+          tone: "text-zinc-900",
+        };
+      default:
+        // ACTIVE, or a caller that passes no status at all.
+        return isPublished
+          ? { title: "Product is published", hint: "Click to unpublish", tone: "text-emerald-600" }
+          : { title: "Product is not published yet", hint: "Click to publish", tone: "text-zinc-900" };
+    }
+  })();
   /*
    * NO MEASUREMENT. The media column used to size itself from the RIGHT
    * column's measured height, so a square image matched the rows beside it.
@@ -352,8 +413,16 @@ export function ProductCard({
               directions are the row now: the card is a list of properties and
               publish is one of them.
             */}
-            <div onClick={isPublished ? onUnpublish : onPublish}
-              className="flex items-start gap-3 rounded-lg py-1 hover:bg-zinc-50 cursor-pointer">
+            {/*
+              * A closed listing is not a button.
+              *
+              * CANCELLED and REVOKED are ended, and the API refuses a publish
+              * on either — so offering "Click to publish" promised an action
+              * that fails. The row becomes a statement in those two states and
+              * stays a control in the rest.
+              */}
+            <div onClick={listingClosed ? undefined : (isPublished ? onUnpublish : onPublish)}
+              className={`flex items-start gap-3 rounded-lg py-1 ${listingClosed ? "" : "hover:bg-zinc-50 cursor-pointer"}`}>
               <div className={`shrink-0 w-11 h-11 rounded-lg border flex items-center justify-center ${
                 isPublished ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"
               }`}>
@@ -364,17 +433,8 @@ export function ProductCard({
                 )}
               </div>
               <div className="flex-1 min-w-0 flex flex-col justify-center min-h-[2.75rem]">
-                {isPublished ? (
-                  <>
-                    <p className="text-sm font-medium text-emerald-600">Product is published</p>
-                    <p className="text-xs text-zinc-500">Click to unpublish</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm font-medium text-zinc-900">Product is not published yet</p>
-                    <p className="text-xs text-zinc-500">Click to publish</p>
-                  </>
-                )}
+                <p className={`text-sm font-medium ${listingCopy.tone}`}>{listingCopy.title}</p>
+                <p className="text-xs text-zinc-500">{listingCopy.hint}</p>
               </div>
             </div>
           </div>
