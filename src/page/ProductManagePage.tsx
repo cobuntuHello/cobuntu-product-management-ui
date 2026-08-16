@@ -9,6 +9,7 @@ import { ListingDetailDrawer } from "./sections/ListingDetailDrawer";
 import { ProductActivityTab } from "../components/activity/ProductActivityTab";
 import { getProductManagementConfig } from "../config";
 import { ProductManageHeader, type ProductManageHeaderProps } from "./ProductManageHeader";
+import { ManageAccessProvider } from "../lib/manageAccess";
 
 /**
  * THE product manage page. One implementation, both apps.
@@ -92,6 +93,18 @@ export function visibleProductViews(opts: {
 }
 
 export interface ProductManagePageProps {
+  /**
+   * May this viewer CHANGE the product, as opposed to merely open this page?
+   *
+   * Send the backend's `viewerCanEdit`. It is resolved there by the same
+   * predicate the write endpoints enforce, so the controls this page offers
+   * and the writes the server accepts cannot disagree.
+   *
+   * False renders read-only: every editing surface stops opening and a notice
+   * explains where to go instead. Used for a leader of a community that
+   * CARRIES someone else's product. DEFAULTS TRUE.
+   */
+  canEdit?: boolean;
   /** The community's product taxonomy, loaded by the host app. */
   categories?: import("../components/CategoryPickerRow").CategoryOption[];
   communityTag: string;
@@ -183,6 +196,10 @@ export function ProductManagePage({
   onSaveApproval,
   approvalCopy,
   overviewExtras,
+  // Defaults true: every consumer that has not been taught about this renders
+  // exactly as before, and read-only is opt-in by the page that knows it is
+  // showing someone else's product.
+  canEdit = true,
 }: ProductManagePageProps) {
   // Touch the config early so a host app that forgot the provider fails here,
   // loudly, rather than three views deep on a fetch.
@@ -282,8 +299,14 @@ export function ProductManagePage({
   }
 
   return (
+    /*
+     * The nav sits outside the read-only effect on purpose: moving between
+     * tabs is reading, and a read-only viewer is here precisely to look.
+     */
+    <ManageAccessProvider canEdit={canEdit}>
     <div>
       {header ?? (headerProps ? <ProductManageHeader {...headerProps} /> : null)}
+      {!canEdit && <ReadOnlyNotice product={product} />}
       <ProductSectionsNav activeView={active} onViewChange={onViewChange} visibleViews={allowed} />
       {content}
 
@@ -295,6 +318,35 @@ export function ProductManagePage({
           onRefresh={() => { setDetailListing(null); void onUpdate(); }}
         />
       )}
+    </div>
+    </ManageAccessProvider>
+  );
+}
+
+/**
+ * Says WHOSE product this is and where changes actually happen.
+ *
+ * A page that simply refuses to save reads as broken. Naming the seller and
+ * pointing at the listing conversation makes it a relationship instead: the
+ * community decides whether it carries this and on what terms, and the seller
+ * decides what it is.
+ */
+function ReadOnlyNotice({ product }: { product: any }) {
+  const sellerName = product?.owner?.name || product?.creator?.name || null;
+
+  return (
+    <div
+      role="note"
+      className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200"
+    >
+      <p className="font-medium">
+        {sellerName ? `${sellerName} sells this.` : "This product belongs to its seller."}
+      </p>
+      <p className="mt-1 opacity-90">
+        Your community carries it, so you manage the listing — the terms, the commission,
+        and whether it stays on your shelf. Ask the seller through the listing conversation
+        to change the product itself.
+      </p>
     </div>
   );
 }
