@@ -4,6 +4,7 @@ import * as React from "react";
 import { useProductManagementConfig, useJsonHeaders } from "../../config";
 import { ModalShell } from "../helpers";
 import { UserAvatarFallback } from "../../ui/user-avatar-fallback";
+import { useCanEdit } from "../../lib/manageAccess";
 
 /**
  * Co-sellers — the product twin of the event page's Hosts tab, built to the
@@ -73,8 +74,36 @@ export function CollaboratorsView({
   const UserAvatar = ConfigAvatar ?? UserAvatarFallback;
 
   const [rows, setRows] = React.useState<Collaborator[] | null>(null);
-  const [addOpen, setAddOpen] = React.useState(false);
-  const [confirmRemove, setConfirmRemove] = React.useState<Collaborator | null>(null);
+  const [addOpen, setAddOpenState] = React.useState(false);
+  const [confirmRemove, setConfirmRemoveState] = React.useState<Collaborator | null>(null);
+  /*
+   * Adding or removing a co-seller changes who gets paid. A leader of a
+   * community that merely CARRIES this product does not get to decide that.
+   *
+   * This view has no shared modal state -- it opens its own -- which is
+   * exactly the shape that was missed on the event side, so it is gated
+   * explicitly here.
+   */
+  /*
+   * BOTH signals, and-ed. The `canEdit` PROP already existed and says whether
+   * this particular viewer may manage co-sellers; the context says whether the
+   * whole page is read-only. Either one saying no means no -- taking only the
+   * prop would let a carrying community's leader through, and taking only the
+   * context would quietly widen whatever the prop was protecting.
+   */
+  // The hook is called UNCONDITIONALLY. Written as `canEdit && useCanEdit()`
+  // it would be skipped whenever the prop is false -- a conditional hook, and
+  // React tears the tree down with error #310 the moment the prop flips.
+  const pageAllowsEditing = useCanEdit();
+  const mayEdit = canEdit && pageAllowsEditing;
+  const setAddOpen = (v: boolean) => {
+    if (!mayEdit && v !== false) return;
+    setAddOpenState(v);
+  };
+  const setConfirmRemove = (v: Collaborator | null) => {
+    if (!mayEdit && v !== null) return;
+    setConfirmRemoveState(v);
+  };
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 

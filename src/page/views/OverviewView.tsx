@@ -17,6 +17,7 @@ import { ProductMediaModal } from "../../components/ProductMediaModal";
 import { TagsEditModal } from "../../components/TagsEditModal";
 import { CategoryEditModal } from "../../components/CategoryEditModal";
 import type { CategoryOption } from "../../components/CategoryPickerRow";
+import { useCanEdit } from "../../lib/manageAccess";
 
 /**
  * The Overview tab: quick actions, the product card with its edit rows, and
@@ -150,11 +151,38 @@ export function OverviewView({
   // in a test) without a wrapper.
   const [ownModal, setOwnModal] = React.useState<ProductModal>(null);
   const [ownDrawer, setOwnDrawer] = React.useState(false);
-  const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [settingsOpen, setSettingsOpenState] = React.useState(false);
   const modal = modalProp !== undefined ? modalProp : ownModal;
-  const setModal = setModalProp ?? setOwnModal;
   const showEditDrawer = drawerProp !== undefined ? drawerProp : ownDrawer;
-  const setShowEditDrawer = setDrawerProp ?? setOwnDrawer;
+
+  /*
+   * Every editing surface on this view opens through one of these three
+   * setters, so gating them here gates all of them.
+   *
+   * At the OPENER and not at each button: a modal that cannot be opened cannot
+   * save, so a control that slips through leads nowhere instead of leading to
+   * a 403. The event side learned this the expensive way -- guarding buttons
+   * individually left two whole views ungated because nobody had enumerated
+   * the openers.
+   *
+   * Closing stays allowed. Read-only is about writing, and trapping somebody
+   * in a dialog they cannot dismiss is a worse bug than the one being fixed.
+   */
+  const canEdit = useCanEdit();
+  const rawSetModal = setModalProp ?? setOwnModal;
+  const setModal = (m: ProductModal) => {
+    if (!canEdit && m !== null) return;
+    rawSetModal(m);
+  };
+  const rawSetShowEditDrawer = setDrawerProp ?? setOwnDrawer;
+  const setShowEditDrawer = (v: boolean) => {
+    if (!canEdit && v !== false) return;
+    rawSetShowEditDrawer(v);
+  };
+  const setSettingsOpen = (v: boolean) => {
+    if (!canEdit && v !== false) return;
+    setSettingsOpenState(v);
+  };
 
   /**
    * The one-field saves (rename) go through the PERSONAL products route, not
