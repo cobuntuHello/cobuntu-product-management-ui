@@ -9,7 +9,6 @@ import { UserAvatarFallback } from "../../ui/user-avatar-fallback";
 interface Props {
   product: any;
   communityTag: string;
-  isPublished: boolean;
   listingId: string | null;
   onEditName: () => void;
   onEditPrice: () => void;
@@ -23,14 +22,11 @@ interface Props {
   onEditTags?: () => void;
   /** Opens the category picker. Omit to hide the row. */
   onEditCategory?: () => void;
-  onPublish: () => void;
-  onUnpublish: () => void;
 }
 
 export function ProductCard({
-  product, communityTag, isPublished, listingId,
+  product, communityTag, listingId,
   onEditName, onEditPrice, onEditMedia, onEditCta, onEditDescription, onEditTags, onEditCategory,
-  onPublish, onUnpublish,
 }: Props) {
   // Injected by the host app; the package ships its own fallback so no host
   // is forced to supply one.
@@ -352,31 +348,19 @@ export function ProductCard({
               directions are the row now: the card is a list of properties and
               publish is one of them.
             */}
-            <div onClick={isPublished ? onUnpublish : onPublish}
-              className="flex items-start gap-3 rounded-lg py-1 hover:bg-zinc-50 cursor-pointer">
-              <div className={`shrink-0 w-11 h-11 rounded-lg border flex items-center justify-center ${
-                isPublished ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"
-              }`}>
-                {isPublished ? (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-500"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-500"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                )}
-              </div>
-              <div className="flex-1 min-w-0 flex flex-col justify-center min-h-[2.75rem]">
-                {isPublished ? (
-                  <>
-                    <p className="text-sm font-medium text-emerald-600">Product is published</p>
-                    <p className="text-xs text-zinc-500">Click to unpublish</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm font-medium text-zinc-900">Product is not published yet</p>
-                    <p className="text-xs text-zinc-500">Click to publish</p>
-                  </>
-                )}
-              </div>
-            </div>
+            {/*
+              * THE PUBLISH ROW IS GONE, and it was the second of two surfaces
+              * for an act that does not exist on a product.
+              *
+              * products.status is DRAFT | CREATED. Whether anything can be
+              * bought is decided per LISTING, one per community, each with its
+              * own commission -- so "Product is not published yet" described a
+              * state the product never had, and pressing it bulk-moved every
+              * paused listing in one community without naming any of them.
+              *
+              * Where a thing can be bought, and how to take it off a shelf, is
+              * the Overview tab and the listing's own page.
+              */}
           </div>
 
           {/*

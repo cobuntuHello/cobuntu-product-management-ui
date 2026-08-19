@@ -27,8 +27,6 @@ const handlers = () => ({
   onEditDescription: vi.fn(),
   onEditTags: vi.fn(),
   onEditCategory: vi.fn(),
-  onPublish: vi.fn(),
-  onUnpublish: vi.fn(),
 });
 
 const product = {
@@ -49,7 +47,6 @@ function renderCard(over: Record<string, any> = {}, h = handlers()) {
     <ProductCard
       product={{ ...product, ...over }}
       communityTag="avepark"
-      isPublished={false}
       listingId={null}
       {...h}
     />,
@@ -415,13 +412,10 @@ describe("tags and category as rows", () => {
       <ProductCard
         product={{ ...product, tags: [] }}
         communityTag="avepark"
-        isPublished={false}
         listingId={null}
         onEditName={vi.fn()}
         onEditPrice={vi.fn()}
         onEditMedia={vi.fn()}
-        onPublish={vi.fn()}
-        onUnpublish={vi.fn()}
       />,
     );
     expect(container.textContent).not.toContain("Add tags");

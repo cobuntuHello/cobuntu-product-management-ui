@@ -8,7 +8,15 @@ import { visibleProductViews } from "../page/ProductManagePage";
  * the person it belongs to, and nothing surfaces an error.
  */
 
-const SELLER_SET = ["overview", "collaborators", "listings", "activity"];
+/*
+ * "details" is in this set, and that is the point of the test.
+ *
+ * The nav's SECTIONS list and this allowed list are INTERSECTED, so a tab in
+ * one and not the other silently vanishes. That shipped: Details was added to
+ * the nav only, and editing a product became unreachable in production. Pinning
+ * the exact set here is what makes the next such omission fail loudly.
+ */
+const SELLER_SET = ["overview", "details", "collaborators", "listings", "activity"];
 const MODERATOR_SET = ["overview", "activity"];
 
 describe("visibleProductViews", () => {

@@ -223,7 +223,6 @@ export function DetailsView({
       <ProductCard
         product={product}
         communityTag={communityTag}
-        isPublished={isPublished}
         listingId={listingId}
         onEditName={() => setModal("name")}
         onEditPrice={() => setModal("price")}
@@ -232,8 +231,6 @@ export function DetailsView({
         onEditDescription={() => setModal("description")}
         onEditTags={() => setModal("tags")}
         onEditCategory={categories?.length ? () => setModal("category") : undefined}
-        onPublish={() => void onPublish()}
-        onUnpublish={() => setModal("unpublish")}
       />
 
       {modal === "name" && (
