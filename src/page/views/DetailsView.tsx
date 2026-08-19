@@ -213,12 +213,10 @@ export function DetailsView({
   return (
     <div className="space-y-6">
       <OverviewActionCards
-        isPublished={isPublished}
+        isSellable={isPublished}
         onShare={() => setModal("share")}
         onSettings={() => setSettingsOpen(true)}
         canConfigureSettings={canConfigureSettings}
-        onPublish={() => void onPublish()}
-        onUnpublish={() => setModal("unpublish")}
         onDelete={() => setModal("delete")}
       />
 

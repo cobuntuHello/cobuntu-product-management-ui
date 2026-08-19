@@ -28,8 +28,6 @@ const actions = {
   onShare: vi.fn(),
   onEdit: vi.fn(),
   onSettings: vi.fn(),
-  onPublish: vi.fn(),
-  onUnpublish: vi.fn(),
   onDelete: vi.fn(),
 };
 
@@ -40,32 +38,32 @@ beforeEach(() => {
 
 describe("OverviewActionCards — Settings gating", () => {
   it("shows Settings for a community-owned product", () => {
-    renderWithConfig(<OverviewActionCards isPublished={false} canConfigureSettings {...actions} />);
+    renderWithConfig(<OverviewActionCards isSellable canConfigureSettings {...actions} />);
     expect(screen.getByText("Settings")).toBeInTheDocument();
   });
 
   it("does NOT render Settings for a user-owned product", () => {
-    renderWithConfig(<OverviewActionCards isPublished={false} canConfigureSettings={false} {...actions} />);
+    renderWithConfig(<OverviewActionCards isSellable canConfigureSettings={false} {...actions} />);
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
   });
 
   it("hides it rather than disabling it", () => {
     // The distinction that matters: a disabled control is still a claim that
     // the capability exists.
-    renderWithConfig(<OverviewActionCards isPublished={false} canConfigureSettings={false} {...actions} />);
+    renderWithConfig(<OverviewActionCards isSellable canConfigureSettings={false} {...actions} />);
     const disabled = screen.queryAllByRole("button").filter((b) => (b as HTMLButtonElement).disabled);
     expect(disabled.some((b) => b.textContent?.includes("Settings"))).toBe(false);
   });
 
   it("keeps the other actions", () => {
     // Hiding Settings must not take Share/Delete with it.
-    renderWithConfig(<OverviewActionCards isPublished={false} canConfigureSettings={false} {...actions} />);
+    renderWithConfig(<OverviewActionCards isSellable canConfigureSettings={false} {...actions} />);
     expect(screen.getByText("Share Product")).toBeInTheDocument();
     expect(screen.getByText("Delete Product")).toBeInTheDocument();
   });
 
   it("opens the drawer when clicked", async () => {
-    renderWithConfig(<OverviewActionCards isPublished canConfigureSettings {...actions} />);
+    renderWithConfig(<OverviewActionCards isSellable canConfigureSettings {...actions} />);
     await userEvent.click(screen.getByText("Settings"));
     expect(actions.onSettings).toHaveBeenCalled();
   });
