@@ -28,7 +28,15 @@ const SECTIONS: Array<{ key: ProductViewKey; label: string }> = [
    */
   { key: "details", label: "Details" },
   { key: "collaborators", label: "Collaborators" },
-  { key: "listings", label: "Listings" },
+  /*
+   * "listings" is still a valid KEY -- a link or a saved URL may carry it, and
+   * the host may still render that view -- but it is no longer a TAB.
+   *
+   * Overview shows one section per community with that listing's own views,
+   * sales, earnings and terms, plus the way to ask another community to carry
+   * this. A tab whose whole content is a less informative copy of the first
+   * screen is a second place to look for the same answer.
+   */
   // Activity landed with feat/product-audits (product_audits + the
   // /activity endpoint), so the tab this file used to say could not exist
   // now can. It is last on purpose: it answers questions about the other

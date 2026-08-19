@@ -98,7 +98,13 @@ export function visibleProductViews(opts: {
    */
   return isModerator
     ? ["overview", "activity"]
-    : ["overview", "details", "collaborators", "listings", "activity"];
+    /*
+     * "listings" is deliberately absent: Overview carries the listings now,
+     * with more per listing than that tab showed. The KEY still resolves, so an
+     * existing ?view=listings link keeps working rather than 404-ing into the
+     * default.
+     */
+    : ["overview", "details", "collaborators", "activity"];
 }
 
 export interface ProductManagePageProps {

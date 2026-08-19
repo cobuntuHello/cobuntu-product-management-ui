@@ -15,8 +15,12 @@ import { visibleProductViews } from "../page/ProductManagePage";
  * one and not the other silently vanishes. That shipped: Details was added to
  * the nav only, and editing a product became unreachable in production. Pinning
  * the exact set here is what makes the next such omission fail loudly.
+ *
+ * "listings" left the set when Overview began carrying the listings itself,
+ * with more per listing than that tab ever showed. The KEY still resolves so an
+ * existing ?view=listings link keeps working; it is simply not a tab.
  */
-const SELLER_SET = ["overview", "details", "collaborators", "listings", "activity"];
+const SELLER_SET = ["overview", "details", "collaborators", "activity"];
 const MODERATOR_SET = ["overview", "activity"];
 
 describe("visibleProductViews", () => {
