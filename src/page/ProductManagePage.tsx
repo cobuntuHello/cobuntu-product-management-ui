@@ -87,9 +87,18 @@ export function visibleProductViews(opts: {
   // true one, and they are still that product's seller.
   const isModerator = opts.forceModerator === true || !isSeller;
 
+  /*
+   * "details" MUST be here, not only in the nav's SECTIONS list.
+   *
+   * SectionsNav renders the intersection of SECTIONS and this list, so adding a
+   * tab in one place and not the other silently drops it -- which is exactly
+   * what shipped: Overview became the dashboard, the edit stack moved to
+   * Details, and Details was filtered out. Editing a product became unreachable
+   * in production. A moderator does not get it, because they cannot edit.
+   */
   return isModerator
     ? ["overview", "activity"]
-    : ["overview", "collaborators", "listings", "activity"];
+    : ["overview", "details", "collaborators", "listings", "activity"];
 }
 
 export interface ProductManagePageProps {
