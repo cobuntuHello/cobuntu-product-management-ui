@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { EmptyState as SharedEmptyState } from "@cobuntu/management-ui-shared";
 import { useProductManagementConfig } from "../../config";
 import { UserAvatarFallback } from "../../ui/user-avatar-fallback";
 import {
@@ -254,19 +255,17 @@ function LoadingRow() {
 
 function EmptyState() {
   return (
-    <div className="px-6 py-12 text-center">
-      <svg
-        width="28" height="28" viewBox="0 0 24 24" fill="none"
-        stroke="currentColor" strokeWidth="1.5"
-        className="mx-auto text-zinc-200 mb-3" aria-hidden
-      >
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7v5l3 2" />
-      </svg>
-      <p className="text-sm text-zinc-500">No activity yet</p>
-      <p className="text-xs text-zinc-400 mt-1">
-        Edits, listing decisions, and co-seller changes will show up here.
-      </p>
-    </div>
+    <SharedEmptyState
+      bordered={false}
+      icon={
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </svg>
+      }
+      title="No activity yet"
+      body="Edits, listing decisions, and co-seller changes will show up here."
+    />
   );
 }

@@ -377,15 +377,19 @@ export function ProductManagePage({
        * A SLOT, not a component this package owns.
        *
        * The dashboard is `ManageOverview` in @cobuntu/management-ui-shared, and
-       * importing it here would drag this package's shared pin from 0.4.1 to
-       * 0.19.0 — fifteen versions, which breaks fifteen tests across ProductForm,
-       * EditProductDrawer and PriceEditModal that have nothing to do with a new
-       * tab. That bump is worth doing on its own terms, with those failures read
-       * one by one; it is not worth doing as a side effect of this.
+       * the host fetches it and passes it down. That keeps this package's pin
+       * independent of the dashboard's release cadence, and it is the same
+       * reason the community app keeps its own copy of the tab strip.
        *
-       * Both host apps already run 0.19.0, so they render the dashboard and pass
-       * it in. Same reason the community app keeps its own copy of the tab strip:
-       * the package takes the panel as a slot rather than owning it.
+       * AN EARLIER VERSION OF THIS COMMENT WAS WRONG and is worth correcting
+       * rather than deleting: it claimed the shared bump broke fifteen tests
+       * across ProductForm, EditProductDrawer and PriceEditModal. It does not.
+       * Those fifteen fail at the old pin too -- they are this package's
+       * baseline. The bump was measured against a stale symlinked node_modules,
+       * which reported an old version while the locked tree held another, and
+       * the reading stuck for several releases. Diff the failing test NAMES
+       * either side of a bump, with the timings stripped, before believing a
+       * dependency caused anything.
        */
       content = overviewSlot ?? null;
   }

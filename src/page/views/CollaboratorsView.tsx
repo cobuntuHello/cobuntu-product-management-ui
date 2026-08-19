@@ -5,6 +5,7 @@ import { useProductManagementConfig, useJsonHeaders } from "../../config";
 import { ModalShell } from "../helpers";
 import { UserAvatarFallback } from "../../ui/user-avatar-fallback";
 import { useCanEdit } from "../../lib/manageAccess";
+import { EmptyState } from "@cobuntu/management-ui-shared";
 
 /**
  * Co-sellers — the product twin of the event page's Hosts tab, built to the
@@ -169,16 +170,21 @@ export function CollaboratorsView({
         {rows === null ? (
           <p className="px-6 py-12 text-center text-[12px] text-zinc-400">Loading co-sellers…</p>
         ) : rows.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto text-zinc-200 mb-3" aria-hidden>
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-            <p className="text-sm text-zinc-500">No co-sellers yet</p>
-            <p className="text-xs text-zinc-400 mt-1">Add one by @usertag. They appear on the listing beside you.</p>
-          </div>
+          <EmptyState
+            bordered={false}
+            icon={
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            }
+            title="No co-sellers yet"
+            body="Add one by @usertag. They appear on the listing beside you."
+          />
+       
         ) : (
           <ul className="divide-y divide-zinc-100">
             {rows.map((c) => (
