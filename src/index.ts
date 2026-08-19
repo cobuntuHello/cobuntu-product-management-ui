@@ -115,7 +115,15 @@ export { ProductSettingsDrawer, type ProductSettingsDrawerProps } from "./page/P
 export { ProductDescriptionEditModal, ProductCtaEditModal } from "./components/ProductDescriptionEditModal";
 export { ProductMediaModal } from "./components/ProductMediaModal";
 export { ProductVisibilityEditModal, type VisibilityAxis } from "./components/ProductVisibilityEditModal";
-export { OverviewView as ProductOverviewView } from "./page/views/OverviewView";
+/*
+ * The edit stack, exported under BOTH names.
+ *
+ * It was OverviewView until Overview became a dashboard; this is the same
+ * component, renamed to say what it is. The old alias stays so a host that
+ * imports ProductOverviewView keeps working -- a rename that breaks every
+ * consumer to gain a better word is not worth it.
+ */
+export { DetailsView, DetailsView as ProductOverviewView } from "./page/views/DetailsView";
 export { CollaboratorsView } from "./page/views/CollaboratorsView";
 export { ProductActivityTab, type ProductActivityTabProps } from "./components/activity/ProductActivityTab";
 export {

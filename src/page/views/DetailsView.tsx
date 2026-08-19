@@ -20,6 +20,16 @@ import type { CategoryOption } from "../../components/CategoryPickerRow";
 import { useCanEdit } from "../../lib/manageAccess";
 
 /**
+ * The DETAILS tab: everything about this product you can change.
+ *
+ * This was the Overview tab, which is why opening a product used to greet you
+ * with a form. It is unchanged except in name and position — the same rows and
+ * the same modals — but it is no longer what you land on. Overview is a
+ * dashboard now, and this is where the editing lives.
+ *
+ */
+
+/**
  * The Overview tab: quick actions, the product card with its edit rows, and
  * every modal those rows open.
  *
@@ -39,7 +49,7 @@ export type ProductModal = "name" | "price" | "share" | "distribution" | "delete
   | "tags"
   | "category";
 
-export interface OverviewViewProps {
+export interface DetailsViewProps {
   product: any;
   communityTag: string;
   productId: string;
@@ -118,7 +128,7 @@ export interface OverviewViewProps {
   extras?: React.ReactNode;
 }
 
-export function OverviewView({
+export function DetailsView({
   product,
   communityTag,
   productId,
@@ -142,7 +152,7 @@ export function OverviewView({
   onSaveApproval,
   approvalCopy,
   extras,
-}: OverviewViewProps) {
+}: DetailsViewProps) {
   const { apiBaseUrl } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
 

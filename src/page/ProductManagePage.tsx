@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ProductSectionsNav, type ProductViewKey } from "./ProductSectionsNav";
-import { OverviewView, type ProductModal } from "./views/OverviewView";
+import { DetailsView, type ProductModal } from "./views/DetailsView";
 import { CollaboratorsView } from "./views/CollaboratorsView";
 import { ListingsSection } from "./sections/ListingsSection";
 import { ListingDetailDrawer } from "./sections/ListingDetailDrawer";
@@ -164,6 +164,15 @@ export interface ProductManagePageProps {
 
   /** App-specific cards under the product card on Overview. */
   overviewExtras?: React.ReactNode;
+  /**
+   * What the Overview tab renders: the host app's `<ManageOverview>`.
+   *
+   * A slot rather than something this package builds, so the dashboard can use
+   * the current shared package while this one keeps its own pin. Omitted, the
+   * tab renders nothing, which is what an un-updated host should get rather
+   * than a crash.
+   */
+  overviewSlot?: React.ReactNode;
 }
 
 export function ProductManagePage({
@@ -196,6 +205,7 @@ export function ProductManagePage({
   onSaveApproval,
   approvalCopy,
   overviewExtras,
+  overviewSlot,
   // Defaults true: every consumer that has not been taught about this renders
   // exactly as before, and read-only is opt-in by the page that knows it is
   // showing someone else's product.
@@ -255,10 +265,13 @@ export function ProductManagePage({
     case "activity":
       content = <ProductActivityTab product={product ?? { id: productId }} communityTag={communityTag} />;
       break;
-    case "overview":
-    default:
+    /*
+     * DETAILS keeps every prop the old Overview had -- it is the same view,
+     * renamed and moved second. Overview is the dashboard now.
+     */
+    case "details":
       content = (
-        <OverviewView
+        <DetailsView
           categories={categories}
           product={product}
           communityTag={communityTag}
@@ -296,6 +309,30 @@ export function ProductManagePage({
           extras={overviewExtras}
         />
       );
+      break;
+
+    /*
+     * OVERVIEW is now the landing: how this product is doing, and whether it
+     * can be sold at all. Default too, so an unknown view key lands on the
+     * dashboard rather than on a form.
+     */
+    case "overview":
+    default:
+      /*
+       * A SLOT, not a component this package owns.
+       *
+       * The dashboard is `ManageOverview` in @cobuntu/management-ui-shared, and
+       * importing it here would drag this package's shared pin from 0.4.1 to
+       * 0.19.0 — fifteen versions, which breaks fifteen tests across ProductForm,
+       * EditProductDrawer and PriceEditModal that have nothing to do with a new
+       * tab. That bump is worth doing on its own terms, with those failures read
+       * one by one; it is not worth doing as a side effect of this.
+       *
+       * Both host apps already run 0.19.0, so they render the dashboard and pass
+       * it in. Same reason the community app keeps its own copy of the tab strip:
+       * the package takes the panel as a slot rather than owning it.
+       */
+      content = overviewSlot ?? null;
   }
 
   return (

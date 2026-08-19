@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithConfig, mockFetch } from "./test-utils";
-import { OverviewView } from "../page/views/OverviewView";
+import { DetailsView } from "../page/views/DetailsView";
 
 /**
  * Every row on the Overview tab must actually OPEN its editor.
@@ -31,7 +31,7 @@ const product = {
 
 function renderOverview(over: Record<string, any> = {}) {
   return renderWithConfig(
-    <OverviewView
+    <DetailsView
       product={product}
       communityTag="belaescala"
       productId="p1"
@@ -123,7 +123,7 @@ describe("the branches exist at all", () => {
      */
     const { readFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
-    const src = readFileSync(resolve(__dirname, "../page/views/OverviewView.tsx"), "utf8");
+    const src = readFileSync(resolve(__dirname, "../page/views/DetailsView.tsx"), "utf8");
     for (const key of [
       "name", "price", "share", "distribution", "delete", "unpublish",
       "description", "cta", "media", "tags", "category",

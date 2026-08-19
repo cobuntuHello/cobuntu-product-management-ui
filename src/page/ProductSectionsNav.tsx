@@ -12,10 +12,21 @@ import * as React from "react";
  * of its own. This is view-state, like events, so tabs are cheap to add.
  */
 
-export type ProductViewKey = "overview" | "collaborators" | "listings" | "activity";
+export type ProductViewKey = "overview" | "details" | "collaborators" | "listings" | "activity";
 
 const SECTIONS: Array<{ key: ProductViewKey; label: string }> = [
   { key: "overview", label: "Overview" },
+  /*
+   * Details is where the editing went.
+   *
+   * Overview used to BE this tab: a column of Name, Price, Category and
+   * Description rows that each opened a modal, which meant opening a product
+   * answered a question nobody arrived with. Overview is now a dashboard --
+   * how it is doing, and whether it can be sold at all -- and the form has its
+   * own place, second, because changing the thing is the second reason to be
+   * here rather than the first.
+   */
+  { key: "details", label: "Details" },
   { key: "collaborators", label: "Collaborators" },
   { key: "listings", label: "Listings" },
   // Activity landed with feat/product-audits (product_audits + the
