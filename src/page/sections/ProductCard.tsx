@@ -385,7 +385,15 @@ function InfoRow({ children, onClick, disabled, icon, customIcon }: {
   const Component = onClick ? "button" : "div";
   return (
     <Component onClick={onClick} disabled={disabled}
-      className={`w-full flex items-center gap-3 rounded-lg transition-all text-left group py-1 ${
+      /*
+        * pr-3, because the value TRUNCATES.
+        *
+        * The row had vertical padding and none horizontal, so a long
+        * description ran its ellipsis right into the card's border -- the text
+        * looked clipped by the card rather than shortened on purpose. The
+        * padding gives the cut somewhere to land.
+        */
+      className={`w-full flex items-center gap-3 rounded-lg transition-all text-left group py-1 pr-3 ${
         onClick ? "hover:bg-zinc-50 cursor-pointer" : ""
       } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}>
       {customIcon || (
