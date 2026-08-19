@@ -12,10 +12,11 @@ import * as React from "react";
  * of its own. This is view-state, like events, so tabs are cheap to add.
  */
 
-export type ProductViewKey = "overview" | "details" | "collaborators" | "listings" | "activity";
+export type ProductViewKey = "overview" | "details" | "collaborators" | "listings" | "ledger" | "activity";
 
 const SECTIONS: Array<{ key: ProductViewKey; label: string }> = [
   { key: "overview", label: "Overview" },
+  { key: "ledger", label: "Ledger" },
   /*
    * Details is where the editing went.
    *

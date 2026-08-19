@@ -57,6 +57,15 @@ export function visibleProductViews(opts: {
   viewerUserId?: string | null;
   /** Host app override for a surface that is moderation by definition. */
   forceModerator?: boolean;
+  /**
+   * Whether the host is passing a Ledger panel.
+   *
+   * The tab is offered only when there is something behind it. A host on an
+   * older pin should show one tab fewer, not a tab that opens onto nothing --
+   * and this is a parameter rather than a read of the slot because this
+   * function is exported and tested on its own, away from any rendered tree.
+   */
+  hasLedger?: boolean;
 }): ProductViewKey[] {
   const ownerId = opts.product?.ownerId ?? opts.product?.owner?.id ?? null;
   const collaborators: any[] = opts.product?.collaborators ?? [];
@@ -104,7 +113,11 @@ export function visibleProductViews(opts: {
      * existing ?view=listings link keeps working rather than 404-ing into the
      * default.
      */
-    : ["overview", "details", "collaborators", "activity"];
+    : [
+        "overview",
+        ...(opts.hasLedger ? (["ledger"] as ProductViewKey[]) : []),
+        "details", "collaborators", "activity",
+      ];
 }
 
 export interface ProductManagePageProps {
@@ -188,6 +201,15 @@ export interface ProductManagePageProps {
    * than a crash.
    */
   overviewSlot?: React.ReactNode;
+  /**
+   * The Ledger tab: every money movement for this item.
+   *
+   * A SLOT, like the Overview and for the same reason -- the host fetches it,
+   * so the package's pin stays independent of the dashboard's. Absent means the
+   * tab does not appear at all rather than rendering an empty panel: a host on
+   * an older pin should show one tab fewer, not a blank one.
+   */
+  ledgerSlot?: React.ReactNode;
 }
 
 export function ProductManagePage({
@@ -221,6 +243,7 @@ export function ProductManagePage({
   approvalCopy,
   overviewExtras,
   overviewSlot,
+  ledgerSlot,
   // Defaults true: every consumer that has not been taught about this renders
   // exactly as before, and read-only is opt-in by the page that knows it is
   // showing someone else's product.
@@ -231,8 +254,8 @@ export function ProductManagePage({
   getProductManagementConfig();
 
   const allowed = React.useMemo(
-    () => visibleProductViews({ product, viewerUserId, forceModerator }),
-    [product, viewerUserId, forceModerator],
+    () => visibleProductViews({ product, viewerUserId, forceModerator, hasLedger: !!ledgerSlot }),
+    [product, viewerUserId, forceModerator, ledgerSlot],
   );
 
   // A `view` this viewer may not use falls back rather than rendering an
@@ -324,6 +347,11 @@ export function ProductManagePage({
           extras={overviewExtras}
         />
       );
+      break;
+
+    case "ledger":
+      /* A slot, like the Overview -- the host fetches it. */
+      content = ledgerSlot ?? null;
       break;
 
     /*

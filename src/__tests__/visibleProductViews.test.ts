@@ -87,3 +87,36 @@ describe("visibleProductViews", () => {
     }
   });
 });
+
+/**
+ * The Ledger tab appears only when the host has a panel to put behind it.
+ *
+ * Both apps pass one; a host on an older pin should show one tab fewer rather
+ * than a tab that opens onto nothing. This is the same guard that caught
+ * "details" being added to the nav and not to the allowed set, which made
+ * editing a product unreachable in production.
+ */
+describe("the ledger tab", () => {
+    const owner = { ownerId: "u1", collaborators: [] };
+
+    it("is absent when the host passes no panel", () => {
+        expect(visibleProductViews({ product: owner, viewerUserId: "u1" }))
+            .not.toContain("ledger");
+    });
+
+    it("appears, right after overview, when it does", () => {
+        const views = visibleProductViews({ product: owner, viewerUserId: "u1", hasLedger: true });
+        expect(views).toContain("ledger");
+        // Money sits beside the numbers it explains, before the forms.
+        expect(views.indexOf("ledger")).toBe(views.indexOf("overview") + 1);
+    });
+
+    /*
+     * A moderator sees the item, not its money. Their set is overview +
+     * activity and the ledger must not slip in behind the flag.
+     */
+    it("stays out of the moderator set even when a panel is passed", () => {
+        expect(visibleProductViews({ product: owner, forceModerator: true, hasLedger: true }))
+            .not.toContain("ledger");
+    });
+});
