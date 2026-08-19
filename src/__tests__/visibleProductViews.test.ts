@@ -112,11 +112,21 @@ describe("the ledger tab", () => {
     });
 
     /*
-     * A moderator sees the item, not its money. Their set is overview +
-     * activity and the ledger must not slip in behind the flag.
+     * A MODERATOR GETS IT TOO, and this is the line that matters.
+     *
+     * The reduced set exists because a moderator cannot EDIT, not because they
+     * may not look. A community leader reviewing a member's product is a
+     * moderator by this definition -- they are not the owner -- and they are
+     * also the party the community column is for. Excluding them would hide
+     * the ledger from exactly the person it was built to answer.
      */
-    it("stays out of the moderator set even when a panel is passed", () => {
-        expect(visibleProductViews({ product: owner, forceModerator: true, hasLedger: true }))
-            .not.toContain("ledger");
+    it("is offered to a moderator, alongside the other read-only tabs", () => {
+        const views = visibleProductViews({ product: owner, forceModerator: true, hasLedger: true });
+        expect(views).toEqual(["overview", "ledger", "activity"]);
+    });
+
+    it("is still absent for a moderator when no panel is passed", () => {
+        expect(visibleProductViews({ product: owner, forceModerator: true }))
+            .toEqual(["overview", "activity"]);
     });
 });

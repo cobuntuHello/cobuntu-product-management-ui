@@ -106,7 +106,19 @@ export function visibleProductViews(opts: {
    * in production. A moderator does not get it, because they cannot edit.
    */
   return isModerator
-    ? ["overview", "activity"]
+    /*
+     * A moderator gets the READ-ONLY surfaces, and the Ledger is one.
+     *
+     * The reduced set exists because a moderator cannot EDIT -- not because
+     * they may not look. A community leader reviewing a member's product is a
+     * moderator by this definition, and they are also the party the ledger's
+     * community column is FOR: it is what makes a commission disagreement
+     * answerable without leaving the page.
+     *
+     * The server decides who may actually read it (LedgerService reuses the
+     * Overview's gate); this only decides whether to offer the tab.
+     */
+    ? ["overview", ...(opts.hasLedger ? (["ledger"] as ProductViewKey[]) : []), "activity"]
     /*
      * "listings" is deliberately absent: Overview carries the listings now,
      * with more per listing than that tab showed. The KEY still resolves, so an
