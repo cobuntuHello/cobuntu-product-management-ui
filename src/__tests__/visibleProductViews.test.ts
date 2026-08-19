@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { visibleProductViews } from "../page/ProductManagePage";
+import { SECTION_KEYS } from "../page/ProductSectionsNav";
 
 /**
  * Which tabs a viewer gets. The rule that matters is the FAILURE direction:
@@ -104,11 +105,21 @@ describe("the ledger tab", () => {
             .not.toContain("ledger");
     });
 
-    it("appears, right after overview, when it does", () => {
+    it("appears after details when it does", () => {
         const views = visibleProductViews({ product: owner, viewerUserId: "u1", hasLedger: true });
-        expect(views).toContain("ledger");
-        // Money sits beside the numbers it explains, before the forms.
-        expect(views.indexOf("ledger")).toBe(views.indexOf("overview") + 1);
+        expect(views).toEqual(["overview", "details", "ledger", "collaborators", "activity"]);
+    });
+
+    /*
+     * The ORDER a person sees comes from SECTIONS in ProductSectionsNav, which
+     * renders SECTIONS.filter(visible) -- this list decides WHETHER a tab shows,
+     * that one decides WHERE. An earlier version of this test pinned the
+     * position here and nowhere else, which pinned it in the list that does not
+     * order anything.
+     */
+    it("is ordered after details in the nav, which is what decides", () => {
+        const keys = SECTION_KEYS;
+        expect(keys.indexOf("ledger")).toBe(keys.indexOf("details") + 1);
     });
 
     /*

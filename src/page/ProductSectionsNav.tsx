@@ -14,9 +14,15 @@ import * as React from "react";
 
 export type ProductViewKey = "overview" | "details" | "collaborators" | "listings" | "ledger" | "activity";
 
+/**
+ * The tab strip, IN ORDER.
+ *
+ * SectionsNav renders `SECTIONS.filter(visible)`, so this array decides where a
+ * tab sits and `visibleProductViews` decides whether it appears at all. Order
+ * pinned only in that other list is pinned in the wrong place.
+ */
 const SECTIONS: Array<{ key: ProductViewKey; label: string }> = [
   { key: "overview", label: "Overview" },
-  { key: "ledger", label: "Ledger" },
   /*
    * Details is where the editing went.
    *
@@ -28,6 +34,15 @@ const SECTIONS: Array<{ key: ProductViewKey; label: string }> = [
    * here rather than the first.
    */
   { key: "details", label: "Details" },
+  /*
+   * LEDGER SITS AFTER DETAILS, always.
+   *
+   * THIS list is the one that orders the tabs -- SectionsNav renders
+   * SECTIONS.filter(visible), so the allowed-views array decides WHETHER a tab
+   * shows and this decides WHERE. A position pinned only in the other list is
+   * pinned in the wrong place.
+   */
+  { key: "ledger", label: "Ledger" },
   { key: "collaborators", label: "Collaborators" },
   /*
    * "listings" is still a valid KEY -- a link or a saved URL may carry it, and
@@ -78,3 +93,6 @@ export function ProductSectionsNav({
     </div>
   );
 }
+
+/** The tab order, for tests that assert it without rendering the strip. */
+export const SECTION_KEYS: ProductViewKey[] = SECTIONS.map((s) => s.key);

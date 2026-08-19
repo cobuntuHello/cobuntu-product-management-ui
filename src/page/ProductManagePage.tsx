@@ -126,9 +126,9 @@ export function visibleProductViews(opts: {
      * default.
      */
     : [
-        "overview",
+        "overview", "details",
         ...(opts.hasLedger ? (["ledger"] as ProductViewKey[]) : []),
-        "details", "collaborators", "activity",
+        "collaborators", "activity",
       ];
 }
 
