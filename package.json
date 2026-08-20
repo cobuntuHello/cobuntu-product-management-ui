@@ -1,6 +1,6 @@
 {
   "name": "@cobuntu/product-management-ui",
-  "version": "0.31.0",
+  "version": "0.32.0",
   "description": "Shared marketplace-product management UI components for the Cobuntu admin app (community-leader-facing) and community app (host-facing /marketplace/[sku]/manage). The single source of truth for product management \u2014 both apps consume this as a git dependency. Sibling to @cobuntu/event-management-ui.",
   "private": true,
   "main": "./src/index.ts",

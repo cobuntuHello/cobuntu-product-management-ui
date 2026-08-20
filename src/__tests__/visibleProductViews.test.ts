@@ -22,7 +22,7 @@ import { SECTION_KEYS } from "../page/ProductSectionsNav";
  * existing ?view=listings link keeps working; it is simply not a tab.
  */
 const SELLER_SET = ["overview", "details", "collaborators", "activity"];
-const MODERATOR_SET = ["overview", "activity"];
+const MODERATOR_SET = ["overview", "details", "collaborators", "activity"];
 
 describe("visibleProductViews", () => {
   it("gives the owner every tab", () => {
@@ -133,11 +133,45 @@ describe("the ledger tab", () => {
      */
     it("is offered to a moderator, alongside the other read-only tabs", () => {
         const views = visibleProductViews({ product: owner, forceModerator: true, hasLedger: true });
-        expect(views).toEqual(["overview", "ledger", "activity"]);
+        expect(views).toEqual(["overview", "details", "ledger", "collaborators", "activity"]);
     });
 
     it("is still absent for a moderator when no panel is passed", () => {
         expect(visibleProductViews({ product: owner, forceModerator: true }))
-            .toEqual(["overview", "activity"]);
+            .toEqual(["overview", "details", "collaborators", "activity"]);
+    });
+});
+
+/**
+ * Reading and editing are different questions, and the tab set answers only
+ * the first.
+ *
+ * A reduced "moderator" set used to hide Details and Collaborators from anyone
+ * who was not the seller -- which is the community leader carrying the product,
+ * and the superadmin. Both were reported as "I cannot open the tab". Whether
+ * they may CHANGE anything is `canEdit`, resolved server-side and enforced on
+ * every control; this decides only whether they may LOOK.
+ */
+describe("everyone who may look gets the same tabs", () => {
+    const owner = { ownerId: "u1", collaborators: [] };
+
+    it("gives a moderator Details and Collaborators too", () => {
+        const views = visibleProductViews({ product: owner, forceModerator: true, hasLedger: true });
+        expect(views).toContain("details");
+        expect(views).toContain("collaborators");
+    });
+
+    /*
+     * The two sets are now IDENTICAL, which is the point rather than an
+     * oversight: what you may LOOK at does not depend on whether you may edit.
+     * `canEdit` is resolved server-side and gates every control on these tabs.
+     *
+     * Written as a comparison rather than a literal so it keeps holding when a
+     * tab is added -- the invariant is "the same for both", not "these five".
+     */
+    it("shows a moderator and the seller exactly the same tabs", () => {
+        const mod = visibleProductViews({ product: owner, forceModerator: true, hasLedger: true });
+        const seller = visibleProductViews({ product: owner, viewerUserId: "u1", hasLedger: true });
+        expect(mod).toEqual(seller);
     });
 });

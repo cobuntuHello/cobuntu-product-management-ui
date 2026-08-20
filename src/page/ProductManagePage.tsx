@@ -105,31 +105,44 @@ export function visibleProductViews(opts: {
    * Details, and Details was filtered out. Editing a product became unreachable
    * in production. A moderator does not get it, because they cannot edit.
    */
-  return isModerator
-    /*
-     * A moderator gets the READ-ONLY surfaces, and the Ledger is one.
-     *
-     * The reduced set exists because a moderator cannot EDIT -- not because
-     * they may not look. A community leader reviewing a member's product is a
-     * moderator by this definition, and they are also the party the ledger's
-     * community column is FOR: it is what makes a commission disagreement
-     * answerable without leaving the page.
-     *
-     * The server decides who may actually read it (LedgerService reuses the
-     * Overview's gate); this only decides whether to offer the tab.
-     */
-    ? ["overview", ...(opts.hasLedger ? (["ledger"] as ProductViewKey[]) : []), "activity"]
-    /*
-     * "listings" is deliberately absent: Overview carries the listings now,
-     * with more per listing than that tab showed. The KEY still resolves, so an
-     * existing ?view=listings link keeps working rather than 404-ing into the
-     * default.
-     */
-    : [
-        "overview", "details",
-        ...(opts.hasLedger ? (["ledger"] as ProductViewKey[]) : []),
-        "collaborators", "activity",
-      ];
+  /*
+   * EVERYONE WHO MAY LOOK GETS THE SAME TABS. Only what they can DO differs.
+   *
+   * There used to be a reduced "moderator" set -- overview, ledger, activity --
+   * on the reasoning that a moderator cannot edit. That confused two questions.
+   * Whether you may CHANGE a product is `canEdit`, resolved server-side and
+   * already enforced on every control; whether you may LOOK at it is this. Cut
+   * to three tabs, the reduced set hid Details and Collaborators from a
+   * community leader carrying the product -- who is a "moderator" here purely
+   * by not being the seller -- and from the superadmin, whose whole purpose is
+   * reaching everything. Both were reported.
+   *
+   * The events package never made this distinction: its base set includes
+   * details for everyone and hands carriers a read-only view. This is that.
+   *
+   * "listings" is deliberately absent: Overview carries the listings now, with
+   * more per listing than that tab showed. The KEY still resolves, so an
+   * existing ?view=listings link keeps working rather than falling through.
+   */
+  const base: ProductViewKey[] = [
+    "overview", "details",
+    ...(opts.hasLedger ? (["ledger"] as ProductViewKey[]) : []),
+    "collaborators",
+  ];
+
+  /*
+   * ONE SET, for everyone who may open the page at all.
+   *
+   * `isModerator` no longer changes what is VISIBLE, and saying so plainly is
+   * better than keeping a branch whose two arms are identical. It still
+   * decides plenty elsewhere -- `canEdit` is resolved server-side and gates
+   * every control on these tabs -- but which tabs EXIST is not a function of
+   * it. Activity was in both arms all along; the reduced set only ever removed
+   * Details, Collaborators and Ledger, which is exactly the removal that
+   * locked out carriers and the superadmin.
+   */
+  void isModerator;
+  return [...base, "activity"];
 }
 
 export interface ProductManagePageProps {
