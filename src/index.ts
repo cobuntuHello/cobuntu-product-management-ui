@@ -16,6 +16,11 @@ export {
 // Components
 export { PriceEditModal, type PriceEditModalProps, CURRENCIES } from "./components/PriceEditModal";
 export { NameEditModal } from "./components/NameEditModal";
+export {
+  PhysicalDetailsFields, CONDITION_OPTIONS, PARCEL_CLASS_OPTIONS,
+  conditionLabel, parcelClassLabel,
+  type ProductConditionValue, type ParcelClassValue,
+} from "./components/PhysicalDetailsFields";
 export { ShareModal } from "./components/ShareModal";
 export { DeleteModal } from "./components/DeleteModal";
 export {

@@ -21,6 +21,10 @@ import { type DraftTier, type DonationDraft } from "./PriceEditModal/types";
 import { blankTier, blankDonation } from "./PriceEditModal/helpers";
 import { CategoryPickerRow, type CategoryOption } from "./CategoryPickerRow";
 import {
+  PhysicalDetailsFields, conditionLabel, parcelClassLabel,
+  type ProductConditionValue, type ParcelClassValue,
+} from "./PhysicalDetailsFields";
+import {
   MembershipTierPicker,
   toTierAccessValue,
   fromTierAccessValue,
@@ -123,6 +127,14 @@ export interface ProductFormData {
    * `null` for disabled donations.
    */
   donation: DonationDraft;
+  /**
+   * Physical-only. NULL on every other product type, and that is enforced
+   * rather than assumed: the backend normaliser THROWS if a digital product
+   * carries either, so the emit below nulls them whenever productType is not
+   * PHYSICAL. A consumer can append whatever this form emits without checking.
+   */
+  condition: ProductConditionValue | null;
+  parcelClass: ParcelClassValue | null;
   // (viewability + accessibility declared above — both default PUBLIC.)
 }
 
@@ -171,6 +183,15 @@ interface ProductFormProps {
    * hideVisibility.
    */
   hideApproval?: boolean;
+  /**
+   * What is being sold. Drives the physical-only row, and nothing else.
+   *
+   * Defaults to DIGITAL so every existing caller is byte-identical: the row
+   * does not render and both physical fields emit null. The community app's
+   * create wizard passes the seller's choice from its type step; the admin
+   * passes the product's own type when editing.
+   */
+  productType?: "DIGITAL" | "PHYSICAL" | "COURSE";
 }
 
 /**
@@ -182,7 +203,7 @@ const AUTO_SEED_NAME = /^(Standard|Tier \d+)$/;
 
 // ─── Component ─────────────────────────────────────────────────
 
-export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds }: ProductFormProps) {
+export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL" }: ProductFormProps) {
   // Form state
   const [name, setName] = useState(initialData?.name || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -251,6 +272,37 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const [isTagsOpen, setIsTagsOpen] = useState(false);
   const [isFilesOpen, setIsFilesOpen] = useState(false);
   const [isCtaOpen, setIsCtaOpen] = useState(false);
+  const [isPhysicalOpen, setIsPhysicalOpen] = useState(false);
+
+  /*
+   * Physical-only state. Seeded from initialData like everything else, so a
+   * resumed draft or an edit reopens on what was saved.
+   *
+   * parcelClass is never null in state: STANDARD is the answer until the
+   * seller says otherwise, which is what lets the row read "Standard parcel"
+   * before anyone has opened it. The null in ProductFormData is about the
+   * OTHER product types, not about an unanswered question.
+   */
+  const [condition, setCondition] = useState<ProductConditionValue | null>(initialData?.condition ?? null);
+  const [parcelClass, setParcelClass] = useState<ParcelClassValue>(initialData?.parcelClass ?? "STANDARD");
+  const isPhysical = productType === "PHYSICAL";
+
+  /*
+   * The dialog must not outlive the field it edits.
+   *
+   * Caught by a test, not by review. The row is gated on `isPhysical`, but the
+   * dialog is a sibling and was not: open Postage and condition, step back in
+   * the wizard, switch to Digital, and the modal stayed on screen editing two
+   * values that no longer exist on the product. The row behind it was already
+   * gone.
+   *
+   * Resetting the FLAG rather than only hiding the dialog also stops the
+   * mirror-image bug: with the flag left true, switching back to Physical
+   * would spontaneously reopen a modal nobody asked for.
+   */
+  useEffect(() => {
+    if (!isPhysical) setIsPhysicalOpen(false);
+  }, [isPhysical]);
 
   // ─── Inline photo upload ───
   // Tap a slot → native device picker (our own hidden input) → the square
@@ -404,11 +456,25 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       viewTierIds: viewResolved.tierIds,
       buyTierIds: buyResolved.tierIds,
       requiresApproval,
+      /*
+       * NULLED for anything that is not physical, and this is the guard, not a
+       * tidy-up. normalisePhysicalFields THROWS a ValidationError when a
+       * digital product arrives carrying `condition` or `parcelClass` — it
+       * refuses to silently drop them, because dropping quietly is how a caller
+       * ships believing it set something. So the form must not emit them.
+       *
+       * Doing it HERE rather than at each consumer's submit is the same
+       * argument the normaliser itself makes: two consumers remembering the
+       * same rule is one consumer eventually forgetting it. Whatever this form
+       * emits is safe to append as-is.
+       */
+      condition: isPhysical ? condition : null,
+      parcelClass: isPhysical ? parcelClass : null,
       // Every configured tier, free or paid — not only the paid ones.
       tiers: configured.length > 0 ? named : [],
       donation,
     });
-  }, [name, description, tags, categoryId, subCategoryId, mediaItems, productFiles, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, tiers, donation]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [name, description, tags, categoryId, subCategoryId, mediaItems, productFiles, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, tiers, donation, condition, parcelClass, isPhysical]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Configured tiers drive the Pricing row summary + tier cards. A blank
   // seed tier ("Standard") counts once the user has named it.
@@ -525,6 +591,29 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             setSubCategoryId(sc);
           }}
         />
+
+        {/*
+          * Physical only, and it renders NOTHING for anything else — not a
+          * disabled row, not a row that says "not applicable". A digital
+          * product has no parcel, so the question does not exist there.
+          *
+          * Never shows the empty-state styling the other rows use, because it
+          * is never unanswered: parcel size is STANDARD until someone says
+          * otherwise, so the summary always reads as a real answer.
+          */}
+        {isPhysical && (
+          <button type="button" onClick={() => setIsPhysicalOpen(true)}
+            className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
+            <Package className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm truncate font-medium text-zinc-800">Postage and condition</span>
+              <span className="block text-[12.5px] text-zinc-500 truncate">
+                {[conditionLabel(condition), parcelClassLabel(parcelClass)].filter(Boolean).join(" · ")}
+              </span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
+          </button>
+        )}
 
         <button type="button" onClick={() => setIsFilesOpen(true)}
           className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
@@ -739,6 +828,27 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDescriptionOpen(false)}>Cancel</Button>
             <Button onClick={() => setIsDescriptionOpen(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Postage and condition ─── (physical only; same shell as Tags) */}
+      <Dialog open={isPhysical && isPhysicalOpen} onOpenChange={setIsPhysicalOpen}>
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Postage and condition</DialogTitle>
+            <DialogDescription>
+              You pack and post this item yourself. Both answers are optional.
+            </DialogDescription>
+          </DialogHeader>
+          <PhysicalDetailsFields
+            condition={condition}
+            parcelClass={parcelClass}
+            onConditionChange={setCondition}
+            onParcelClassChange={setParcelClass}
+          />
+          <DialogFooter>
+            <Button onClick={() => setIsPhysicalOpen(false)}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
