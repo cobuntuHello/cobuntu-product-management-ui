@@ -81,6 +81,14 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       viewability: product.viewability || "PUBLIC",
       accessibility: product.accessibility || "PUBLIC",
       requiresApproval: product.requiresApproval || false,
+      /*
+       * Physical-only, seeded so reopening this drawer shows what the listing
+       * actually says rather than an empty postage row. ProductForm nulls both
+       * again if the product is not physical, so seeding them unconditionally
+       * is safe.
+       */
+      condition: (product as any).condition ?? null,
+      parcelClass: (product as any).parcelClass ?? "STANDARD",
     };
   }, [product]);
 
@@ -200,6 +208,13 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
         <div className="flex-1 overflow-y-auto px-6 py-5">
           <ProductForm
             communityTag={communityTag}
+            /*
+             * The product's OWN type. Without it this drawer defaults to
+             * DIGITAL, so editing a physical listing would show the digital
+             * form: no postage row, no stock field, and an "Add files" row
+             * offering a delivery channel that listing does not use.
+             */
+            productType={product.productType}
             initialData={initialFormData}
             categories={categories}
             onChange={data => { formDataRef.current = data; }}

@@ -145,3 +145,111 @@ describe("what the form emits", () => {
     expect(screen.queryByText("Postage and condition")).not.toBeInTheDocument();
   });
 });
+
+/**
+ * Stock, and the digital delivery channel that must not follow a parcel.
+ *
+ * Both are the same shape of bug as `condition`: state that stays behind when
+ * the seller changes their mind about what they are selling, and is then sent
+ * anyway. The difference is what it costs. A stale `condition` is a failed
+ * create with a visible error. A stale FILE is a successful create that hands
+ * the buyer a download the seller thought they had removed.
+ */
+describe("stock", () => {
+  it("asks how many only for a physical product", () => {
+    const { rerender } = renderWithConfig(
+      <ProductForm {...base} onChange={vi.fn()} productType="PHYSICAL" />,
+    );
+    expect(screen.getByLabelText(/How many do you have/)).toBeInTheDocument();
+
+    rerender(<ProductForm {...base} onChange={vi.fn()} />);
+    expect(screen.queryByLabelText(/How many do you have/)).not.toBeInTheDocument();
+  });
+
+  it("emits no tier at all when the quantity is blank", () => {
+    // Blank means unlimited, which is the honest reading of "no capacity row".
+    const onChange = vi.fn();
+    renderWithConfig(<ProductForm {...base} onChange={onChange} productType="PHYSICAL" />);
+    expect(lastEmit(onChange).tiers).toEqual([]);
+  });
+
+  it("puts the number on a tier, because that is where stock lives", () => {
+    /*
+     * There is no products.stockQuantity and deliberately will not be. Stock
+     * is product_tiers.capacity, row-locked and derived from seat-holding
+     * sales, so a refund frees its unit with no counter that can drift.
+     *
+     * The seller types one number and never meets the word "tier".
+     */
+    const onChange = vi.fn();
+    renderWithConfig(<ProductForm {...base} onChange={onChange} productType="PHYSICAL" />);
+
+    fireEvent.change(screen.getByLabelText(/How many do you have/), { target: { value: "3" } });
+
+    const tiers = lastEmit(onChange).tiers;
+    expect(tiers).toHaveLength(1);
+    expect(tiers[0].capacity).toBe("3");
+  });
+
+  it("keeps a zero, because on a live product that means sold out", () => {
+    // This form edits as well as creates. Silently clearing 0 to "unlimited"
+    // would put a sold-out listing back on sale.
+    const onChange = vi.fn();
+    renderWithConfig(<ProductForm {...base} onChange={onChange} productType="PHYSICAL" />);
+
+    fireEvent.change(screen.getByLabelText(/How many do you have/), { target: { value: "0" } });
+    expect(lastEmit(onChange).tiers[0].capacity).toBe("0");
+  });
+
+  it("refuses anything that is not a number", () => {
+    const onChange = vi.fn();
+    renderWithConfig(<ProductForm {...base} onChange={onChange} productType="PHYSICAL" />);
+    const input = screen.getByLabelText(/How many do you have/) as HTMLInputElement;
+
+    fireEvent.change(input, { target: { value: "12x" } });
+    expect(input.value).toBe("12");
+
+    fireEvent.change(input, { target: { value: "007" } });
+    expect(input.value).toBe("7");
+  });
+});
+
+describe("the digital delivery channel does not follow a parcel", () => {
+  it("hides Add files for a physical product", () => {
+    /*
+     * productFiles is DELIVERY, not description: attachments land in a private
+     * bucket and are handed over on purchase. The label does not say so, so a
+     * seller could attach a care guide believing it is a description.
+     */
+    renderWithConfig(<ProductForm {...base} onChange={vi.fn()} productType="PHYSICAL" />);
+    expect(screen.queryByText("Add files")).not.toBeInTheDocument();
+  });
+
+  it("still offers it for a digital product", () => {
+    renderWithConfig(<ProductForm {...base} onChange={vi.fn()} />);
+    expect(screen.getByText("Add files")).toBeInTheDocument();
+  });
+
+  it("DROPS files already attached when the type becomes physical", () => {
+    /*
+     * The worst version of this bug: attach a file, switch to Physical, and
+     * without the emit rule the parcel seller also ships a download they had
+     * stopped being able to see. Nothing on screen would have shown it.
+     *
+     * Emptied on EMIT, not cleared from state, so switching back brings them.
+     */
+    const onChange = vi.fn();
+    const seeded = { productFiles: [{ id: "f1", name: "guide.pdf", size: 10, type: "application/pdf", url: "u", isExisting: true }] } as any;
+
+    const { rerender } = renderWithConfig(
+      <ProductForm {...base} onChange={onChange} initialData={seeded} />,
+    );
+    expect(lastEmit(onChange).productFiles).toHaveLength(1);
+
+    rerender(<ProductForm {...base} onChange={onChange} initialData={seeded} productType="PHYSICAL" />);
+    expect(lastEmit(onChange).productFiles).toEqual([]);
+
+    rerender(<ProductForm {...base} onChange={onChange} initialData={seeded} />);
+    expect(lastEmit(onChange).productFiles).toHaveLength(1);
+  });
+});

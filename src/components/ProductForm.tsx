@@ -288,6 +288,40 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const isPhysical = productType === "PHYSICAL";
 
   /*
+   * Stock, as ONE number, written onto the tier that already holds it.
+   *
+   * There is no `products.stockQuantity` and there deliberately is not going to
+   * be: stock lives on `product_tiers.capacity`, enforced by a SELECT ... FOR
+   * UPDATE row lock that serialises concurrent buyers, and DERIVED from
+   * seat-holding sales rather than decremented — so a refund frees its unit
+   * with no restock path to write and no counter that can drift.
+   *
+   * A seller listing one jacket should never meet the word "tier" to say so.
+   * So this writes `capacity` onto the seed tier, and the emit rule below
+   * already treats a tier carrying a capacity as configured, which is what
+   * makes the tier appear on the payload without anything else changing.
+   *
+   * BLANK means unlimited, which is the honest reading of "no capacity row"
+   * and the right default for a community running print-on-demand merch.
+   */
+  const stockTier = tiers.find(t => !t.deleted) ?? null;
+  const quantity = stockTier?.capacity ?? "";
+
+  function setQuantity(raw: string) {
+    // Digits only, and leading zeros collapsed so "007" reads as 7. "0" is
+    // KEPT: this form also edits a live product, where zero is a real answer
+    // meaning sold out, not an empty one.
+    const digits = raw.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+    setTiers(prev => {
+      const idx = prev.findIndex(t => !t.deleted);
+      if (idx === -1) return prev;
+      const next = [...prev];
+      next[idx] = { ...next[idx], capacity: digits };
+      return next;
+    });
+  }
+
+  /*
    * The dialog must not outlive the field it edits.
    *
    * Caught by a test, not by review. The row is gated on `isPhysical`, but the
@@ -302,6 +336,8 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
    */
   useEffect(() => {
     if (!isPhysical) setIsPhysicalOpen(false);
+    // Same rule in the other direction: Files does not apply to a parcel.
+    if (isPhysical) setIsFilesOpen(false);
   }, [isPhysical]);
 
   // ─── Inline photo upload ───
@@ -439,7 +475,20 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         || !AUTO_SEED_NAME.test(t.name.trim()),
     );
     onChange?.({
-      name, description, tags, categoryId, subCategoryId, mediaItems, productFiles,
+      name, description, tags, categoryId, subCategoryId, mediaItems,
+      /*
+       * EMPTIED on a physical product, for the same reason `condition` is
+       * nulled on a digital one, and it is the same class of bug.
+       *
+       * productFiles is the DIGITAL DELIVERY channel: attachments land in a
+       * private bucket and are handed to the buyer on purchase. Attach a file,
+       * switch the type to Physical, and without this the parcel seller also
+       * ships a download they had stopped being able to see.
+       *
+       * Emptied on EMIT rather than cleared from state, so switching back
+       * brings the files with it.
+       */
+      productFiles: isPhysical ? [] : productFiles,
       isPaid: paid,
       price: "",
       currency,
@@ -615,6 +664,45 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           </button>
         )}
 
+        {/*
+          * Stock is VISIBLE, not behind a row like postage and condition.
+          *
+          * The other two have a right answer the seller can walk past. This one
+          * does not: how many exist is the whole difference between a listing
+          * that closes when the jacket is gone and one that keeps taking money
+          * for an object already in the post. It is worth the space.
+          *
+          * Hidden once Advanced pricing is on, because each tier then carries
+          * its own capacity and one number above several tiers would be a
+          * second control writing the first one's value.
+          */}
+        {isPhysical && !multiTier && (
+          <div className="w-full flex items-center gap-3 rounded-2xl bg-zinc-50 px-4 py-3">
+            <Package className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
+            <label htmlFor="product-quantity" className="flex-1 min-w-0">
+              <span className="block text-sm font-medium text-zinc-800">How many do you have?</span>
+              <span className="block text-[12.5px] text-zinc-500">
+                Leave blank if you can keep making them
+              </span>
+            </label>
+            <input
+              id="product-quantity"
+              type="text"
+              inputMode="numeric"
+              value={quantity}
+              onChange={e => setQuantity(e.target.value)}
+              placeholder="Unlimited"
+              className="w-[104px] shrink-0 text-right px-3 py-1.5 text-sm text-zinc-800 bg-white rounded-lg ring-1 ring-zinc-200 focus:outline-none focus:ring-zinc-400 placeholder:text-zinc-400"
+            />
+          </div>
+        )}
+
+        {/*
+          * NOT shown for a parcel. "Add files" is the digital delivery channel,
+          * and its label does not say so — a seller could reasonably attach a
+          * care guide believing it is a description, and have it delivered.
+          */}
+        {!isPhysical && (
         <button type="button" onClick={() => setIsFilesOpen(true)}
           className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
           {productFiles.length > 0 ? (
@@ -626,6 +714,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           </span>
           <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
         </button>
+        )}
 
         <button type="button" onClick={() => setIsCtaOpen(true)}
           className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
@@ -880,7 +969,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       />
 
       {/* ─── Files Modal ─── (digital delivery) */}
-      <Dialog open={isFilesOpen} onOpenChange={setIsFilesOpen}>
+      <Dialog open={!isPhysical && isFilesOpen} onOpenChange={setIsFilesOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Product Files</DialogTitle>
