@@ -17,7 +17,6 @@ interface Props {
   /** Opens the CTA-text editor. Omit to hide the row. */
   onEditCta?: () => void;
   /** Opens the description editor. Omit to hide the row. */
-  onEditDescription?: () => void;
   /** Opens the tags editor. Omit to hide the row. */
   onEditTags?: () => void;
   /** Opens the category picker. Omit to hide the row. */
@@ -26,7 +25,7 @@ interface Props {
 
 export function ProductCard({
   product, communityTag, listingId,
-  onEditName, onEditPrice, onEditMedia, onEditCta, onEditDescription, onEditTags, onEditCategory,
+  onEditName, onEditPrice, onEditMedia, onEditCta, onEditTags, onEditCategory,
 }: Props) {
   // Injected by the host app; the package ships its own fallback so no host
   // is forced to supply one.
@@ -261,18 +260,6 @@ export function ProductCard({
               is: a row that only appears once the field has a value cannot be
               the thing you use to give it one.
             */}
-            {onEditDescription && (
-              <InfoRow onClick={onEditDescription}
-                icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><line x1="21" y1="6" x2="3" y2="6"/><line x1="17" y1="12" x2="3" y2="12"/><line x1="15" y1="18" x2="3" y2="18"/></svg>}>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-zinc-400">Description</p>
-                  <p className={`text-sm truncate ${plainDescription ? "font-medium text-zinc-900" : "text-zinc-500"}`}>
-                    {plainDescription || "Add a description"}
-                  </p>
-                </div>
-              </InfoRow>
-            )}
-
             {/*
               CTA text — always rendered, even when empty. It used to appear
               only once set, so there was no way to set it from here: the row

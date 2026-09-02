@@ -12,7 +12,8 @@ import { ShareModal } from "../../components/ShareModal";
 import { DeleteModal } from "../../components/DeleteModal";
 import { ProductDistributionModal } from "../../components/ProductDistributionModal";
 import { ProductSettingsDrawer } from "../ProductSettingsDrawer";
-import { ProductDescriptionEditModal, ProductCtaEditModal } from "../../components/ProductDescriptionEditModal";
+import { ProductCtaEditModal } from "../../components/ProductDescriptionEditModal";
+import { DescriptionSection } from "../sections/DescriptionSection";
 import { ProductMediaModal } from "../../components/ProductMediaModal";
 import { TagsEditModal } from "../../components/TagsEditModal";
 import { CategoryEditModal } from "../../components/CategoryEditModal";
@@ -45,7 +46,7 @@ import { useCanEdit } from "../../lib/manageAccess";
  * rather than being imported here — a slot, not a fork.
  */
 
-export type ProductModal = "name" | "price" | "share" | "distribution" | "delete" | "unpublish" | "description" | "cta" | "media" | null
+export type ProductModal = "name" | "price" | "share" | "distribution" | "delete" | "unpublish" | "cta" | "media" | null
   | "tags"
   | "category";
 
@@ -228,9 +229,24 @@ export function DetailsView({
         onEditPrice={() => setModal("price")}
         onEditMedia={() => setModal("media")}
         onEditCta={() => setModal("cta")}
-        onEditDescription={() => setModal("description")}
         onEditTags={() => setModal("tags")}
         onEditCategory={categories?.length ? () => setModal("category") : undefined}
+      />
+
+      {/*
+        * Description, in full, directly below the card.
+        *
+        * It was a truncated row that opened a modal. The other fields are a
+        * name, a price, a category — things a compact row shows completely —
+        * but a description is paragraphs, so that row displayed almost nothing
+        * and amounted to a permanent instruction to click. Reading the page and
+        * reading the description were two separate acts.
+        */}
+      <DescriptionSection
+        product={product}
+        productId={productId}
+        onSaved={() => { void onUpdate(); }}
+        showToast={showToast}
       />
 
       {modal === "name" && (
@@ -324,16 +340,6 @@ export function DetailsView({
             </button>
           </div>
         </ModalShell>
-      )}
-
-      {modal === "description" && (
-        <ProductDescriptionEditModal
-          product={product}
-          productId={productId}
-          onClose={() => setModal(null)}
-          onSaved={() => { setModal(null); void onUpdate(); }}
-          showToast={showToast}
-        />
       )}
 
       {modal === "cta" && (
