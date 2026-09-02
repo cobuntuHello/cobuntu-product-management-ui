@@ -81,10 +81,19 @@ describe("every Overview row opens its editor", () => {
     await expectSomethingOpened();
   });
 
-  it("description", async () => {
+  it("description — no longer a modal, and no longer a row", async () => {
+    /*
+     * Deliberate. Client feedback: the short fields are fine in a row because
+     * you see them whole, but a description is paragraphs, so one truncated
+     * line showed almost nothing and was a permanent instruction to click.
+     *
+     * It now renders as a full-width section below the card with the editor
+     * already open, so there is no row to click and no dialog to open. Kept as
+     * an assertion rather than deleted, so the row cannot quietly come back
+     * alongside the section and give two ways to edit one field.
+     */
     renderOverview();
-    await userEvent.click(screen.getByText("Add a description"));
-    await expectSomethingOpened();
+    expect(screen.queryByText("Add a description")).not.toBeInTheDocument();
   });
 
   it("button text", async () => {
@@ -124,9 +133,15 @@ describe("the branches exist at all", () => {
     const { readFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
     const src = readFileSync(resolve(__dirname, "../page/views/DetailsView.tsx"), "utf8");
+    /*
+     * "description" is absent BY DESIGN, not by omission: it was removed from
+     * the ProductModal union when the description moved to an inline section,
+     * so there is no key for a branch to read. Every key that still exists
+     * must still have one.
+     */
     for (const key of [
       "name", "price", "share", "distribution", "delete", "unpublish",
-      "description", "cta", "media", "tags", "category",
+      "cta", "media", "tags", "category",
     ]) {
       expect(src).toContain(`modal === "${key}"`);
     }

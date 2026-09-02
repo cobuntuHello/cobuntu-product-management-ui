@@ -131,18 +131,25 @@ describe("the edit rows", () => {
     expect(screen.queryByText("Digital Product")).not.toBeInTheDocument();
   });
 
-  it("shows a plain-text preview of the description, not its markup", () => {
+  it("does NOT carry the description any more", () => {
+    /*
+     * Replaced, not deleted. Two tests here used to pin a truncated
+     * description row: one that it previewed plain text, one that it appeared
+     * even when empty. Both were right for a row — and the row was the
+     * problem.
+     *
+     * Client feedback: the short fields are fine in a row because you see them
+     * whole, but a description is paragraphs, so one truncated line showed
+     * almost nothing and was a permanent instruction to click. It now lives in
+     * a full-width section below the card, editor already open. See
+     * DescriptionSection.test.ts.
+     *
+     * Asserted as an ABSENCE so the two surfaces can never both claim it: a
+     * card row plus an inline section would be two ways to edit one field.
+     */
     renderCard();
-    expect(screen.getByText(/Most communities don't die/)).toBeInTheDocument();
-    expect(screen.queryByText(/<p>/)).not.toBeInTheDocument();
-  });
-
-  it("renders the description row even when EMPTY", async () => {
-    // A row that only appears once the field has a value cannot be the thing
-    // you use to give it one.
-    const { h } = renderCard({ description: "" });
-    await userEvent.click(screen.getByText("Add a description"));
-    expect(h.onEditDescription).toHaveBeenCalled();
+    expect(screen.queryByText("Add a description")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Most communities don't die/)).not.toBeInTheDocument();
   });
 
   it("renders the button-text row even when empty", async () => {
