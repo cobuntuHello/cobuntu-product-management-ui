@@ -122,3 +122,112 @@ describe("removal is confirmed, and explains itself", () => {
     );
   });
 });
+
+describe("adding a co-seller — the flow that had never worked", () => {
+  /*
+   * The add modal posted `{ usertag }`, typed by hand, to an endpoint that
+   * reads `req.body?.userId` and 400s without it. Every attempt from admin
+   * failed with "userId is required".
+   *
+   * Nothing caught it because this suite covered GET and DELETE and never the
+   * add BODY — so that is the assertion that matters here, not the markup.
+   */
+  const MEMBER = { id: "u-9", name: "Nia New", usertag: "nia", profileImage: null };
+
+  function renderForAdd(extraRoutes: any[] = []) {
+    const fn = mockFetch([
+      { method: "GET", url: /\/collaborators$/, body: [OWNER] },
+      { method: "GET", url: /\/members\/search/, body: { members: [MEMBER] } },
+      ...extraRoutes,
+    ]);
+    renderWithConfig(
+      <CollaboratorsView
+        product={product}
+        onUpdate={vi.fn()}
+        showToast={vi.fn()}
+        communityTag="pbn"
+      />,
+    );
+    return fn;
+  }
+
+  async function pickNia() {
+    await userEvent.click(await screen.findByText("Add member"));
+    await userEvent.type(await screen.findByPlaceholderText(/search by name/i), "nia");
+    await userEvent.click(await screen.findByText("Nia New"));
+  }
+
+  it("POSTs userId — not usertag", async () => {
+    const fn = renderForAdd([{ method: "POST", url: /\/collaborators$/, body: { ok: true } }]);
+    await pickNia();
+    await userEvent.click(screen.getByRole("button", { name: "Add co-seller" }));
+
+    await waitFor(() => {
+      const post = fn.mock.calls.find(
+        ([, init]: any) => (init?.method || "").toUpperCase() === "POST",
+      );
+      expect(post).toBeTruthy();
+      expect(JSON.parse(post![1].body)).toEqual({ userId: "u-9" });
+    });
+  });
+
+  it("searches the community's members rather than asking for an exact tag", async () => {
+    const fn = renderForAdd();
+    await userEvent.click(await screen.findByText("Add member"));
+    await userEvent.type(await screen.findByPlaceholderText(/search by name/i), "nia");
+
+    await waitFor(() => {
+      const search = fn.mock.calls.find(([url]: any) => String(url).includes("/members/search"));
+      expect(search).toBeTruthy();
+      expect(String(search![0])).toContain("/api/communities/pbn/members/search");
+    });
+    expect(await screen.findByText("Nia New")).toBeInTheDocument();
+  });
+
+  it("excludes people already on the bench, so they cannot be picked at all", async () => {
+    const fn = renderForAdd();
+    await userEvent.click(await screen.findByText("Add member"));
+    await userEvent.type(await screen.findByPlaceholderText(/search by name/i), "nia");
+
+    await waitFor(() => {
+      const search = fn.mock.calls.find(([url]: any) => String(url).includes("/members/search"));
+      // u-own is the owner row loaded above — a 409 avoided before it happens.
+      expect(String(search![0])).toContain("excludeUserIds=u-own");
+    });
+  });
+
+  it("shows what it will do before it does it", async () => {
+    renderForAdd([{ method: "POST", url: /\/collaborators$/, body: { ok: true } }]);
+    await pickNia();
+    expect(screen.getByText("What happens next")).toBeInTheDocument();
+    // "Payouts still go to the owner" also appears in the section subtitle,
+    // so assert on the half that only the consequence list carries.
+    expect(screen.getByText(/No money changes hands/i)).toBeInTheDocument();
+  });
+
+  it("keeps the pick and explains a 409 instead of dropping back to search", async () => {
+    renderForAdd([{ method: "POST", url: /\/collaborators$/, status: 409, body: { error: "nope" } }]);
+    await pickNia();
+    await userEvent.click(screen.getByRole("button", { name: "Add co-seller" }));
+
+    expect(await screen.findByText(/already a co-seller/i)).toBeInTheDocument();
+    expect(screen.getByText("Nia New")).toBeInTheDocument();
+  });
+
+  it("falls back to global search for a product no community owns", async () => {
+    const fn = mockFetch([
+      { method: "GET", url: /\/collaborators$/, body: [OWNER] },
+      { method: "GET", url: /\/discovery\/users/, body: { data: [MEMBER] } },
+    ]);
+    renderWithConfig(
+      <CollaboratorsView product={product} onUpdate={vi.fn()} showToast={vi.fn()} communityTag={null} />,
+    );
+    await userEvent.click(await screen.findByText("Add member"));
+    await userEvent.type(await screen.findByPlaceholderText(/search by name/i), "nia");
+
+    await waitFor(() => {
+      const search = fn.mock.calls.find(([url]: any) => String(url).includes("/discovery/users"));
+      expect(search).toBeTruthy();
+    });
+  });
+});

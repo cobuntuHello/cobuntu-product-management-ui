@@ -302,6 +302,7 @@ export function ProductManagePage({
           showToast={showToast}
           canEdit={isSeller}
           currentUserId={viewerUserId}
+          communityTag={communityTag}
         />
       );
       break;
