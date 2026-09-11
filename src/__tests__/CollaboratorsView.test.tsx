@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithConfig, mockFetch } from "./test-utils";
 import { CollaboratorsView } from "../page/views/CollaboratorsView";
@@ -137,6 +137,9 @@ describe("adding a co-seller — the flow that had never worked", () => {
   function renderForAdd(extraRoutes: any[] = []) {
     const fn = mockFetch([
       { method: "GET", url: /\/collaborators$/, body: [OWNER] },
+      // The picker browses the community now; search is the fallback when the
+      // roster has nothing for the query.
+      { method: "GET", url: /\/memberships/, body: { members: [{ ...MEMBER, roleGroups: [] }] } },
       { method: "GET", url: /\/members\/search/, body: { members: [MEMBER] } },
       ...extraRoutes,
     ]);
@@ -151,10 +154,16 @@ describe("adding a co-seller — the flow that had never worked", () => {
     return fn;
   }
 
+  /*
+   * Two steps now: choose, then review. The consequences pane sits between the
+   * pick and the write ON PURPOSE — granting management access to somebody
+   * else's product should state what it does before it does it — so the test
+   * walks the same path an operator does.
+   */
   async function pickNia() {
     await userEvent.click(await screen.findByText("Add member"));
-    await userEvent.type(await screen.findByPlaceholderText(/search by name/i), "nia");
     await userEvent.click(await screen.findByText("Nia New"));
+    await userEvent.click(screen.getByRole("button", { name: "Review" }));
   }
 
   it("POSTs userId — not usertag", async () => {
@@ -171,29 +180,49 @@ describe("adding a co-seller — the flow that had never worked", () => {
     });
   });
 
-  it("searches the community's members rather than asking for an exact tag", async () => {
+  it("browses the community instead of asking for an exact tag", async () => {
+    /*
+     * This used to assert that typing hit /members/search. It does not any
+     * more, and that is the improvement rather than a regression: the roster is
+     * on screen before anything is typed, so the common case needs no query at
+     * all. Search survives as the fallback for somebody the roster does not
+     * hold — covered in the picker's own tests.
+     */
     const fn = renderForAdd();
     await userEvent.click(await screen.findByText("Add member"));
-    await userEvent.type(await screen.findByPlaceholderText(/search by name/i), "nia");
 
     await waitFor(() => {
-      const search = fn.mock.calls.find(([url]: any) => String(url).includes("/members/search"));
-      expect(search).toBeTruthy();
-      expect(String(search![0])).toContain("/api/communities/pbn/members/search");
+      expect(fn.mock.calls.some(([u]: any) => String(u).includes("/memberships"))).toBe(true);
     });
     expect(await screen.findByText("Nia New")).toBeInTheDocument();
+    expect(fn.mock.calls.some(([u]: any) => String(u).includes("/members/search"))).toBe(false);
   });
 
   it("excludes people already on the bench, so they cannot be picked at all", async () => {
-    const fn = renderForAdd();
+    // The owner is already a co-seller, so he must not be offered. Exclusion
+    // applies to the ROSTER now rather than being pushed to a search endpoint,
+    // which is why this asserts on what renders instead of on a query string.
+    mockFetch([
+      { method: "GET", url: /\/collaborators$/, body: [OWNER] },
+      {
+        method: "GET", url: /\/memberships/,
+        body: { members: [
+          { ...MEMBER, roleGroups: [] },
+          { id: OWNER.userId, name: "Bea Owner", usertag: "bea", roleGroups: [] },
+        ] },
+      },
+    ]);
+    renderWithConfig(
+      <CollaboratorsView product={product} onUpdate={vi.fn()} showToast={vi.fn()} communityTag="pbn" />,
+    );
     await userEvent.click(await screen.findByText("Add member"));
-    await userEvent.type(await screen.findByPlaceholderText(/search by name/i), "nia");
 
-    await waitFor(() => {
-      const search = fn.mock.calls.find(([url]: any) => String(url).includes("/members/search"));
-      // u-own is the owner row loaded above — a 409 avoided before it happens.
-      expect(String(search![0])).toContain("excludeUserIds=u-own");
-    });
+    // Scoped to the picker: "Bea Owner" is also the owner ROW in the list
+    // behind the modal, so an unscoped query would pass or fail for the wrong
+    // reason either way.
+    const picker = await screen.findByRole("dialog");
+    expect(await within(picker).findByText("Nia New")).toBeInTheDocument();
+    expect(within(picker).queryByText("Bea Owner")).not.toBeInTheDocument();
   });
 
   it("shows what it will do before it does it", async () => {

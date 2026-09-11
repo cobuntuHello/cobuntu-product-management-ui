@@ -21,8 +21,8 @@ import { SECTION_KEYS } from "../page/ProductSectionsNav";
  * with more per listing than that tab ever showed. The KEY still resolves so an
  * existing ?view=listings link keeps working; it is simply not a tab.
  */
-const SELLER_SET = ["overview", "details", "collaborators", "activity"];
-const MODERATOR_SET = ["overview", "details", "collaborators", "activity"];
+const SELLER_SET = ["overview", "details", "collaborators", "buyers", "activity"];
+const MODERATOR_SET = ["overview", "details", "collaborators", "buyers", "activity"];
 
 describe("visibleProductViews", () => {
   it("gives the owner every tab", () => {
@@ -107,7 +107,7 @@ describe("the ledger tab", () => {
 
     it("appears after details when it does", () => {
         const views = visibleProductViews({ product: owner, viewerUserId: "u1", hasLedger: true });
-        expect(views).toEqual(["overview", "details", "ledger", "collaborators", "activity"]);
+        expect(views).toEqual(["overview", "details", "ledger", "collaborators", "buyers", "activity"]);
     });
 
     /*
@@ -133,12 +133,12 @@ describe("the ledger tab", () => {
      */
     it("is offered to a moderator, alongside the other read-only tabs", () => {
         const views = visibleProductViews({ product: owner, forceModerator: true, hasLedger: true });
-        expect(views).toEqual(["overview", "details", "ledger", "collaborators", "activity"]);
+        expect(views).toEqual(["overview", "details", "ledger", "collaborators", "buyers", "activity"]);
     });
 
     it("is still absent for a moderator when no panel is passed", () => {
         expect(visibleProductViews({ product: owner, forceModerator: true }))
-            .toEqual(["overview", "details", "collaborators", "activity"]);
+            .toEqual(["overview", "details", "collaborators", "buyers", "activity"]);
     });
 });
 

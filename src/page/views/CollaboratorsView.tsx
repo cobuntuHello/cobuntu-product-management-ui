@@ -261,6 +261,8 @@ export function CollaboratorsView({
           excludeUserIds={(rows ?? []).map((c) => c.userId)}
           currentUserId={currentUserId ?? null}
           UserAvatar={UserAvatar}
+          /* Single-pick: a co-seller is one person at a time, so the list
+             behaves as radios and the footer shows no count. */
           copy={{
             title: "Add a co-seller",
             searchSubtitle: communityTag
@@ -269,22 +271,34 @@ export function CollaboratorsView({
             pickedSubtitle: "They'll appear on the listing beside you and can manage this product.",
             searchPlaceholder: "Search by name or @usertag",
             emptyHint: communityTag
-              ? "Start typing to search this community's members."
+              ? "No members to show."
               : "Type at least two characters to search.",
             searching: "Searching…",
             noMatches: "No matches.",
             unknown: "Unknown",
             consequencesTitle: "What happens next",
+            stepOne: "Choose a person",
+            stepTwo: "Review",
             back: "Back",
             cancel: "Cancel",
             confirm: "Add co-seller",
             confirming: "Adding…",
+            membersLabel: "Members",
+            showingLabel: "Showing",
+            allMembersLabel: "All members",
+            selectedLabel: (n: number) => `${n} selected`,
           }}
-          consequences={[
-            "They can manage this product and appear on the listing beside you.",
-            "Payouts still go to the owner. No money changes hands.",
-          ]}
-          onConfirm={addCoSeller}
+          stepTwo={{
+            kind: "consequences",
+            items: [
+              "They can manage this product and appear on the listing beside you.",
+              "Payouts still go to the owner. No money changes hands.",
+            ],
+          }}
+          /* The picker hands back a LIST now, because three of the four
+             surfaces are multi-select. Co-sellers take the first, which is the
+             only one single-pick can produce. */
+          onConfirm={(people) => addCoSeller(people[0])}
           onAdded={async () => {
             setAddOpen(false);
             await load();

@@ -4,6 +4,7 @@ import * as React from "react";
 import { ProductSectionsNav, type ProductViewKey } from "./ProductSectionsNav";
 import { DetailsView, type ProductModal } from "./views/DetailsView";
 import { CollaboratorsView } from "./views/CollaboratorsView";
+import { BuyersView } from "./views/BuyersView";
 import { ListingsSection } from "./sections/ListingsSection";
 import { ListingDetailDrawer } from "./sections/ListingDetailDrawer";
 import { ProductActivityTab } from "../components/activity/ProductActivityTab";
@@ -128,6 +129,10 @@ export function visibleProductViews(opts: {
     "overview", "details",
     ...(opts.hasLedger ? (["ledger"] as ProductViewKey[]) : []),
     "collaborators",
+    // Listed HERE as well as in SECTIONS. The nav renders the intersection of
+    // the two, so a tab added to one and not the other is silently dropped —
+    // which is exactly how Details became unreachable once before.
+    "buyers",
   ];
 
   /*
@@ -294,6 +299,18 @@ export function ProductManagePage({
 
   let content: React.ReactNode;
   switch (active) {
+    case "buyers":
+      content = (
+        <BuyersView
+          product={product}
+          onUpdate={onUpdate}
+          showToast={showToast}
+          canEdit={isSeller}
+          communityTag={communityTag}
+          currentUserId={viewerUserId}
+        />
+      );
+      break;
     case "collaborators":
       content = (
         <CollaboratorsView
