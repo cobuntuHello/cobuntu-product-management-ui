@@ -5,7 +5,7 @@ import { useProductManagementConfig, useJsonHeaders } from "../../config";
 import { ModalShell } from "../helpers";
 import { UserAvatarFallback } from "../../ui/user-avatar-fallback";
 import { useCanEdit } from "../../lib/manageAccess";
-import { EmptyState } from "@cobuntu/management-ui-shared";
+import { EmptyState, PersonPickerModal, type PersonSearchResult } from "@cobuntu/management-ui-shared";
 
 /**
  * Co-sellers — the product twin of the event page's Hosts tab, built to the
@@ -30,12 +30,22 @@ import { EmptyState } from "@cobuntu/management-ui-shared";
  *
  * The backend has had this since feat/product-sellers-card:
  *   GET    /products/:id/collaborators
- *   POST   /products/:id/collaborators        { usertag }
+ *   POST   /products/:id/collaborators        { userId }
  *   DELETE /products/:id/collaborators/:userId
  *
  * and canManageProduct has always admitted collaborators. Nothing surfaced it,
  * so the only way to add a co-seller was through the API. The product detail
  * page already STACKS them as co-sellers; this is where they come from.
+ *
+ * THAT POST LINE USED TO READ `{ usertag }`, and it was wrong. The code was
+ * written to match the comment: a bare "@usertag" box posting a field the
+ * controller never reads, answering `400 userId is required` on every attempt.
+ * Adding a co-seller from admin had never worked, and the suite covered GET
+ * and DELETE but never this body, so nothing said so.
+ *
+ * The add flow is the shared PersonPickerModal now — the same component the
+ * events Hosts tab uses — so the id comes back from the server and cannot be
+ * mistyped.
  *
  * THE OWNER ROW IS NOT REMOVABLE. product_collaborators carries a row for the
  * owner too — that is how canManageProduct answers for them — and deleting it
@@ -58,6 +68,7 @@ export function CollaboratorsView({
   showToast,
   canEdit = true,
   currentUserId,
+  communityTag,
 }: {
   product: any;
   onUpdate: () => void | Promise<void>;
@@ -69,6 +80,11 @@ export function CollaboratorsView({
   canEdit?: boolean;
   /** Lets the confirm copy switch to the second person on self-removal. */
   currentUserId?: string | null;
+  /**
+   * Whose members to search when adding. Null for a product no community owns,
+   * which falls back to global user search — see searchPeople.
+   */
+  communityTag?: string | null;
 }) {
   const { apiBaseUrl, authHeaders, UserAvatar: ConfigAvatar } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
@@ -107,6 +123,31 @@ export function CollaboratorsView({
   };
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  /*
+   * THE FIX. This posted `{ usertag }`, typed by hand into a bare text box.
+   * The endpoint reads `req.body?.userId` and answers `400 userId is required`
+   * when it is absent, so adding a co-seller from admin has never once worked
+   * — the operator got "userId is required" and no way to act on it.
+   *
+   * The doc comment at the top of this file documented that wrong contract,
+   * which is plainly how it came to be written, and the suite covered GET and
+   * DELETE but never this body.
+   *
+   * Thrown, not swallowed: the picker keeps the pick and shows the message.
+   */
+  async function addCoSeller(person: PersonSearchResult) {
+    const res = await fetch(`${apiBaseUrl}/api/products/${product.id}/collaborators`, {
+      method: "POST",
+      headers: jsonHeaders(),
+      body: JSON.stringify({ userId: person.id }),
+    });
+    if (res.ok) return;
+    const body = await res.json().catch(() => null);
+    if (res.status === 409) throw new Error("They're already a co-seller on this product.");
+    if (res.status === 403) throw new Error("You don't have permission to manage co-sellers here.");
+    throw new Error(body?.error || `Could not add that member (${res.status})`);
+  }
 
   const load = React.useCallback(async () => {
     try {
@@ -182,7 +223,7 @@ export function CollaboratorsView({
               </svg>
             }
             title="No co-sellers yet"
-            body="Add one by @usertag. They appear on the listing beside you."
+            body="Search for a member to add. They appear on the listing beside you."
           />
        
         ) : (
@@ -205,11 +246,45 @@ export function CollaboratorsView({
       {error && <p className="mt-3 text-[12px] text-red-600">{error}</p>}
 
       {addOpen && (
-        <AddCoSellerModal
-          apiBaseUrl={apiBaseUrl}
-          productId={product.id}
-          jsonHeaders={jsonHeaders}
+        <PersonPickerModal
+          open
           onClose={() => setAddOpen(false)}
+          apiBaseUrl={apiBaseUrl}
+          authHeaders={authHeaders}
+          communityTag={communityTag ?? null}
+          /*
+           * Everyone already on the bench, the owner included. The member
+           * search excludes them server-side; global search excludes them
+           * here. Either way they cannot be picked, which is what turns the
+           * old 409-after-the-fact into a person who simply is not offered.
+           */
+          excludeUserIds={(rows ?? []).map((c) => c.userId)}
+          currentUserId={currentUserId ?? null}
+          UserAvatar={UserAvatar}
+          copy={{
+            title: "Add a co-seller",
+            searchSubtitle: communityTag
+              ? "Search members of this community. Guests and non-members are filtered out."
+              : "Search people on Cobuntu by name or @usertag.",
+            pickedSubtitle: "They'll appear on the listing beside you and can manage this product.",
+            searchPlaceholder: "Search by name or @usertag",
+            emptyHint: communityTag
+              ? "Start typing to search this community's members."
+              : "Type at least two characters to search.",
+            searching: "Searching…",
+            noMatches: "No matches.",
+            unknown: "Unknown",
+            consequencesTitle: "What happens next",
+            back: "Back",
+            cancel: "Cancel",
+            confirm: "Add co-seller",
+            confirming: "Adding…",
+          }}
+          consequences={[
+            "They can manage this product and appear on the listing beside you.",
+            "Payouts still go to the owner. No money changes hands.",
+          ]}
+          onConfirm={addCoSeller}
           onAdded={async () => {
             setAddOpen(false);
             await load();
@@ -299,69 +374,6 @@ function CollaboratorRow({
         </button>
       ) : null}
     </div>
-  );
-}
-
-/** Add by @usertag. The backend distinguishes "no such member" from "already a
- *  collaborator", so its message is surfaced rather than a generic failure. */
-function AddCoSellerModal({
-  apiBaseUrl,
-  productId,
-  jsonHeaders,
-  onClose,
-  onAdded,
-}: {
-  apiBaseUrl: string;
-  productId: string;
-  jsonHeaders: () => Record<string, string>;
-  onClose: () => void;
-  onAdded: () => void | Promise<void>;
-}) {
-  const [usertag, setUsertag] = React.useState("");
-  const [saving, setSaving] = React.useState(false);
-  const [err, setErr] = React.useState<string | null>(null);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const tag = usertag.trim().replace(/^@/, "");
-    if (!tag || saving) return;
-    setSaving(true);
-    setErr(null);
-    try {
-      const res = await fetch(`${apiBaseUrl}/api/products/${productId}/collaborators`, {
-        method: "POST", headers: jsonHeaders(), body: JSON.stringify({ usertag: tag }),
-      });
-      if (res.ok) { await onAdded(); return; }
-      const e2 = await res.json().catch(() => ({}));
-      setErr(e2.error || "Could not add that member");
-    } catch { setErr("Could not add that member"); }
-    setSaving(false);
-  }
-
-  return (
-    <ModalShell onClose={onClose}>
-      <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">Add a co-seller</h3>
-      <p className="text-[12px] text-zinc-500 mb-4">
-        They can manage this product and appear on the listing beside you. Payouts still go to the owner.
-      </p>
-      <form onSubmit={submit}>
-        <input
-          value={usertag}
-          onChange={(e) => setUsertag(e.target.value)}
-          placeholder="@usertag"
-          autoFocus
-          className="w-full px-3 py-2 text-[14px] border border-zinc-200 rounded-lg focus:outline-none focus:border-zinc-400 mb-3"
-        />
-        {err && <p className="text-[12px] text-red-600 mb-3">{err}</p>}
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">Cancel</button>
-          <button type="submit" disabled={saving || !usertag.trim()}
-            className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer">
-            {saving ? "Adding..." : "Add"}
-          </button>
-        </div>
-      </form>
-    </ModalShell>
   );
 }
 
