@@ -4,7 +4,10 @@ import * as React from "react";
 import { useProductManagementConfig, useJsonHeaders } from "../../config";
 import { UserAvatarFallback } from "../../ui/user-avatar-fallback";
 import { useCanEdit } from "../../lib/manageAccess";
-import { EmptyState, PersonPickerModal, type PersonSearchResult } from "@cobuntu/management-ui-shared";
+import {
+    EmptyState, PersonPickerModal,
+    userIdsOf, recipientsToApi, perRecipientMessages, type Recipient,
+} from "@cobuntu/management-ui-shared";
 import { ModalShell } from "../helpers";
 
 /**
@@ -110,11 +113,16 @@ export function BuyersView({
         ...(product?.ownerId ? [product.ownerId] : []),
     ], [grants, invites, product?.ownerId]);
 
-    async function giveAccess(people: PersonSearchResult[]) {
+    async function giveAccess(recipients: Recipient[]) {
+        /* Keyed by user id, unlike invitations: a grant writes a row against
+           an account, so this picker is mounted without `emails` and there is
+           nobody here without one. */
+        const userIds = userIdsOf(recipients);
+        if (userIds.length === 0) throw new Error("Choose at least one person.");
         const res = await fetch(`${apiBaseUrl}/api/products/${product.id}/access-grants`, {
             method: "POST",
             headers: jsonHeaders(),
-            body: JSON.stringify({ userIds: people.map((p) => p.id) }),
+            body: JSON.stringify({ userIds }),
         });
         if (!res.ok) {
             const body = await res.json().catch(() => null);
@@ -126,20 +134,26 @@ export function BuyersView({
          * batch, so a partial result has to be SAID. Silently claiming five
          * when three landed is worse than the failure.
          */
-        const body = await res.json().catch(() => ({ granted: people.map((p) => p.id), failed: [] }));
+        const body = await res.json().catch(() => ({ granted: userIds, failed: [] }));
         if (Array.isArray(body.failed) && body.failed.length > 0) {
             throw new Error(`${body.granted?.length ?? 0} added, ${body.failed.length} could not be.`);
         }
     }
 
-    async function sendInvites(people: PersonSearchResult[], message: string | null) {
+    async function sendInvites(recipients: Recipient[], message: string | null) {
+        const { usertags, emails } = recipientsToApi(recipients);
+        if (usertags.length === 0 && emails.length === 0) {
+            throw new Error("Choose at least one person.");
+        }
+        const overrides = perRecipientMessages(recipients);
         const res = await fetch(`${apiBaseUrl}/api/products/${product.id}/invitations`, {
             method: "POST",
             headers: jsonHeaders(),
             body: JSON.stringify({
-                usertags: people.map((p) => p.usertag).filter(Boolean),
-                emails: people.filter((p) => !p.usertag).map((p) => (p as any).email).filter(Boolean),
-                customMessage: message,
+                usertags: usertags.length > 0 ? usertags : undefined,
+                emails: emails.length > 0 ? emails : undefined,
+                customMessage: message || undefined,
+                perRecipientMessages: overrides.length > 0 ? overrides : undefined,
             }),
         });
         if (!res.ok) {
@@ -318,19 +332,38 @@ export function BuyersView({
                     currentUserId={currentUserId ?? null}
                     UserAvatar={UserAvatar}
                     multiple
+                    /*
+                     * Invitations reach people with no account, which is most
+                     * of what inviting is for. The grant picker above has no
+                     * equivalent: a grant writes a row against an account.
+                     */
+                    emails={{
+                        addRow: (a) => `Invite ${a}`,
+                        importCsv: "Import CSV",
+                        imported: (n) => `Imported ${n} ${n === 1 ? "address" : "addresses"}.`,
+                        importedNothing: "No email addresses in the first column of that file.",
+                        importFailed: "That file could not be read.",
+                    }}
                     copy={{
                         ...BASE_COPY,
                         title: "Invite to buy",
-                        pickedSubtitle: "They get an email with a link. They still pay.",
-                        stepTwo: "Message",
+                        pickedSubtitle: "Write your note, then see exactly what lands in their inbox.",
+                        stepTwo: "Write and preview",
                         confirm: "Send invitations",
                         confirming: "Sending…",
-                        messageLabel: "Personal note",
-                        messagePlaceholder: "Add a note, sent to everyone you invite",
+                        messageLabel: "Message to everyone",
+                        messagePlaceholder: "Add a note. Anyone you write to individually gets theirs instead.",
                     }}
                     stepTwo={{
                         kind: "compose",
                         maxLength: 500,
+                        perRecipient: {
+                            personalize: "Write to them",
+                            personalized: "Has their own message",
+                            save: "Save",
+                            cancel: "Discard",
+                            placeholder: (name) => `Write to ${name} instead of the shared message`,
+                        },
                         preview: (message) => (
                             <EmailPreview
                                 productName={product?.name ?? "this product"}
@@ -398,6 +431,9 @@ const BASE_COPY = {
     showingLabel: "Showing",
     allMembersLabel: "All members",
     selectedLabel: (n: number) => `${n} selected`,
+    selectedTitle: "Selected",
+    clearAll: "Clear all",
+    remove: (name: string) => `Remove ${name}`,
 };
 
 function Section({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
