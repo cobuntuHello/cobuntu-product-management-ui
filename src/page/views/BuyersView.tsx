@@ -6,7 +6,8 @@ import { UserAvatarFallback } from "../../ui/user-avatar-fallback";
 import { useCanEdit } from "../../lib/manageAccess";
 import {
     EmptyState, PersonPickerModal,
-    userIdsOf, recipientsToApi, perRecipientMessages, type Recipient,
+    userIdsOf, recipientsToApi, perRecipientMessages,
+    type Recipient, type PersonPickerTierStep,
 } from "@cobuntu/management-ui-shared";
 import { ModalShell } from "../helpers";
 
@@ -113,16 +114,69 @@ export function BuyersView({
         ...(product?.ownerId ? [product.ownerId] : []),
     ], [grants, invites, product?.ownerId]);
 
+    /*
+     * Which variant is being given away.
+     *
+     * Stock lives on the variant — giving away a Large is not giving away a
+     * Small — and since a grant now consumes that variant's stock, the seller
+     * has to say which one. Invitations below deliberately have no tier step:
+     * an invitation is to the product, and the buyer picks a variant at
+     * checkout.
+     *
+     * Feature-detected on the payload for the same reason the events modal is:
+     * `remaining` only arrives once the tier-bound-capacity backend is
+     * deployed, and presenting an unknown as "no limit" is the mistake that
+     * had the public API reporting every tier available forever.
+     */
+    const variants: any[] = product?.tiers || [];
+    const hasStockInfo = variants.length > 0
+        && variants.every((t) => typeof t?.remaining === "number" || t?.remaining === null);
+
+    const tierStep: PersonPickerTierStep | undefined = hasStockInfo ? {
+        tiers: variants.map((t) => ({
+            id: t.id,
+            name: t.name,
+            remaining: typeof t.remaining === "number" ? t.remaining : null,
+            soldOut: typeof t.remaining === "number" && t.remaining <= 0,
+        })),
+        copy: {
+            stepLabel: "Choose a variant",
+            subtitle: "Which one are you giving away? This uses up that variant's stock.",
+            remaining: (n) => `${n} left`,
+            unlimited: "No limit",
+            soldOut: "Out of stock",
+            allFull: "Every variant is out of stock. Add stock to give one away.",
+            summary: (n, name) => `${n} going to ${name}`,
+            overBy: (n, name) => `${n} more than ${name} has left.`,
+            importPreviewTitle: "Check this import",
+            importReady: (n) => `${n} ${n === 1 ? "row" : "rows"} will be added.`,
+            importProblems: (n) => `${n} ${n === 1 ? "row" : "rows"} cannot be added.`,
+            problemUnknownTier: (name) => `No variant called "${name}"`,
+            problemNoTier: "No variant chosen",
+            problemTierFull: "That variant is out of stock",
+            importConfirm: "Give these",
+            importCancel: "Discard import",
+        },
+    } : undefined;
+
     async function giveAccess(recipients: Recipient[]) {
         /* Keyed by user id, unlike invitations: a grant writes a row against
            an account, so this picker is mounted without `emails` and there is
            nobody here without one. */
         const userIds = userIdsOf(recipients);
         if (userIds.length === 0) throw new Error("Choose at least one person.");
+        /* Per person, because an imported list can mix variants. The server
+           checks every id belongs to this product and refuses otherwise. */
+        const tierAssignments = recipients
+            .filter((r) => r.id && r.tierId)
+            .map((r) => ({ userId: r.id!, tierId: r.tierId! }));
         const res = await fetch(`${apiBaseUrl}/api/products/${product.id}/access-grants`, {
             method: "POST",
             headers: jsonHeaders(),
-            body: JSON.stringify({ userIds }),
+            body: JSON.stringify({
+                userIds,
+                tierAssignments: tierAssignments.length > 0 ? tierAssignments : undefined,
+            }),
         });
         if (!res.ok) {
             const body = await res.json().catch(() => null);
@@ -295,6 +349,7 @@ export function BuyersView({
                     currentUserId={currentUserId ?? null}
                     UserAvatar={UserAvatar}
                     multiple
+                    tierStep={tierStep}
                     copy={{
                         ...BASE_COPY,
                         title: "Give access",

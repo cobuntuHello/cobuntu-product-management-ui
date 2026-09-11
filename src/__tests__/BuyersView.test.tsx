@@ -21,6 +21,15 @@ import { BuyersView } from "../page/views/BuyersView";
 
 const PRODUCT = { id: "p1", name: "Meditation Library", ownerId: "u-own", price: 2400, currency: "EUR" };
 
+/* A product with real variants, each carrying its own stock. */
+const WITH_VARIANTS = {
+    ...PRODUCT,
+    tiers: [
+        { id: "t-small", name: "Small", capacity: 5, remaining: 2 },
+        { id: "t-large", name: "Large", capacity: 1, remaining: 0 },
+    ],
+};
+
 const ROSTER = {
     method: "GET",
     url: /\/memberships/,
@@ -38,11 +47,11 @@ const LISTS = [
     { method: "GET", url: /\/invitations$/, body: [] },
 ];
 
-function renderView(routes: any[] = []) {
+function renderView(routes: any[] = [], product: any = PRODUCT) {
     const fetchMock = mockFetch([...LISTS, ROSTER, ...routes]);
     renderWithConfig(
         <BuyersView
-            product={PRODUCT}
+            product={product}
             onUpdate={vi.fn()}
             showToast={vi.fn()}
             communityTag="c"
@@ -200,5 +209,74 @@ describe("inviting to buy", () => {
 
         expect(await screen.findByText("You don't have permission to manage this product."))
             .toBeInTheDocument();
+    });
+});
+
+describe("giving away a specific variant", () => {
+    it("sends the chosen variant with the grant", async () => {
+        /*
+         * Stock lives on the variant, and a grant consumes it. Giving away a
+         * Large is not giving away a Small, so the endpoint has to be told
+         * which shelf the unit came off.
+         */
+        const user = userEvent.setup();
+        const fetchMock = renderView(
+            [{ method: "POST", url: /\/access-grants$/, body: { granted: ["u-ana"], failed: [] } }],
+            WITH_VARIANTS,
+        );
+
+        await user.click(await screen.findByText("Give access"));
+        await user.click(await screen.findByText("Ana Neto"));
+        await user.click(screen.getByRole("button", { name: "Choose a variant" }));
+        // Small is the only one with stock, so it is already selected.
+        await user.click(screen.getByRole("button", { name: "Review" }));
+        await user.click(screen.getAllByRole("button", { name: "Give access" }).at(-1)!);
+
+        await waitFor(() => expect(posted(fetchMock, /access-grants/)).toBeTruthy());
+        expect(posted(fetchMock, /access-grants/).tierAssignments).toEqual([
+            { userId: "u-ana", tierId: "t-small" },
+        ]);
+    });
+
+    it("shows an out-of-stock variant without letting it be chosen", async () => {
+        const user = userEvent.setup();
+        renderView([], WITH_VARIANTS);
+
+        await user.click(await screen.findByText("Give access"));
+        await user.click(await screen.findByText("Ana Neto"));
+        await user.click(screen.getByRole("button", { name: "Choose a variant" }));
+
+        expect(screen.getByText("Large").closest("button")).toBeDisabled();
+        expect(screen.getByText("Out of stock")).toBeInTheDocument();
+        expect(screen.getByText("2 left")).toBeInTheDocument();
+    });
+
+    it("does not ask for a variant when INVITING", async () => {
+        // An invitation is to the product. The buyer picks a variant at
+        // checkout, so asking the seller to choose would be asking them to
+        // decide something that is not theirs to decide.
+        const user = userEvent.setup();
+        renderView([], WITH_VARIANTS);
+
+        await user.click(await screen.findByText("Invite to buy"));
+        await user.click(await screen.findByText("Ana Neto"));
+
+        expect(screen.getByRole("button", { name: "Write and preview" })).toBeInTheDocument();
+        expect(screen.queryByText("Choose a variant")).not.toBeInTheDocument();
+    });
+
+    it("skips the step on a product with no variants", async () => {
+        const user = userEvent.setup();
+        const fetchMock = renderView(
+            [{ method: "POST", url: /\/access-grants$/, body: { granted: ["u-ana"], failed: [] } }],
+        );
+
+        await user.click(await screen.findByText("Give access"));
+        await user.click(await screen.findByText("Ana Neto"));
+        await user.click(screen.getByRole("button", { name: "Review" }));
+        await user.click(screen.getAllByRole("button", { name: "Give access" }).at(-1)!);
+
+        await waitFor(() => expect(posted(fetchMock, /access-grants/)).toBeTruthy());
+        expect(posted(fetchMock, /access-grants/).tierAssignments).toBeUndefined();
     });
 });
