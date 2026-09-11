@@ -12,7 +12,7 @@ import * as React from "react";
  * of its own. This is view-state, like events, so tabs are cheap to add.
  */
 
-export type ProductViewKey = "overview" | "details" | "collaborators" | "listings" | "ledger" | "activity";
+export type ProductViewKey = "overview" | "details" | "collaborators" | "buyers" | "listings" | "ledger" | "activity";
 
 /**
  * The tab strip, IN ORDER.
@@ -44,6 +44,16 @@ const SECTIONS: Array<{ key: ProductViewKey; label: string }> = [
    */
   { key: "ledger", label: "Ledger" },
   { key: "collaborators", label: "Collaborators" },
+  /*
+   * Who HAS this product, and who was asked to buy it.
+   *
+   * Events put both on Attendees; a product had nowhere for either to live,
+   * which is why giving one away and inviting somebody to buy one did not
+   * exist here at all. Sits beside Collaborators because both answer "which
+   * people are attached to this thing" — Collaborators is who SELLS it, this
+   * is who GETS it.
+   */
+  { key: "buyers", label: "Buyers" },
   /*
    * "listings" is still a valid KEY -- a link or a saved URL may carry it, and
    * the host may still render that view -- but it is no longer a TAB.
