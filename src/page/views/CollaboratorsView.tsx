@@ -5,7 +5,9 @@ import { useProductManagementConfig, useJsonHeaders } from "../../config";
 import { ModalShell } from "../helpers";
 import { UserAvatarFallback } from "../../ui/user-avatar-fallback";
 import { useCanEdit } from "../../lib/manageAccess";
-import { EmptyState, PersonPickerModal, type PersonSearchResult } from "@cobuntu/management-ui-shared";
+import {
+  EmptyState, PersonPickerModal, userIdsOf, type Recipient,
+} from "@cobuntu/management-ui-shared";
 
 /**
  * Co-sellers — the product twin of the event page's Hosts tab, built to the
@@ -136,11 +138,16 @@ export function CollaboratorsView({
    *
    * Thrown, not swallowed: the picker keeps the pick and shows the message.
    */
-  async function addCoSeller(person: PersonSearchResult) {
+  async function addCoSeller(recipients: Recipient[]) {
+    /* Single-pick, and keyed by user id: a co-seller row is written against
+       an account, which is why this picker is mounted without `emails` and
+       nobody here can arrive as a bare address. */
+    const [userId] = userIdsOf(recipients);
+    if (!userId) throw new Error("Choose a person first.");
     const res = await fetch(`${apiBaseUrl}/api/products/${product.id}/collaborators`, {
       method: "POST",
       headers: jsonHeaders(),
-      body: JSON.stringify({ userId: person.id }),
+      body: JSON.stringify({ userId }),
     });
     if (res.ok) return;
     const body = await res.json().catch(() => null);
@@ -287,6 +294,12 @@ export function CollaboratorsView({
             showingLabel: "Showing",
             allMembersLabel: "All members",
             selectedLabel: (n: number) => `${n} selected`,
+            /* Single-pick, so the staged strip never renders. The words are
+               still required, so a surface that later allows several cannot
+               forget to translate them. */
+            selectedTitle: "Selected",
+            clearAll: "Clear",
+            remove: (name: string) => `Remove ${name}`,
           }}
           stepTwo={{
             kind: "consequences",
@@ -295,10 +308,7 @@ export function CollaboratorsView({
               "Payouts still go to the owner. No money changes hands.",
             ],
           }}
-          /* The picker hands back a LIST now, because three of the four
-             surfaces are multi-select. Co-sellers take the first, which is the
-             only one single-pick can produce. */
-          onConfirm={(people) => addCoSeller(people[0])}
+          onConfirm={addCoSeller}
           onAdded={async () => {
             setAddOpen(false);
             await load();
