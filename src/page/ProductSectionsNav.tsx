@@ -82,24 +82,113 @@ export function ProductSectionsNav({
 }) {
   const shown = SECTIONS.filter((s) => !visibleViews || visibleViews.includes(s.key));
 
+  const scrollerRef = React.useRef<HTMLDivElement>(null);
+  const tabRefs = React.useRef<Map<ProductViewKey, HTMLButtonElement | null>>(new Map());
+  /*
+   * Which ends have more strip behind them. Drives the fades below.
+   *
+   * One object rather than two booleans so a scroll sets state once, and so
+   * the common case -- a desktop where every tab fits and both are false --
+   * settles after the first pass and stops re-rendering.
+   */
+  const [edges, setEdges] = React.useState({ left: false, right: false });
+
+  function recompute() {
+    const c = scrollerRef.current;
+    if (!c) return;
+    /*
+     * The 1px slack is not superstition: scrollLeft is fractional under a
+     * browser zoom or a fractional device pixel ratio, so `scrollLeft < max`
+     * stays true by a quarter-pixel at the end of the strip and the right
+     * fade never goes away.
+     */
+    const max = c.scrollWidth - c.clientWidth;
+    const next = { left: c.scrollLeft > 1, right: c.scrollLeft < max - 1 };
+    setEdges((prev) => (prev.left === next.left && prev.right === next.right ? prev : next));
+  }
+
+  /*
+   * Put the active tab on screen before the fades are measured.
+   *
+   * Landing on Activity from a saved URL used to show the first three tabs and
+   * the underline nowhere, which reads as a broken nav rather than a scrolled
+   * one. Done by setting scrollLeft rather than scrollIntoView: that walks
+   * every scrollable ancestor and would drag the page itself.
+   */
+  React.useLayoutEffect(() => {
+    const c = scrollerRef.current;
+    const node = tabRefs.current.get(activeView);
+    if (c && node) {
+      const left = node.offsetLeft;
+      const right = left + node.offsetWidth;
+      if (left < c.scrollLeft) c.scrollLeft = left - 8;
+      else if (right > c.scrollLeft + c.clientWidth) c.scrollLeft = right - c.clientWidth + 8;
+    }
+    recompute();
+  }, [activeView, visibleViews]);
+
+  React.useEffect(() => {
+    function onResize() { recompute(); }
+    window.addEventListener("resize", onResize);
+    const c = scrollerRef.current;
+    if (c) c.addEventListener("scroll", recompute, { passive: true });
+    return () => {
+      window.removeEventListener("resize", onResize);
+      if (c) c.removeEventListener("scroll", recompute);
+    };
+  }, []);
+
   return (
-    <div className="flex items-center gap-1 overflow-x-auto -mx-1 px-1 mb-6 border-b border-zinc-200">
-      {shown.map((s) => {
-        const active = s.key === activeView;
-        return (
-          <button
-            key={s.key}
-            onClick={() => onViewChange(s.key)}
-            className={`inline-flex items-center px-3 py-3 text-[14px] whitespace-nowrap cursor-pointer transition-colors border-b-2 -mb-px ${
-              active
-                ? "text-zinc-900 font-medium border-zinc-900"
-                : "text-zinc-400 hover:text-zinc-700 border-transparent"
-            }`}
-          >
-            {s.label}
-          </button>
-        );
-      })}
+    /*
+     * THE FADES LIVE OUTSIDE THE SCROLLER, THE BORDER WITH THEM.
+     *
+     * An overlay inside an overflow-x-auto element scrolls away with the
+     * content it is supposed to be masking. So the wrapper holds the fades and
+     * the bottom rule, and only the tabs scroll. The scrollbar itself is
+     * hidden: a visible one on a phone is a desktop widget rendered at the
+     * wrong size, and the fade is the affordance that replaces it. The event
+     * page's twin.
+     */
+    <div className="relative -mx-1 mb-6 border-b border-zinc-200">
+      <div
+        ref={scrollerRef}
+        className="flex items-center gap-1 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {shown.map((s) => {
+          const active = s.key === activeView;
+          return (
+            <button
+              key={s.key}
+              ref={(el) => { tabRefs.current.set(s.key, el); }}
+              onClick={() => onViewChange(s.key)}
+              className={`inline-flex items-center px-3 py-3 text-[14px] whitespace-nowrap cursor-pointer transition-colors border-b-2 -mb-px ${
+                active
+                  ? "text-zinc-900 font-medium border-zinc-900"
+                  : "text-zinc-400 hover:text-zinc-700 border-transparent"
+              }`}
+            >
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/*
+        * The fades. Present only while there is something behind that edge,
+        * which is what makes them an indicator rather than decoration -- a
+        * strip that fits shows neither, so a desktop never sees them.
+        *
+        * They sit above the rule (bottom-px) so the border reads as one
+        * unbroken line under them.
+        */}
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute left-0 top-0 bottom-px w-8 bg-gradient-to-r from-white to-transparent transition-opacity duration-200 motion-reduce:transition-none ${edges.left ? "opacity-100" : "opacity-0"}`}
+      />
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute right-0 top-0 bottom-px w-8 bg-gradient-to-l from-white to-transparent transition-opacity duration-200 motion-reduce:transition-none ${edges.right ? "opacity-100" : "opacity-0"}`}
+      />
     </div>
   );
 }
