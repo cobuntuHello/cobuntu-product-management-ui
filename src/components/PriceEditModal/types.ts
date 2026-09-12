@@ -18,6 +18,11 @@ export interface Tier {
   id: string;
   name: string;
   description: string | null;
+  /** Per-tier license terms (feat/tier-license-terms). Lets the same asset
+   *  be sold as e.g. Personal vs Commercial, each tier carrying its own
+   *  terms — shown pre/post-purchase and on the license certificate.
+   *  Nullable: most tiers carry none. */
+  licenseTerms?: string | null;
   capacity: number | null;
   /** Non-refunded sales for this tier (backend joins via product_snapshots). */
   salesCount?: number;
@@ -52,6 +57,10 @@ export interface Tier {
  */
 export const TIER_NAME_MAX = 80;
 export const TIER_DESCRIPTION_MAX = 200;
+/** License-terms ceiling. Matches the backend's LICENSE_TERMS_MAX (2000) in
+ *  ProductTierService.normalizeLicenseTerms, which 400s past it — so the UI
+ *  enforces the same maxLength + counter to keep saves from bouncing. */
+export const TIER_LICENSE_TERMS_MAX = 2000;
 
 /** Local draft state for a single tier card. Fields are display-unit
  *  strings (e.g. "20" for €20) so the input rows can be authored as-is
@@ -64,6 +73,9 @@ export interface DraftTier {
   id?: string;
   name: string;
   description: string;
+  /** Per-tier license terms (feat/tier-license-terms). Plain string ("" when
+   *  none) mirroring `description`; buildTierBody flips blank → null. */
+  licenseTerms: string;
   price: string;
   currency: string;
   capacity: string;

@@ -2,7 +2,7 @@
 
 import { ChevronRight, Package, Calendar, ClipboardList, Lock, Eye, EyeOff, Info } from "lucide-react";
 import { Eyebrow, StepInput, StepTextarea, Switch } from "./_primitives";
-import { TIER_NAME_MAX, TIER_DESCRIPTION_MAX, type DraftTier } from "./types";
+import { TIER_NAME_MAX, TIER_DESCRIPTION_MAX, TIER_LICENSE_TERMS_MAX, type DraftTier } from "./types";
 import { isTierLocked } from "./helpers";
 import { BasicsStep } from "./steps/BasicsStep";
 import type { StepId } from "./steps";
@@ -113,6 +113,21 @@ export function TierEditView({
           <StepTextarea value={t.description} maxLength={TIER_DESCRIPTION_MAX}
             onChange={(e) => onUpdate({ description: e.target.value })}
             placeholder="What's included" rows={2} />
+        </div>
+      </div>
+
+      {/* License terms — per-tier, so the same asset can sell as e.g.
+          Personal vs Commercial with different terms. Shown to the buyer
+          pre/post-purchase and carried onto the license certificate. */}
+      <div>
+        <Eyebrow count={t.licenseTerms.length} max={TIER_LICENSE_TERMS_MAX}
+          help="What the buyer of this tier is licensed to do — e.g. personal use only, or commercial use with attribution. Leave blank for no licence.">
+          License terms (optional)
+        </Eyebrow>
+        <div className="mt-1">
+          <StepTextarea value={t.licenseTerms} maxLength={TIER_LICENSE_TERMS_MAX}
+            onChange={(e) => onUpdate({ licenseTerms: e.target.value })}
+            placeholder="e.g. Personal use only. No resale or redistribution." rows={3} />
         </div>
       </div>
 
