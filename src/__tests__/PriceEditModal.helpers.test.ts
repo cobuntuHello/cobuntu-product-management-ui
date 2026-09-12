@@ -17,6 +17,7 @@ import {
 import {
   TIER_NAME_MAX,
   TIER_DESCRIPTION_MAX,
+  TIER_LICENSE_TERMS_MAX,
 } from "../components/PriceEditModal/types";
 
 describe("PriceEditModal helpers (product) — currency conversion", () => {
@@ -97,6 +98,29 @@ describe("PriceEditModal helpers (product) — validateTier", () => {
         description: "y".repeat(TIER_DESCRIPTION_MAX),
       }),
     ).toBeNull();
+  });
+
+  it("rejects over-long license terms and accepts them at the limit", () => {
+    expect(
+      validateTier({
+        ...blankTier(),
+        name: "Std",
+        price: "10",
+        licenseTerms: "z".repeat(TIER_LICENSE_TERMS_MAX + 1),
+      }),
+    ).toMatch(new RegExp(`${TIER_LICENSE_TERMS_MAX} characters or fewer`));
+    expect(
+      validateTier({
+        ...blankTier(),
+        name: "Std",
+        price: "10",
+        licenseTerms: "z".repeat(TIER_LICENSE_TERMS_MAX),
+      }),
+    ).toBeNull();
+  });
+
+  it("blankTier defaults licenseTerms to an empty string", () => {
+    expect(blankTier().licenseTerms).toBe("");
   });
 
   // ── Event-ported auto-schedule sales-window rules. ──
@@ -328,6 +352,13 @@ describe("PriceEditModal helpers (product) — buildTierBody", () => {
   it("trims tier name", () => {
     expect(buildTierBody({ ...blankTier(), name: "  Std  ", price: "10" }))
       .toMatchObject({ name: "Std" });
+  });
+
+  it("maps licenseTerms (trimmed) and nulls a blank one", () => {
+    expect(buildTierBody({ ...blankTier(), name: "Commercial", price: "50", licenseTerms: "  Commercial use OK  " }))
+      .toMatchObject({ licenseTerms: "Commercial use OK" });
+    expect(buildTierBody({ ...blankTier(), name: "Std", price: "10", licenseTerms: "   " }))
+      .toMatchObject({ licenseTerms: null });
   });
 
   it("emits product keys AND the event-ported scheduling keys together", () => {
