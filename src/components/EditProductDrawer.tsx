@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { useProductManagementConfig } from "../config";
+import { useProductManagementConfig, useJsonHeaders } from "../config";
 import { type CategoryOption } from "./CategoryPickerRow";
 import { ProductForm, type ProductFormData } from "./ProductForm";
 import type { MediaItem } from "../ui/sortable-media-gallery";
@@ -22,12 +22,78 @@ interface Props {
   onSaved: () => void;
 }
 
+/** A LINK-kind product_attachment: an external URL revealed to buyers after
+ *  purchase (feat/product-link-deliverable). The backend stores the URL in
+ *  `url` and the buyer-facing label in `originalName`. */
+interface LinkDeliverable {
+  /** Present for a persisted link; absent for one staged this session. */
+  id?: string;
+  url: string;
+  label: string;
+}
+
+/** Matches the backend's addProductLinkController guard (http/https only). */
+const LINK_URL_RE = /^https?:\/\/\S+$/i;
+
 export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSaved, categories }: Props) {
   const { apiBaseUrl, authHeaders } = useProductManagementConfig();
+  const jsonHeaders = useJsonHeaders();
   const formDataRef = useRef<ProductFormData | null>(null);
   const [saving, setSaving] = useState(false);
   const [visible, setVisible] = useState(false);
   const [animating, setAnimating] = useState(false);
+
+  /*
+   * Link deliverables live OUTSIDE ProductFormData because ProductForm is a
+   * pure controlled form with no productId, and the link endpoint
+   * (POST /api/products/:productId/attachments/link) needs one — so links are
+   * only editable here, on the edit path, where product.id exists.
+   *
+   * Existing LINK attachments, links removed this session (persisted via the
+   * comprehensive PUT's attachmentsToDelete, which is GCS-safe for links), and
+   * links staged for add (POSTed to the link endpoint after the PUT).
+   */
+  const isPhysical = product.productType === "PHYSICAL";
+  const [existingLinks, setExistingLinks] = useState<LinkDeliverable[]>([]);
+  const [linksToDelete, setLinksToDelete] = useState<string[]>([]);
+  const [newLinks, setNewLinks] = useState<LinkDeliverable[]>([]);
+  const [linkLabelDraft, setLinkLabelDraft] = useState("");
+  const [linkUrlDraft, setLinkUrlDraft] = useState("");
+  const [linkError, setLinkError] = useState<string | null>(null);
+
+  // Seed link state from the product whenever the drawer opens on a (new)
+  // product — split LINK-kind attachments out of the file list.
+  useEffect(() => {
+    if (!isOpen) return;
+    const links: LinkDeliverable[] = (product.attachments || [])
+      .filter((a: any) => (a.kind ?? "FILE") === "LINK")
+      .map((a: any) => ({ id: a.id, url: a.url, label: a.originalName || a.url }));
+    setExistingLinks(links);
+    setLinksToDelete([]);
+    setNewLinks([]);
+    setLinkLabelDraft("");
+    setLinkUrlDraft("");
+    setLinkError(null);
+  }, [isOpen, product]);
+
+  function addLinkDraft() {
+    const url = linkUrlDraft.trim();
+    if (!LINK_URL_RE.test(url)) {
+      setLinkError("Enter a valid http(s) link.");
+      return;
+    }
+    setNewLinks(prev => [...prev, { url, label: linkLabelDraft.trim() || url }]);
+    setLinkLabelDraft("");
+    setLinkUrlDraft("");
+    setLinkError(null);
+  }
+  function removeExistingLink(id: string) {
+    setExistingLinks(prev => prev.filter(l => l.id !== id));
+    setLinksToDelete(prev => [...prev, id]);
+  }
+  function removeNewLink(idx: number) {
+    setNewLinks(prev => prev.filter((_, i) => i !== idx));
+  }
 
   useEffect(() => {
     if (isOpen) {
@@ -53,14 +119,19 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
         isExisting: true,
       }));
 
-    const productFiles: UploadedFile[] = (product.attachments || []).map((a: any) => ({
-      id: a.id,
-      name: a.originalName || a.fileName || "file",
-      size: a.fileSize || 0,
-      type: a.mimeType || "application/octet-stream",
-      url: a.url,
-      isExisting: true,
-    }));
+    // LINK-kind attachments are managed in the Link deliverables section, not
+    // the file uploader — excluding them here keeps a link from rendering as a
+    // bogus 0-byte "file" (and out of the file-delete diff in handleSave).
+    const productFiles: UploadedFile[] = (product.attachments || [])
+      .filter((a: any) => (a.kind ?? "FILE") !== "LINK")
+      .map((a: any) => ({
+        id: a.id,
+        name: a.originalName || a.fileName || "file",
+        size: a.fileSize || 0,
+        type: a.mimeType || "application/octet-stream",
+        url: a.url,
+        isExisting: true,
+      }));
 
     const priceInDollars = product.price ? (product.price / 100) : 0;
 
@@ -150,8 +221,15 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       }
 
       const existingAttachmentIds = data.productFiles.filter(f => f.isExisting).map(f => f.id);
-      const originalAttachmentIds = (product.attachments || []).map((a: any) => a.id);
-      const attachmentsToDelete = originalAttachmentIds.filter((id: string) => !existingAttachmentIds.includes(id));
+      // Only FILE-kind rows take part in the file-delete diff — LINK rows are
+      // tracked separately (linksToDelete) so an untouched link is never nuked.
+      const originalAttachmentIds = (product.attachments || [])
+        .filter((a: any) => (a.kind ?? "FILE") !== "LINK")
+        .map((a: any) => a.id);
+      const attachmentsToDelete = [
+        ...originalAttachmentIds.filter((id: string) => !existingAttachmentIds.includes(id)),
+        ...linksToDelete,
+      ];
       if (attachmentsToDelete.length > 0) formData.append("attachmentsToDelete", JSON.stringify(attachmentsToDelete));
 
       for (const file of data.productFiles) {
@@ -179,7 +257,25 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
         });
         if (statusRes.ok) {
           const status = await statusRes.json();
-          if (status.status === "completed") { onSaved(); return; }
+          if (status.status === "completed") {
+            // Staged link deliverables can't ride the multipart comprehensive
+            // PUT (no productId until the product exists in create; and the
+            // backend only ingests links via its dedicated endpoint), so POST
+            // each once the product update has landed.
+            for (const link of newLinks) {
+              const linkRes = await fetch(`${apiBaseUrl}/api/products/${product.id}/attachments/link`, {
+                method: "POST",
+                headers: jsonHeaders(),
+                body: JSON.stringify({ url: link.url, label: link.label }),
+              });
+              if (!linkRes.ok) {
+                const e = await linkRes.json().catch(() => ({}));
+                throw new Error(e.error || e.message || "Failed to add link deliverable");
+              }
+            }
+            onSaved();
+            return;
+          }
           if (status.status === "failed") throw new Error(status.error || "Update failed");
         }
       }
@@ -219,6 +315,89 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
             categories={categories}
             onChange={data => { formDataRef.current = data; }}
           />
+
+          {/*
+            * Link deliverables — external URLs revealed only to verified buyers
+            * (feat/product-link-deliverable). Digital-delivery only, mirroring
+            * the file uploader's !isPhysical gate. Edit-path only: the add
+            * endpoint needs a productId, so create adds files, then edits to
+            * attach links.
+            */}
+          {!isPhysical && (
+            <div className="mt-6 pt-6 border-t border-zinc-100">
+              <h3 className="text-[13px] font-semibold text-zinc-900">Link deliverables</h3>
+              <p className="text-[12px] text-zinc-500 mt-0.5">
+                External links revealed to buyers after purchase. Anyone with the link can open it, so only paying buyers ever see the URL.
+              </p>
+
+              {(existingLinks.length > 0 || newLinks.length > 0) && (
+                <ul className="mt-3 space-y-1.5">
+                  {existingLinks.map(link => (
+                    <li key={link.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-100">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] text-zinc-800 truncate">{link.label}</p>
+                        <p className="text-[11px] text-zinc-400 truncate">{link.url}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => link.id && removeExistingLink(link.id)}
+                        className="text-[12px] text-zinc-400 hover:text-red-500 cursor-pointer shrink-0"
+                        aria-label={`Remove ${link.label}`}
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                  {newLinks.map((link, idx) => (
+                    <li key={`new-${idx}`} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50/60 border border-emerald-100">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] text-zinc-800 truncate">{link.label}</p>
+                        <p className="text-[11px] text-zinc-400 truncate">{link.url}</p>
+                      </div>
+                      <span className="text-[11px] text-emerald-600 shrink-0">New</span>
+                      <button
+                        type="button"
+                        onClick={() => removeNewLink(idx)}
+                        className="text-[12px] text-zinc-400 hover:text-red-500 cursor-pointer shrink-0"
+                        aria-label={`Remove ${link.label}`}
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="mt-3 space-y-2">
+                <input
+                  type="text"
+                  value={linkLabelDraft}
+                  onChange={e => setLinkLabelDraft(e.target.value)}
+                  placeholder="Label (e.g. Download page)"
+                  className="w-full px-3 py-2 text-[13px] rounded-lg border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={linkUrlDraft}
+                    onChange={e => { setLinkUrlDraft(e.target.value); if (linkError) setLinkError(null); }}
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addLinkDraft(); } }}
+                    placeholder="https://…"
+                    className="flex-1 min-w-0 px-3 py-2 text-[13px] rounded-lg border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-300"
+                  />
+                  <button
+                    type="button"
+                    onClick={addLinkDraft}
+                    disabled={!linkUrlDraft.trim()}
+                    className="px-3 py-2 text-[13px] font-medium bg-zinc-100 text-zinc-700 rounded-lg hover:bg-zinc-200 disabled:opacity-40 cursor-pointer shrink-0"
+                  >
+                    Add link
+                  </button>
+                </div>
+                {linkError && <p className="text-[12px] text-red-500">{linkError}</p>}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="px-6 py-4 border-t border-zinc-100 flex justify-end gap-2">

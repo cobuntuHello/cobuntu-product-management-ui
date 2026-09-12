@@ -14,6 +14,7 @@ import {
   SUPPORTED_CURRENCIES,
   TIER_NAME_MAX,
   TIER_DESCRIPTION_MAX,
+  TIER_LICENSE_TERMS_MAX,
   type DonationDraft,
   type DraftTier,
 } from "./types";
@@ -65,6 +66,7 @@ export function blankTier(seed: BlankTierSeed = {}): DraftTier {
     localId: newLocalId(),
     name: indexHint === 1 ? "Standard" : `Tier ${indexHint}`,
     description: "",
+    licenseTerms: "",
     // "0", not "". validateTier rejects an empty price, so a blank seed made
     // Save fail with "Price required for Standard" the moment a seller added a
     // SECOND tier — a dead end they did nothing to cause. "0" renders
@@ -142,6 +144,9 @@ export function validateTier(t: DraftTier): string | null {
   }
   if (t.description.length > TIER_DESCRIPTION_MAX) {
     return `Description for "${t.name}" must be ${TIER_DESCRIPTION_MAX} characters or fewer.`;
+  }
+  if (t.licenseTerms.length > TIER_LICENSE_TERMS_MAX) {
+    return `License terms for "${t.name}" must be ${TIER_LICENSE_TERMS_MAX} characters or fewer.`;
   }
   if (t.price === "" || isNaN(parseFloat(t.price))) {
     return `Price required for "${t.name}"`;
@@ -280,6 +285,9 @@ export function buildTierBody(
   return {
     name: t.name.trim(),
     description: t.description.trim() || null,
+    // Blank → null so an empty box clears any prior terms (the backend
+    // normalizeLicenseTerms does the same trim/blank→null server-side).
+    licenseTerms: t.licenseTerms.trim() || null,
     ...(locked ? {} : { price: parseFloat(t.price || "0"), currency: t.currency }),
     capacity: t.capacity ? parseInt(t.capacity, 10) : null,
     ...(locked ? {} : { priceMode: t.priceMode, pwywMinAmount: pwywMinSmallest }),
