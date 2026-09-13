@@ -40,6 +40,7 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
   const jsonHeaders = useJsonHeaders();
   const formDataRef = useRef<ProductFormData | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
   const [animating, setAnimating] = useState(false);
 
@@ -61,8 +62,10 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
   const [linkUrlDraft, setLinkUrlDraft] = useState("");
   const [linkError, setLinkError] = useState<string | null>(null);
 
-  // Seed link state from the product whenever the drawer opens on a (new)
-  // product — split LINK-kind attachments out of the file list.
+  // Seed link state ONCE per opened product — keyed on product.id, NOT the
+  // whole product object. A parent re-render that passes a fresh `product`
+  // reference (same id) must not wipe the seller's staged link add/removes;
+  // the main form is protected the same way (seeds once per record id).
   useEffect(() => {
     if (!isOpen) return;
     const links: LinkDeliverable[] = (product.attachments || [])
@@ -74,7 +77,8 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
     setLinkLabelDraft("");
     setLinkUrlDraft("");
     setLinkError(null);
-  }, [isOpen, product]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, product?.id]);
 
   function addLinkDraft() {
     const url = linkUrlDraft.trim();
@@ -167,6 +171,7 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
     const data = formDataRef.current;
     if (!data) return;
     setSaving(true);
+    setSaveError(null);
 
     try {
       const formData = new FormData();
@@ -261,8 +266,12 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
             // Staged link deliverables can't ride the multipart comprehensive
             // PUT (no productId until the product exists in create; and the
             // backend only ingests links via its dedicated endpoint), so POST
-            // each once the product update has landed.
-            for (const link of newLinks) {
+            // each once the product update has landed. Drop each from state as
+            // it succeeds so a mid-loop failure + retry does NOT re-create the
+            // links that already landed (the endpoint is not idempotent).
+            const remaining = [...newLinks];
+            while (remaining.length > 0) {
+              const link = remaining[0];
               const linkRes = await fetch(`${apiBaseUrl}/api/products/${product.id}/attachments/link`, {
                 method: "POST",
                 headers: jsonHeaders(),
@@ -270,9 +279,12 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
               });
               if (!linkRes.ok) {
                 const e = await linkRes.json().catch(() => ({}));
+                setNewLinks(remaining); // only the un-posted links survive for retry
                 throw new Error(e.error || e.message || "Failed to add link deliverable");
               }
+              remaining.shift();
             }
+            setNewLinks([]);
             onSaved();
             return;
           }
@@ -281,6 +293,7 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       }
     } catch (err: any) {
       console.error("Save failed:", err.message);
+      setSaveError(err?.message || "Save failed. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -400,7 +413,10 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-zinc-100 flex justify-end gap-2">
+        <div className="px-6 py-4 border-t border-zinc-100 flex items-center justify-end gap-2">
+          {saveError && (
+            <p className="mr-auto text-[12px] text-red-600 max-w-[60%]">{saveError}</p>
+          )}
           <button onClick={handleClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">Cancel</button>
           <button
             onClick={handleSave}
