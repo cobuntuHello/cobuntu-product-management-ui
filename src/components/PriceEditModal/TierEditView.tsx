@@ -131,6 +131,19 @@ export function TierEditView({
         </div>
       </div>
 
+      {/* Download limit — optional per-file cap for buyers of this tier. Blank
+          = unlimited. Enforced by the gated download endpoint. */}
+      <div>
+        <Eyebrow help="Cap how many times a buyer of this tier can download each file. Leave blank for unlimited.">
+          Max downloads per file (optional)
+        </Eyebrow>
+        <div className="mt-1">
+          <StepInput type="number" min={1} value={t.maxDownloads}
+            onChange={(e) => onUpdate({ maxDownloads: e.target.value })}
+            placeholder="Unlimited" />
+        </div>
+      </div>
+
       {/* Pricing — the full pricing surface, inline (model, price, billing,
           installment schedule, and member pricing when enabled). */}
       <div>

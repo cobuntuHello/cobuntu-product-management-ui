@@ -273,6 +273,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               name: t.name,
               description: t.description ?? "",
               licenseTerms: t.licenseTerms ?? "",
+              maxDownloads: t.maxDownloads != null ? String(t.maxDownloads) : "",
               price: String(toDisplay(t.products.price, t.products.currency)),
               currency: t.products.currency,
               capacity: t.capacity != null ? String(t.capacity) : "",
@@ -463,8 +464,9 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         id: newTier.id,
         name: newTier.name,
         description: newTier.description ?? "",
-        // Backend's cloneTier copies licenseTerms across, so hydrate it too.
+        // Backend's cloneTier copies licenseTerms + maxDownloads across.
         licenseTerms: newTier.licenseTerms ?? "",
+        maxDownloads: newTier.maxDownloads != null ? String(newTier.maxDownloads) : "",
         price: String(toDisplay(newTier.products.price, newTier.products.currency)),
         currency: newTier.products.currency,
         capacity: newTier.capacity != null ? String(newTier.capacity) : "",
