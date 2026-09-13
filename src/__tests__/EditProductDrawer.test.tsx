@@ -156,4 +156,53 @@ describe("EditProductDrawer", () => {
     expect(toDelete).toContain("att-link-1");
     expect(toDelete).not.toContain("att-file-1");
   }, 10000);
+
+  it("on a partial link-POST failure: surfaces the error and does not duplicate the posted link on retry", async () => {
+    // First link POST succeeds, second fails. On retry only the un-posted link
+    // should be sent again (no duplicate of the first).
+    let linkPosts = 0;
+    const posted: string[] = [];
+    const fetchImpl = vi.fn(async (url: string, init?: RequestInit) => {
+      const method = (init?.method || "GET").toUpperCase();
+      if (method === "PUT" && url.endsWith("/products/p-1/comprehensive")) return new Response(JSON.stringify({ jobId: "j-1" }), { status: 200 });
+      if (method === "GET" && url.endsWith("/products/update/status/j-1")) return new Response(JSON.stringify({ status: "completed" }), { status: 200 });
+      if (method === "POST" && url.endsWith("/products/p-1/attachments/link")) {
+        linkPosts++;
+        const body = JSON.parse((init!.body as string));
+        if (linkPosts === 2) return new Response(JSON.stringify({ error: "boom" }), { status: 500 }); // second call fails
+        posted.push(body.label);
+        return new Response(JSON.stringify({ id: `att-${body.label}`, kind: "LINK" }), { status: 200 });
+      }
+      return new Response("{}", { status: 200 });
+    });
+    global.fetch = fetchImpl as unknown as typeof fetch;
+
+    const user = userEvent.setup();
+    const props = baseProps();
+    renderWithConfig(<EditProductDrawer {...props} />);
+    await waitFor(() => expect(screen.getByText(/link deliverables/i)).toBeInTheDocument());
+
+    // Stage two links.
+    await user.type(screen.getByPlaceholderText(/^Label/), "L1");
+    await user.type(screen.getByPlaceholderText(/^https/), "https://s.example/1");
+    await user.click(screen.getByRole("button", { name: /add link/i }));
+    await user.type(screen.getByPlaceholderText(/^Label/), "L2");
+    await user.type(screen.getByPlaceholderText(/^https/), "https://s.example/2");
+    await user.click(screen.getByRole("button", { name: /add link/i }));
+
+    // First save: L1 posts OK, L2 500s → error surfaced, onSaved NOT called.
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+    await waitFor(() => expect(screen.getByText(/boom|failed/i)).toBeInTheDocument(), { timeout: 8000 });
+    expect(props.onSaved).not.toHaveBeenCalled();
+    expect(posted).toEqual(["L1"]);
+
+    // Retry: make everything succeed now; only L2 should be POSTed again.
+    linkPosts = 10; // past the failure branch
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+    await waitFor(() => expect(props.onSaved).toHaveBeenCalled(), { timeout: 8000 });
+    const l2Retries = fetchImpl.mock.calls.filter(c => c[0].endsWith("/attachments/link") && (c[1] as RequestInit)?.method === "POST" && JSON.parse((c[1] as RequestInit).body as string).label === "L2");
+    const l1Total = fetchImpl.mock.calls.filter(c => c[0].endsWith("/attachments/link") && (c[1] as RequestInit)?.method === "POST" && JSON.parse((c[1] as RequestInit).body as string).label === "L1");
+    expect(l1Total.length).toBe(1); // L1 never re-POSTed → no duplicate
+    expect(l2Retries.length).toBe(2); // L2 tried on both saves
+  }, 15000);
 });
