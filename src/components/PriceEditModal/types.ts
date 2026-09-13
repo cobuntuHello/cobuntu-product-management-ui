@@ -23,6 +23,9 @@ export interface Tier {
    *  terms — shown pre/post-purchase and on the license certificate.
    *  Nullable: most tiers carry none. */
   licenseTerms?: string | null;
+  /** Optional per-attachment download cap for buyers of this tier
+   *  (feat/tier-max-downloads). Null = unlimited. */
+  maxDownloads?: number | null;
   capacity: number | null;
   /** Non-refunded sales for this tier (backend joins via product_snapshots). */
   salesCount?: number;
@@ -76,6 +79,9 @@ export interface DraftTier {
   /** Per-tier license terms (feat/tier-license-terms). Plain string ("" when
    *  none) mirroring `description`; buildTierBody flips blank → null. */
   licenseTerms: string;
+  /** Optional per-attachment download cap (feat/tier-max-downloads). Display
+   *  string ("" = unlimited); buildTierBody parses to a positive int or null. */
+  maxDownloads: string;
   price: string;
   currency: string;
   capacity: string;

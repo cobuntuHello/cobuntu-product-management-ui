@@ -123,6 +123,19 @@ describe("PriceEditModal helpers (product) — validateTier", () => {
     expect(blankTier().licenseTerms).toBe("");
   });
 
+  it("blankTier defaults maxDownloads to an empty string", () => {
+    expect(blankTier().maxDownloads).toBe("");
+  });
+
+  it("rejects a non-positive / non-integer maxDownloads and accepts a valid one / blank", () => {
+    for (const bad of ["0", "-1", "2.5"]) {
+      expect(validateTier({ ...blankTier(), name: "Std", price: "10", maxDownloads: bad }))
+        .toMatch(/Max downloads/);
+    }
+    expect(validateTier({ ...blankTier(), name: "Std", price: "10", maxDownloads: "5" })).toBeNull();
+    expect(validateTier({ ...blankTier(), name: "Std", price: "10", maxDownloads: "" })).toBeNull();
+  });
+
   // ── Event-ported auto-schedule sales-window rules. ──
   describe("auto-schedule sales window (event-ported)", () => {
     const sched = (over: Record<string, unknown>) =>
@@ -359,6 +372,13 @@ describe("PriceEditModal helpers (product) — buildTierBody", () => {
       .toMatchObject({ licenseTerms: "Commercial use OK" });
     expect(buildTierBody({ ...blankTier(), name: "Std", price: "10", licenseTerms: "   " }))
       .toMatchObject({ licenseTerms: null });
+  });
+
+  it("maps maxDownloads to a positive int, and blank to null", () => {
+    expect(buildTierBody({ ...blankTier(), name: "Personal", price: "5", maxDownloads: "3" }))
+      .toMatchObject({ maxDownloads: 3 });
+    expect(buildTierBody({ ...blankTier(), name: "Std", price: "10", maxDownloads: "" }))
+      .toMatchObject({ maxDownloads: null });
   });
 
   it("emits product keys AND the event-ported scheduling keys together", () => {
