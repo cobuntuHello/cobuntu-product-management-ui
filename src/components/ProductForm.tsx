@@ -306,6 +306,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const [isTagsOpen, setIsTagsOpen] = useState(false);
   const [isFilesOpen, setIsFilesOpen] = useState(false);
   const [isLinksOpen, setIsLinksOpen] = useState(false);
+  const [isLicenseOpen, setIsLicenseOpen] = useState(false);
   const [isCtaOpen, setIsCtaOpen] = useState(false);
   const [isPhysicalOpen, setIsPhysicalOpen] = useState(false);
 
@@ -390,8 +391,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
    */
   useEffect(() => {
     if (!isPhysical) setIsPhysicalOpen(false);
-    // Same rule in the other direction: Files does not apply to a parcel.
-    if (isPhysical) setIsFilesOpen(false);
+    // Same rule in the other direction: Files and the license that governs them
+    // do not apply to a parcel.
+    if (isPhysical) { setIsFilesOpen(false); setIsLicenseOpen(false); }
   }, [isPhysical]);
 
   // ─── Inline photo upload ───
@@ -593,6 +595,14 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   // to before, so the drawer and admin single-page form are unaffected.
   const showListing = page !== "commerce";
   const showCommerce = page !== "listing";
+
+  // License & usage summary, for its collapsed row. "Configured" = a tier has
+  // terms or a download cap; the license is per-tier, so the summary counts them.
+  const licensedTiers = configuredTiers.filter(t => !!t.licenseTerms?.trim() || !!t.maxDownloads?.trim());
+  const hasLicense = licensedTiers.length > 0;
+  const licenseSummary = configuredTiers.length > 1
+    ? `${licensedTiers.length} of ${configuredTiers.length} tiers`
+    : (configuredTiers[0]?.licenseTerms?.trim() || "Download cap set");
 
   return (
     <div className="space-y-6">
@@ -819,6 +829,24 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
         </button>
         )}
+
+        {/* License & usage — the terms that govern the files/links above, per
+            tier. A row + modal like the others, sitting WITH the deliverables it
+            licenses (above the Pricing card). Digital-only; needs tiers to
+            attach the terms to. */}
+        {showTiers && !isPhysical && (
+        <button type="button" onClick={() => setIsLicenseOpen(true)}
+          className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
+          {hasLicense ? (
+            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
+          ) : <ScrollText className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
+          <span className="flex-1 min-w-0">
+            <span className={`block text-sm truncate ${hasLicense ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{hasLicense ? "License & usage" : "Add license & usage"}<span className="font-normal text-zinc-400 text-[12.5px]">{hasLicense ? "" : " · optional"}</span></span>
+            {hasLicense && <span className="block text-[12.5px] text-zinc-500 truncate">{licenseSummary}</span>}
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
+        </button>
+        )}
       </div>
       )}
 
@@ -846,41 +874,23 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 </div>
                 {configuredTiers.length > 0 && (
                   <div className="space-y-2 mb-3">
-                    {configuredTiers.map((t, i) => {
-                      const published = !!t.publishedAt;
-                      return (
-                      <div key={i}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white hover:bg-zinc-100 transition-all duration-150">
-                        {/* Only this part opens the tier. The row itself cannot
-                            be the button — the publish switch below is
-                            interactive, and nesting the two is invalid HTML
-                            that fires both handlers on one click. */}
-                        <button type="button" onClick={() => openTierEditor(t.localId)}
-                          className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-zinc-200 text-zinc-600">
-                            <DollarSign className="h-3.5 w-3.5" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-medium text-zinc-800 truncate">{t.name.trim() || "Unnamed tier"}</p>
-                            <p className="text-[11px] text-zinc-400">{t.price && parseFloat(t.price) > 0 ? `${getCurrencySymbol(t.currency)}${t.price}` : "Free"}</p>
-                          </div>
-                        </button>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className={`text-[10.5px] ${published ? "text-zinc-500" : "text-zinc-400"}`}>
-                            {published ? "Published" : "Draft"}
-                          </span>
-                          <Switch
-                            checked={published}
-                            aria-label={`Publish ${t.name.trim() || "tier"}`}
-                            onCheckedChange={(next: boolean) => setTiers(prev => prev.map(x =>
-                              x.localId === t.localId
-                                ? { ...x, publishedAt: next ? new Date().toISOString() : null }
-                                : x))}
-                          />
+                    {configuredTiers.map((t, i) => (
+                      /* The whole row opens the tier editor. The publish switch
+                         that used to sit here is gone — publishing a tier lives
+                         inside that editor's Availability section, so a second
+                         copy here was one control writing another's value. */
+                      <button key={i} type="button" onClick={() => openTierEditor(t.localId)}
+                        className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white hover:bg-zinc-100 transition-all duration-150 text-left cursor-pointer">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-zinc-200 text-zinc-600">
+                          <DollarSign className="h-3.5 w-3.5" />
                         </div>
-                      </div>
-                      );
-                    })}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-medium text-zinc-800 truncate">{t.name.trim() || "Unnamed tier"}</p>
+                          <p className="text-[11px] text-zinc-400">{t.price && parseFloat(t.price) > 0 ? `${getCurrencySymbol(t.currency)}${t.price}` : "Free"}</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
+                      </button>
+                    ))}
                   </div>
                 )}
                 <button type="button" onClick={addAndEditTier}
@@ -892,50 +902,6 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 </button>
               </div>
             )}
-            </div>
-          )}
-
-          {/* ─── License & usage ───
-              Per-tier license terms + download cap, surfaced here as a
-              first-class section instead of being buried in the tier editor
-              drill-in. Bound to the same tier drafts the Pricing card drives. */}
-          {showTiers && !isPhysical && (
-            <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 overflow-hidden">
-              <div className="px-5 py-4">
-                <div className="flex items-center gap-3 mb-1">
-                  <ScrollText className="h-[18px] w-[18px] text-zinc-400" />
-                  <span className="text-sm font-medium text-zinc-800">License &amp; usage</span>
-                </div>
-                <p className="text-[12.5px] text-zinc-400 mb-3">What a buyer of each tier is licensed to do, and an optional download cap. Optional.</p>
-                <div className="space-y-4">
-                  {configuredTiers.map(t => (
-                    <div key={t.localId} className={configuredTiers.length > 1 ? "rounded-xl ring-1 ring-zinc-100 p-3" : ""}>
-                      {configuredTiers.length > 1 && (
-                        <p className="text-[12px] font-medium text-zinc-700 mb-1.5">{t.name}</p>
-                      )}
-                      <textarea
-                        value={t.licenseTerms}
-                        maxLength={TIER_LICENSE_TERMS_MAX}
-                        onChange={e => patchTier(t.localId, { licenseTerms: e.target.value })}
-                        placeholder="License terms — e.g. Personal use only. No resale or redistribution."
-                        rows={2}
-                        className="w-full px-3 py-2 text-[13px] rounded-lg ring-1 ring-zinc-200 focus:outline-none focus:ring-zinc-400 placeholder:text-zinc-400 resize-y"
-                      />
-                      <div className="flex items-center gap-2 mt-2">
-                        <label className="text-[12.5px] text-zinc-500 flex-1">Max downloads per file <span className="text-zinc-400">· blank = unlimited</span></label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={t.maxDownloads}
-                          onChange={e => patchTier(t.localId, { maxDownloads: e.target.value })}
-                          placeholder="Unlimited"
-                          className="w-[120px] shrink-0 text-right px-3 py-1.5 text-sm text-zinc-800 bg-white rounded-lg ring-1 ring-zinc-200 focus:outline-none focus:ring-zinc-400 placeholder:text-zinc-400"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           )}
 
@@ -1159,6 +1125,49 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
 
           <DialogFooter>
             <Button onClick={() => setIsLinksOpen(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── License & usage Modal ─── (per-tier terms + download cap that
+           govern the files/links above). Digital-only; bound to the same tier
+           drafts the Pricing card drives. */}
+      <Dialog open={showTiers && !isPhysical && isLicenseOpen} onOpenChange={setIsLicenseOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>License &amp; usage</DialogTitle>
+            <DialogDescription>What a buyer of each tier is licensed to do, and an optional download cap. Optional.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {configuredTiers.map(t => (
+              <div key={t.localId} className={configuredTiers.length > 1 ? "rounded-xl ring-1 ring-zinc-100 p-3" : ""}>
+                {configuredTiers.length > 1 && (
+                  <p className="text-[12px] font-medium text-zinc-700 mb-1.5">{t.name}</p>
+                )}
+                <textarea
+                  value={t.licenseTerms}
+                  maxLength={TIER_LICENSE_TERMS_MAX}
+                  onChange={e => patchTier(t.localId, { licenseTerms: e.target.value })}
+                  placeholder="License terms — e.g. Personal use only. No resale or redistribution."
+                  rows={2}
+                  className="w-full px-3 py-2 text-[13px] rounded-lg ring-1 ring-zinc-200 focus:outline-none focus:ring-zinc-400 placeholder:text-zinc-400 resize-y"
+                />
+                <div className="flex items-center gap-2 mt-2">
+                  <label className="text-[12.5px] text-zinc-500 flex-1">Max downloads per file <span className="text-zinc-400">· blank = unlimited</span></label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={t.maxDownloads}
+                    onChange={e => patchTier(t.localId, { maxDownloads: e.target.value })}
+                    placeholder="Unlimited"
+                    className="w-[120px] shrink-0 text-right px-3 py-1.5 text-sm text-zinc-800 bg-white rounded-lg ring-1 ring-zinc-200 focus:outline-none focus:ring-zinc-400 placeholder:text-zinc-400"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setIsLicenseOpen(false)}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
