@@ -204,6 +204,20 @@ interface ProductFormProps {
    * form must not render a second, conflicting section there.
    */
   showLinkDeliverables?: boolean;
+  /**
+   * Which half of the form to render, so a wizard can spread ONE mounted
+   * instance across two steps without splitting its state:
+   *   - "listing"  → name, photos, description, tags, category, CTA
+   *   - "commerce" → postage/condition, stock, files, links, pricing tiers,
+   *                  per-tier license, approval, community access
+   *   - "all" (default) → everything, one page. The manage/edit drawer and the
+   *                  admin single-page form pass nothing and get "all", so they
+   *                  are unaffected.
+   * Only VISIBLE blocks change; state, onChange, and every modal stay mounted
+   * regardless of page, so opening a dialog on one page and switching pages
+   * never loses its contents.
+   */
+  page?: "listing" | "commerce" | "all";
 }
 
 /**
@@ -218,7 +232,7 @@ const LINK_URL_RE = /^https?:\/\/\S+$/i;
 
 // ─── Component ─────────────────────────────────────────────────
 
-export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true }: ProductFormProps) {
+export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all" }: ProductFormProps) {
   // Form state
   const [name, setName] = useState(initialData?.name || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -575,8 +589,14 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   // seed tier ("Standard") counts once the user has named it.
   const configuredTiers = tiers.filter(t => !t.deleted && t.name.trim());
 
+  // Which page's blocks to render. Default "all" → both true → byte-identical
+  // to before, so the drawer and admin single-page form are unaffected.
+  const showListing = page !== "commerce";
+  const showCommerce = page !== "listing";
+
   return (
     <div className="space-y-6">
+      {showListing && (<>
       {/* ─── Product name — big inline title (borderless, matches event) ─── */}
       <div>
         <input value={name} onChange={e => setName(e.target.value)} placeholder="Product Name"
@@ -648,9 +668,14 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         <p className="text-[12px] text-zinc-400 mt-2.5">{mediaItems.length > 0 ? `${mediaItems.length} of 5 photos · tap a photo to make it the cover` : "Up to 5 photos · the first is your cover"}</p>
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={onPhotoFile} />
       </div>
+      </>)}
 
       {/* ─── Detail rows — done-states (check + snippet when filled) + hover
-           motion. The whole row lifts on hover; the chevron nudges right. ─── */}
+           motion. Split into a LISTING group (description · tags · category ·
+           CTA) and a COMMERCE group (postage · stock · files · links) so the
+           create wizard can show each on its own step via `page`; "all" renders
+           both, listing first. ─── */}
+      {showListing && (
       <div className="space-y-2.5">
         <button type="button" onClick={() => setIsDescriptionOpen(true)}
           className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
@@ -687,6 +712,22 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           }}
         />
 
+        <button type="button" onClick={() => setIsCtaOpen(true)}
+          className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
+          {ctaText.trim() ? (
+            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
+          ) : <MousePointerClick className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
+          <span className="flex-1 min-w-0">
+            <span className={`block text-sm truncate ${ctaText.trim() ? "font-medium text-zinc-800" : "text-zinc-500"}`}>Call to Action Label<span className="font-normal text-zinc-400 text-[12.5px]">{ctaText.trim() ? "" : " · optional"}</span></span>
+            {ctaText.trim() && <span className="block text-[12.5px] text-zinc-500 truncate">&ldquo;{ctaText}&rdquo;</span>}
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
+        </button>
+      </div>
+      )}
+
+      {showCommerce && (
+      <div className="space-y-2.5">
         {/*
           * Physical only, and it renders NOTHING for anything else — not a
           * disabled row, not a row that says "not applicable". A digital
@@ -778,19 +819,8 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
         </button>
         )}
-
-        <button type="button" onClick={() => setIsCtaOpen(true)}
-          className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
-          {ctaText.trim() ? (
-            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
-          ) : <MousePointerClick className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
-          <span className="flex-1 min-w-0">
-            <span className={`block text-sm truncate ${ctaText.trim() ? "font-medium text-zinc-800" : "text-zinc-500"}`}>Call to Action Label<span className="font-normal text-zinc-400 text-[12.5px]">{ctaText.trim() ? "" : " · optional"}</span></span>
-            {ctaText.trim() && <span className="block text-[12.5px] text-zinc-500 truncate">&ldquo;{ctaText}&rdquo;</span>}
-          </span>
-          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
-        </button>
       </div>
+      )}
 
       {/* ─── Product Options ─── one card, hairline-divided rows (mirrors the
            event "Event Options" card). Pricing is the first row and opens the
@@ -799,7 +829,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       {/* The "Product Options" eyebrow was removed 2026-08-09 — the rows say
           what they are, and the label was the only thing separating this card
           from the detail rows above it. */}
-      {(showTiers || !hideVisibility || !hideApproval) && (
+      {showCommerce && (showTiers || !hideVisibility || !hideApproval) && (
         <div className="space-y-6">
           {showTiers && (
             <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
