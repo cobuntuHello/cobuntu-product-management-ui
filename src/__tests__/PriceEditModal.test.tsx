@@ -4,6 +4,16 @@ import userEvent from "@testing-library/user-event";
 import { PriceEditModal } from "../components/PriceEditModal";
 import { renderWithConfig, mockFetch } from "./test-utils";
 
+/**
+ * PriceEditModal — the redesigned single-scroll variant editor
+ * (feat/product-variants-editor).
+ *
+ * The old three-level flow (list → per-tier hub → focused step) collapsed to
+ * two: the variant LIST, and ONE scrolling editor per variant. So tapping a
+ * variant row now lands directly on name / description / pricing / advanced —
+ * there is no "Pricing configuration" or "Details" tile to click through.
+ */
+
 const product = {
   id: "p-1",
   name: "Cool product",
@@ -25,20 +35,18 @@ const baseProps = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("PriceEditModal", () => {
-  it("when no tiers exist: pre-fills a Standard tier with the parent product price", async () => {
+  it("when no tiers exist: pre-fills a Standard variant with the parent product price", async () => {
     const user = userEvent.setup();
     mockFetch([
       { method: "GET", url: "/products/p-1/tiers", body: [] },
     ]);
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    // L1: pre-filled Standard tier visible as a row.
+    // L1: pre-filled Standard variant visible as a row.
     const row = await screen.findByRole("button", { name: /Standard/ });
-    // Click row → L2 hub.
+    // Click row → single-scroll editor. Price is inline (no tile to open).
     await user.click(row);
-    // L2 → click Pricing configuration tile → L3 where price lives.
-    await user.click(await screen.findByRole("button", { name: /Pricing configuration/ }));
-    // BasicsStep mounted; price prefilled from product.price (2500 → 25).
+    // price prefilled from product.price (2500 → 25).
     expect(screen.getByDisplayValue("25")).toBeInTheDocument();
   });
 
@@ -60,9 +68,8 @@ describe("PriceEditModal", () => {
     ]);
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    // L1 → row → L2 → Pricing configuration → L3 for the price input.
+    // L1 → row → single-scroll editor; price input is inline.
     await user.click(await screen.findByRole("button", { name: /Pro/ }));
-    await user.click(await screen.findByRole("button", { name: /Pricing configuration/ }));
     expect(screen.getByDisplayValue("50")).toBeInTheDocument();
   });
 
@@ -82,7 +89,7 @@ describe("PriceEditModal", () => {
     const props = baseProps();
     renderWithConfig(<PriceEditModal {...props} />);
 
-    // Wait for L1 row, then save without entering the hub — Save is on the modal footer.
+    // Wait for L1 row, then save without entering the editor — Save is on the modal footer.
     await screen.findByRole("button", { name: /Pro/ });
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
@@ -95,7 +102,7 @@ describe("PriceEditModal", () => {
     expect(putBody).toMatchObject({ name: "Pro", price: 50, currency: "EUR" });
   });
 
-  it("on validation failure (blank tier name): toasts the error, does NOT call onSaved", async () => {
+  it("on validation failure (blank variant name): toasts the error, does NOT call onSaved", async () => {
     mockFetch([
       {
         method: "GET", url: "/products/p-1/tiers", body: [
@@ -110,11 +117,10 @@ describe("PriceEditModal", () => {
     const props = baseProps();
     renderWithConfig(<PriceEditModal {...props} />);
 
-    // L1 → click tier row → L2 → open Details (name lives there now).
+    // L1 → click row → editor. Name lives at the top of the scroll.
     await user.click(await screen.findByRole("button", { name: /Pro/ }));
-    await user.click(await screen.findByRole("button", { name: /Details/ }));
     const input = (await screen.findByPlaceholderText(
-      "Standard, VIP, Early-bird…",
+      "e.g. Blue / M — or Personal",
     )) as HTMLInputElement;
     await user.clear(input);
 
@@ -124,7 +130,7 @@ describe("PriceEditModal", () => {
     expect(props.onSaved).not.toHaveBeenCalled();
   });
 
-  it("tier with salesCount > 0: shows 'X sold' badge + disables price input", async () => {
+  it("variant with salesCount > 0: shows 'X sold' badge + disables price input", async () => {
     const user = userEvent.setup();
     mockFetch([
       {
@@ -143,67 +149,72 @@ describe("PriceEditModal", () => {
     await waitFor(() =>
       expect(screen.getAllByText(/7\/50/).length).toBeGreaterThanOrEqual(1),
     );
-    // L1 → click row → L2 → click Pricing configuration tile → L3 where price lives.
+    // L1 → click row → editor. Price is inline and locked.
     await user.click(screen.getByRole("button", { name: /Pro/ }));
-    await user.click(await screen.findByRole("button", { name: /Pricing configuration/ }));
     const priceInput = screen.getByPlaceholderText("0.00") as HTMLInputElement;
     expect(priceInput.value).toBe("50");
     expect(priceInput.disabled).toBe(true);
   });
 
-  it("Duplicate button on saved tier: POSTs copyFromTierId, appends the new tier", async () => {
-    const fetchMock = mockFetch([
+  it("physical product: the editor's shape core shows Condition / Parcel size / Stock", async () => {
+    const user = userEvent.setup();
+    mockFetch([
+      { method: "GET", url: "/products/p-1/tiers", body: [] },
+    ]);
+    renderWithConfig(<PriceEditModal {...baseProps({ productType: "PHYSICAL" })} />);
+
+    await user.click(await screen.findByRole("button", { name: /Standard/ }));
+
+    expect(screen.getByText("Condition")).toBeInTheDocument();
+    expect(screen.getByText("Parcel size")).toBeInTheDocument();
+    expect(screen.getByText("Stock")).toBeInTheDocument();
+    // Digital-only deliverables must NOT appear on a physical product.
+    expect(screen.queryByText("Files")).not.toBeInTheDocument();
+    expect(screen.queryByText("External links")).not.toBeInTheDocument();
+  });
+
+  it("digital product: the editor's shape core shows Files / External links / Licence", async () => {
+    const user = userEvent.setup();
+    mockFetch([
+      { method: "GET", url: "/products/p-1/tiers", body: [] },
+    ]);
+    renderWithConfig(<PriceEditModal {...baseProps({ productType: "DIGITAL" })} />);
+
+    await user.click(await screen.findByRole("button", { name: /Standard/ }));
+
+    expect(screen.getByText("Files")).toBeInTheDocument();
+    expect(screen.getByText("External links")).toBeInTheDocument();
+    expect(screen.getByText("Licence")).toBeInTheDocument();
+    // Physical-only fields must NOT appear on a digital product.
+    expect(screen.queryByText("Condition")).not.toBeInTheDocument();
+    expect(screen.queryByText("Parcel size")).not.toBeInTheDocument();
+  });
+
+  it("footer: Delete is hidden for the only variant, shown once more than one exists", async () => {
+    const user = userEvent.setup();
+    mockFetch([
       {
         method: "GET", url: "/products/p-1/tiers", body: [
           {
-            id: "t-1", name: "Pro", capacity: null, priceMode: "fixed", pwywMinAmount: null,
+            id: "t-1", name: "Solo", capacity: null, priceMode: "fixed", pwywMinAmount: null,
             products: { id: "tp-1", price: 5000, currency: "EUR", isRecurring: false, recurringInterval: null },
           },
         ],
       },
-      {
-        method: "POST", url: "/products/p-1/tiers", body: {
-          id: "t-2", name: "Pro (copy)", capacity: null, priceMode: "fixed", pwywMinAmount: null,
-          products: { id: "tp-2", price: 5000, currency: "EUR", isRecurring: false, recurringInterval: null },
-        },
-      },
     ]);
-    const user = userEvent.setup();
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    // Duplicate is an L2 (per-tier hub) footer action now — enter the tier first.
-    await user.click(await screen.findByRole("button", { name: /Pro/ }));
-    await user.click(await screen.findByRole("button", { name: /^duplicate$/i }));
+    // Only variant → editor footer is two equal buttons: Cancel + Save, no Delete.
+    await user.click(await screen.findByRole("button", { name: /Solo/ }));
+    expect(screen.getByRole("button", { name: /^cancel$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^delete$/i })).not.toBeInTheDocument();
 
-    // The POST fires immediately; wait for it before navigating back.
+    // Add a second variant → its editor opens with Delete available.
+    await user.click(screen.getByRole("button", { name: /^cancel$/i }));
+    await user.click(await screen.findByRole("button", { name: /Add variant/i }));
     await waitFor(() =>
-      expect(fetchMock.mock.calls.some(c => (c[1] as RequestInit | undefined)?.method === "POST")).toBe(true),
+      expect(screen.getByRole("button", { name: /^delete$/i })).toBeInTheDocument(),
     );
-
-    // Back to L1 — both tiers (incl. the appended copy) show as rows.
-    await user.click(screen.getByRole("button", { name: /^Back$/ }));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Pro \(copy\)/ })).toBeInTheDocument(),
-    );
-
-    const postCall = fetchMock.mock.calls.find(c => (c[1] as RequestInit | undefined)?.method === "POST");
-    expect(postCall).toBeDefined();
-    const body = JSON.parse((postCall![1] as RequestInit).body as string);
-    expect(body).toEqual({ copyFromTierId: "t-1" });
-  });
-
-  it("unsaved tier: Duplicate button is NOT rendered (it'd 404 — no backend id yet)", async () => {
-    mockFetch([
-      { method: "GET", url: "/products/p-1/tiers", body: [] },
-    ]);
-    const user = userEvent.setup();
-    renderWithConfig(<PriceEditModal {...baseProps()} />);
-
-    // L1: pre-filled unsaved "Standard" row is visible. Enter it → L2 hub.
-    await user.click(await screen.findByRole("button", { name: /Standard/ }));
-    // Delete (always shown) confirms we're in the L2 footer; Duplicate is
-    // hidden for unsaved tiers (no backend id to copy from).
-    await screen.findByRole("button", { name: "Delete" });
-    expect(screen.queryByRole("button", { name: /^duplicate$/i })).not.toBeInTheDocument();
   });
 });

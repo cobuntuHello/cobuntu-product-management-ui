@@ -127,6 +127,29 @@ export interface DraftTier {
   installmentAccessMonths: string;
   expanded: boolean;
   deleted?: boolean;
+  /**
+   * Variant-editor local-only draft fields (feat/product-variants-editor).
+   *
+   * The single-scroll variant editor surfaces shape-specific attributes the
+   * backend does not yet persist at the tier level. They are held here as
+   * LOCAL draft state only — buildTierBody / draftTiersToCreatePayload do NOT
+   * emit them, so the save payload is byte-identical to before. A later phase
+   * adds persistence. Reused, persisted fields stay where they are: Stock →
+   * capacity, Licence → licenseTerms, Downloads-per-file → maxDownloads.
+   *
+   *   - attrs:     "Other attributes" — controlled-vocabulary key/value pairs
+   *                buyers pick by (Colour, Size, …). Not freeform.
+   *   - condition/parcelSize: physical-shape core selects.
+   *   - files/links: digital-shape deliverables (file names, external URLs).
+   *
+   * All optional so the many existing DraftTier construction sites (the /tiers
+   * mapper, duplicateTier, tests) need no change — reads default to empty.
+   */
+  attrs?: { k: string; v: string }[];
+  condition?: string;
+  parcelSize?: string;
+  files?: string[];
+  links?: string[];
   /** When this draft was created via "Duplicate", the source's tier
    *  id. The POST body sends it as copyFormFromTierId so the backend
    *  clones the source's registration form onto the new tier in the
@@ -145,6 +168,37 @@ export interface DraftTier {
   salesStartAt: string;
   salesEndAt: string;
 }
+
+/**
+ * Controlled vocabularies for the variant editor (feat/product-variants-editor).
+ * These match the prototype (product-builder-app.html) exactly and drive the
+ * shape-specific selects + the "Other attributes" key picker. Kept here so the
+ * editor and any future persistence layer read a single source.
+ */
+/** Physical condition — empty string = "Not specified". */
+export const VARIANT_CONDITIONS: ReadonlyArray<string> = [
+  "",
+  "New with tags",
+  "Very good",
+  "Good",
+  "Satisfactory",
+];
+/** Parcel size — [value, label, weight hint]. */
+export const VARIANT_PARCELS: ReadonlyArray<[string, string, string]> = [
+  ["STANDARD", "Standard parcel", "Up to 2 kg"],
+  ["HEAVY", "Large or heavy", "2–20 kg"],
+];
+/** "Other attributes" keys — buyers pick by these, from a defined set. */
+export const VARIANT_ATTR_KEYS: ReadonlyArray<string> = [
+  "Colour",
+  "Size",
+  "Material",
+  "Style",
+  "Length",
+  "Format",
+  "Flavour",
+  "Scent",
+];
 
 /** Sidecar donation config — saved separately from tiers via PUT
  *  /products/:id/donations. Mirrors events.donationConfig. */
