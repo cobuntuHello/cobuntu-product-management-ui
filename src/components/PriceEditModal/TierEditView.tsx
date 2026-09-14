@@ -168,7 +168,11 @@ export function TierEditView({
           sub-screen. Matches the approved mockup. */}
       <div>
         <Eyebrow>Advanced</Eyebrow>
-        <div className="mt-1.5 rounded-2xl ring-1 ring-zinc-100 divide-y divide-zinc-100 overflow-hidden">
+        {/* border, not ring: a ring is an OUTSET box-shadow that the modal's
+            overflow-y scroll container clips at the card's left/right edges and
+            rounded corners (the "hidden border" bug). A border lives inside the
+            box, so overflow-hidden clips the rows to it and nothing is cut. */}
+        <div className="mt-1.5 rounded-2xl border border-zinc-100 divide-y divide-zinc-100 overflow-hidden">
           <AdvancedRow
             icon={<Package className="h-[17px] w-[17px]" />}
             label="Capacity"
@@ -203,7 +207,7 @@ export function TierEditView({
       {onTogglePublish && (
         <div>
           <Eyebrow>Availability</Eyebrow>
-          <div className="mt-1.5 rounded-2xl ring-1 ring-zinc-100 overflow-hidden">
+          <div className="mt-1.5 rounded-2xl border border-zinc-100 overflow-hidden">
             <div className="flex items-center gap-3 px-4 py-3.5">
               <span className="text-zinc-400 shrink-0">
                 {published ? <Eye className="h-[17px] w-[17px]" /> : <EyeOff className="h-[17px] w-[17px]" />}
