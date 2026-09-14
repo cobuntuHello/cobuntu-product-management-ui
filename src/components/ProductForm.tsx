@@ -1173,6 +1173,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             draftMode
             initialDraftTiers={pendingNewTier ? [...tiers, pendingNewTier] : tiers}
             initialDraftDonation={donation}
+            productType={productType}
             openTierLocalId={editTierLocalId}
             onDraftCommit={({ tiers: nextTiers, donation: nextDonation }) => {
               setTiers(nextTiers);

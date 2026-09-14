@@ -206,7 +206,7 @@ describe("PriceEditModal — draftMode registration form", () => {
     await user.click(await screen.findByRole("button", { name: /Standard/ }));
 
     const row = await screen.findByRole("button", { name: /Registration form/i });
-    expect(row.textContent).toMatch(/2 fields/i);
+    expect(row.textContent).toMatch(/2 questions/i);
   });
 
   it("actually RENDERS the builder on a draft tier", async () => {

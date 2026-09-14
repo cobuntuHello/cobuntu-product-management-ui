@@ -289,9 +289,27 @@ export function buildTierBody(
       ? new Date(t.salesEndAt).toISOString()
       : null,
   };
+  // Structured attributes ("Other attributes"). Map the editor's {k,v} draft
+  // shape to the backend contract [{key,value}], trimming and dropping any row
+  // that's missing a key or a value (the backend re-validates keys against its
+  // vocabulary + caps). Always sent: an empty array clears prior attributes,
+  // matching the backend's present-only update semantics.
+  const attributes = (t.attrs ?? [])
+    .map((a) => ({ key: (a.k || "").trim(), value: (a.v || "").trim() }))
+    .filter((a) => a.key && a.value);
+  // Physical shape fields, sent ONLY when set. The backend rejects
+  // condition/parcelClass on a non-physical parent (no-mixing → 400), so a
+  // digital variant (both unset) must omit them entirely; a physical variant
+  // carries the ProductCondition enum value + STANDARD|HEAVY parcel class.
+  const physicalBody = {
+    ...(t.condition ? { condition: t.condition } : {}),
+    ...(t.parcelSize ? { parcelClass: t.parcelSize } : {}),
+  };
   return {
     name: t.name.trim(),
     description: t.description.trim() || null,
+    attributes,
+    ...physicalBody,
     // Blank → null so an empty box clears any prior terms (the backend
     // normalizeLicenseTerms does the same trim/blank→null server-side).
     licenseTerms: t.licenseTerms.trim() || null,

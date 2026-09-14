@@ -288,6 +288,7 @@ export function DetailsView({
           onSaved={() => { setModal(null); void onUpdate(); }}
           showToast={showToast}
           showMemberPricing={showMemberPricing}
+          productType={product.productType}
         />
       )}
 
