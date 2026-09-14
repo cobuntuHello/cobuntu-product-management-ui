@@ -17,7 +17,7 @@ import { FileUploadZone, type UploadedFile } from "../ui/file-upload-zone";
 import { cn } from "../ui/utils";
 import { PriceEditModal } from "./PriceEditModal";
 import { ProductManagementConfigProvider } from "../config";
-import { type DraftTier, type DonationDraft } from "./PriceEditModal/types";
+import { type DraftTier, type DonationDraft, TIER_LICENSE_TERMS_MAX } from "./PriceEditModal/types";
 import { blankTier, blankDonation } from "./PriceEditModal/helpers";
 import { CategoryPickerRow, type CategoryOption } from "./CategoryPickerRow";
 import {
@@ -40,6 +40,7 @@ import {
   DollarSign, MousePointerClick, ChevronRight,
   Eye, EyeOff, UserCheck, Lock, ClipboardCheck,
   Image as ImageIcon, Plus, Check, X,
+  Link as LinkIcon, ScrollText,
 } from "lucide-react";
 
 // draftMode makes ZERO API calls (mount fetch, member-pricing fetch, and
@@ -83,6 +84,10 @@ export interface ProductFormData {
   subCategoryId: string | null;
   mediaItems: MediaItem[];
   productFiles: UploadedFile[];
+  /** External link deliverables staged on the form — revealed to verified
+   *  buyers post-purchase (feat/create-form-link). Persisted on create via the
+   *  upload job's `links` field. Empty for physical products. */
+  links: { label: string; url: string }[];
   isPaid: boolean;
   price: string;
   currency: string;
@@ -192,6 +197,13 @@ interface ProductFormProps {
    * passes the product's own type when editing.
    */
   productType?: "DIGITAL" | "PHYSICAL" | "COURSE";
+  /**
+   * When true (default), the form renders its own "Link deliverables" section
+   * (staged into ProductFormData.links, persisted on create). The EDIT drawer
+   * passes false — it manages links itself against the live product, so the
+   * form must not render a second, conflicting section there.
+   */
+  showLinkDeliverables?: boolean;
 }
 
 /**
@@ -201,9 +213,12 @@ interface ProductFormProps {
  */
 const AUTO_SEED_NAME = /^(Standard|Tier \d+)$/;
 
+/** Matches the backend's link guard (http/https only). */
+const LINK_URL_RE = /^https?:\/\/\S+$/i;
+
 // ─── Component ─────────────────────────────────────────────────
 
-export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL" }: ProductFormProps) {
+export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true }: ProductFormProps) {
   // Form state
   const [name, setName] = useState(initialData?.name || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -215,6 +230,11 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const [tags, setTags] = useState<Tag[]>(initialData?.tags || []);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>(initialData?.mediaItems || []);
   const [productFiles, setProductFiles] = useState<UploadedFile[]>(initialData?.productFiles || []);
+  // Link deliverables staged on the form (feat/create-form-link).
+  const [links, setLinks] = useState<{ label: string; url: string }[]>(initialData?.links || []);
+  const [linkLabelDraft, setLinkLabelDraft] = useState("");
+  const [linkUrlDraft, setLinkUrlDraft] = useState("");
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [isPaid, setIsPaid] = useState(initialData?.isPaid || false);
   const [price, setPrice] = useState(initialData?.price || "");
   const [currency, setCurrency] = useState(initialData?.currency || "USD");
@@ -271,6 +291,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const [subCategoryId, setSubCategoryId] = useState<string | null>(initialData?.subCategoryId ?? null);
   const [isTagsOpen, setIsTagsOpen] = useState(false);
   const [isFilesOpen, setIsFilesOpen] = useState(false);
+  const [isLinksOpen, setIsLinksOpen] = useState(false);
   const [isCtaOpen, setIsCtaOpen] = useState(false);
   const [isPhysicalOpen, setIsPhysicalOpen] = useState(false);
 
@@ -319,6 +340,25 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       next[idx] = { ...next[idx], capacity: digits };
       return next;
     });
+  }
+
+  // ── Link deliverables ──────────────────────────────────────────
+  function addLinkDraft() {
+    const url = linkUrlDraft.trim();
+    if (!LINK_URL_RE.test(url)) { setLinkError("Enter a valid http(s) link."); return; }
+    setLinks(prev => [...prev, { url, label: linkLabelDraft.trim() || url }]);
+    setLinkLabelDraft("");
+    setLinkUrlDraft("");
+    setLinkError(null);
+  }
+  function removeLink(idx: number) {
+    setLinks(prev => prev.filter((_, i) => i !== idx));
+  }
+  // Per-tier license/usage patch — mirrors setQuantity's per-tier write, so the
+  // form-level "License & usage" section stays in sync with the tier drafts the
+  // pricing editor also drives.
+  function patchTier(localId: string, patch: Partial<DraftTier>) {
+    setTiers(prev => prev.map(t => t.localId === localId ? { ...t, ...patch } : t));
   }
 
   /*
@@ -472,6 +512,11 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         || t.priceMode === "pwyw"
         || !!t.capacity?.trim()
         || !!t.draftForm?.fields?.length
+        // License terms / a download cap are real configuration too — without
+        // this, setting only a license on the free default tier would drop the
+        // tier at emit and lose the license (feat/…-license-surfacing).
+        || !!t.licenseTerms?.trim()
+        || !!t.maxDownloads?.trim()
         || !AUTO_SEED_NAME.test(t.name.trim()),
     );
     onChange?.({
@@ -489,6 +534,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
        * brings the files with it.
        */
       productFiles: isPhysical ? [] : productFiles,
+      links: isPhysical ? [] : links,
       isPaid: paid,
       price: "",
       currency,
@@ -523,7 +569,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       tiers: configured.length > 0 ? named : [],
       donation,
     });
-  }, [name, description, tags, categoryId, subCategoryId, mediaItems, productFiles, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, tiers, donation, condition, parcelClass, isPhysical]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [name, description, tags, categoryId, subCategoryId, mediaItems, productFiles, links, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, tiers, donation, condition, parcelClass, isPhysical]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Configured tiers drive the Pricing row summary + tier cards. A blank
   // seed tier ("Standard") counts once the user has named it.
@@ -716,6 +762,23 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         </button>
         )}
 
+        {/* Link deliverables — external URLs revealed to verified buyers after
+            purchase. Digital-only, like files. Suppressed inside the edit drawer,
+            which manages links itself against the live product. */}
+        {showLinkDeliverables && !isPhysical && (
+        <button type="button" onClick={() => setIsLinksOpen(true)}
+          className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
+          {links.length > 0 ? (
+            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
+          ) : <LinkIcon className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
+          <span className="flex-1 min-w-0">
+            <span className={`block text-sm truncate ${links.length > 0 ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{links.length > 0 ? "Link deliverables" : "Add link deliverables"}<span className="font-normal text-zinc-400 text-[12.5px]">{links.length > 0 ? "" : " · optional"}</span></span>
+            {links.length > 0 && <span className="block text-[12.5px] text-zinc-500 truncate">{links.length} link{links.length > 1 ? "s" : ""} attached</span>}
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
+        </button>
+        )}
+
         <button type="button" onClick={() => setIsCtaOpen(true)}
           className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
           {ctaText.trim() ? (
@@ -799,6 +862,50 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 </button>
               </div>
             )}
+            </div>
+          )}
+
+          {/* ─── License & usage ───
+              Per-tier license terms + download cap, surfaced here as a
+              first-class section instead of being buried in the tier editor
+              drill-in. Bound to the same tier drafts the Pricing card drives. */}
+          {showTiers && !isPhysical && (
+            <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 overflow-hidden">
+              <div className="px-5 py-4">
+                <div className="flex items-center gap-3 mb-1">
+                  <ScrollText className="h-[18px] w-[18px] text-zinc-400" />
+                  <span className="text-sm font-medium text-zinc-800">License &amp; usage</span>
+                </div>
+                <p className="text-[12.5px] text-zinc-400 mb-3">What a buyer of each tier is licensed to do, and an optional download cap. Optional.</p>
+                <div className="space-y-4">
+                  {configuredTiers.map(t => (
+                    <div key={t.localId} className={configuredTiers.length > 1 ? "rounded-xl ring-1 ring-zinc-100 p-3" : ""}>
+                      {configuredTiers.length > 1 && (
+                        <p className="text-[12px] font-medium text-zinc-700 mb-1.5">{t.name}</p>
+                      )}
+                      <textarea
+                        value={t.licenseTerms}
+                        maxLength={TIER_LICENSE_TERMS_MAX}
+                        onChange={e => patchTier(t.localId, { licenseTerms: e.target.value })}
+                        placeholder="License terms — e.g. Personal use only. No resale or redistribution."
+                        rows={2}
+                        className="w-full px-3 py-2 text-[13px] rounded-lg ring-1 ring-zinc-200 focus:outline-none focus:ring-zinc-400 placeholder:text-zinc-400 resize-y"
+                      />
+                      <div className="flex items-center gap-2 mt-2">
+                        <label className="text-[12.5px] text-zinc-500 flex-1">Max downloads per file <span className="text-zinc-400">· blank = unlimited</span></label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={t.maxDownloads}
+                          onChange={e => patchTier(t.localId, { maxDownloads: e.target.value })}
+                          placeholder="Unlimited"
+                          className="w-[120px] shrink-0 text-right px-3 py-1.5 text-sm text-zinc-800 bg-white rounded-lg ring-1 ring-zinc-200 focus:outline-none focus:ring-zinc-400 placeholder:text-zinc-400"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
@@ -978,6 +1085,50 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           <FileUploadZone files={productFiles} onChange={setProductFiles} maxFiles={10} />
           <DialogFooter>
             <Button onClick={() => setIsFilesOpen(false)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Link deliverables Modal ─── (external URLs revealed to buyers) */}
+      <Dialog open={showLinkDeliverables && !isPhysical && isLinksOpen} onOpenChange={setIsLinksOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Link deliverables</DialogTitle>
+            <DialogDescription>External links revealed to buyers after purchase. Anyone with a link can open it, so only paying buyers ever see it.</DialogDescription>
+          </DialogHeader>
+
+          {links.length > 0 && (
+            <ul className="space-y-1.5">
+              {links.map((link, idx) => (
+                <li key={idx} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-50 ring-1 ring-zinc-100">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] text-zinc-800 truncate">{link.label}</p>
+                    <p className="text-[11px] text-zinc-400 truncate">{link.url}</p>
+                  </div>
+                  <button type="button" onClick={() => removeLink(idx)} aria-label={`Remove ${link.label}`}
+                    className="text-[12px] text-zinc-400 hover:text-red-500 cursor-pointer shrink-0">Remove</button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <div className="space-y-2">
+            <input type="text" value={linkLabelDraft} onChange={e => setLinkLabelDraft(e.target.value)}
+              placeholder="Label (e.g. Download page)"
+              className="w-full px-3 py-2 text-[13px] rounded-lg ring-1 ring-zinc-200 focus:outline-none focus:ring-zinc-400" />
+            <div className="flex gap-2">
+              <input type="url" value={linkUrlDraft}
+                onChange={e => { setLinkUrlDraft(e.target.value); if (linkError) setLinkError(null); }}
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addLinkDraft(); } }}
+                placeholder="https://…"
+                className="flex-1 min-w-0 px-3 py-2 text-[13px] rounded-lg ring-1 ring-zinc-200 focus:outline-none focus:ring-zinc-400" />
+              <Button type="button" variant="secondary" onClick={addLinkDraft} disabled={!linkUrlDraft.trim()}>Add link</Button>
+            </div>
+            {linkError && <p className="text-[12px] text-red-500">{linkError}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setIsLinksOpen(false)}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

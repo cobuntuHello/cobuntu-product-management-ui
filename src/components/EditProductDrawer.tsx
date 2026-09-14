@@ -326,6 +326,9 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
             productType={product.productType}
             initialData={initialFormData}
             categories={categories}
+            // This drawer manages link deliverables itself (below) against the
+            // live product, so the form must not render a second link section.
+            showLinkDeliverables={false}
             onChange={data => { formDataRef.current = data; }}
           />
 

@@ -116,33 +116,37 @@ export function TierEditView({
         </div>
       </div>
 
-      {/* License terms — per-tier, so the same asset can sell as e.g.
-          Personal vs Commercial with different terms. Shown to the buyer
-          pre/post-purchase and carried onto the license certificate. */}
-      <div>
-        <Eyebrow count={t.licenseTerms.length} max={TIER_LICENSE_TERMS_MAX}
-          help="What the buyer of this tier is licensed to do — e.g. personal use only, or commercial use with attribution. Leave blank for no licence.">
-          License terms (optional)
-        </Eyebrow>
-        <div className="mt-1">
-          <StepTextarea value={t.licenseTerms} maxLength={TIER_LICENSE_TERMS_MAX}
-            onChange={(e) => onUpdate({ licenseTerms: e.target.value })}
-            placeholder="e.g. Personal use only. No resale or redistribution." rows={3} />
-        </div>
-      </div>
+      {/* License terms + download cap — per-tier. In the CREATE wizard
+          (draftMode) these are surfaced on the product form's "License & usage"
+          section instead, so they're hidden here to avoid two edit points; on
+          the saved-product manage path (non-draftMode) this modal is the only
+          editor, so they stay. */}
+      {!draftMode && (
+        <>
+          <div>
+            <Eyebrow count={t.licenseTerms.length} max={TIER_LICENSE_TERMS_MAX}
+              help="What the buyer of this tier is licensed to do — e.g. personal use only, or commercial use with attribution. Leave blank for no licence.">
+              License terms (optional)
+            </Eyebrow>
+            <div className="mt-1">
+              <StepTextarea value={t.licenseTerms} maxLength={TIER_LICENSE_TERMS_MAX}
+                onChange={(e) => onUpdate({ licenseTerms: e.target.value })}
+                placeholder="e.g. Personal use only. No resale or redistribution." rows={3} />
+            </div>
+          </div>
 
-      {/* Download limit — optional per-file cap for buyers of this tier. Blank
-          = unlimited. Enforced by the gated download endpoint. */}
-      <div>
-        <Eyebrow help="Cap how many times a buyer of this tier can download each file. Leave blank for unlimited.">
-          Max downloads per file (optional)
-        </Eyebrow>
-        <div className="mt-1">
-          <StepInput type="number" min={1} value={t.maxDownloads}
-            onChange={(e) => onUpdate({ maxDownloads: e.target.value })}
-            placeholder="Unlimited" />
-        </div>
-      </div>
+          <div>
+            <Eyebrow help="Cap how many times a buyer of this tier can download each file. Leave blank for unlimited.">
+              Max downloads per file (optional)
+            </Eyebrow>
+            <div className="mt-1">
+              <StepInput type="number" min={1} value={t.maxDownloads}
+                onChange={(e) => onUpdate({ maxDownloads: e.target.value })}
+                placeholder="Unlimited" />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Pricing — the full pricing surface, inline (model, price, billing,
           installment schedule, and member pricing when enabled). */}
