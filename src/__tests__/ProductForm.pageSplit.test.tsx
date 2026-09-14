@@ -47,9 +47,10 @@ describe("page split — listing vs commerce", () => {
     expect(screen.getByText("Add files")).toBeInTheDocument();
   });
 
-  it("the physical commerce page carries postage & condition (not files)", () => {
+  it("the physical commerce page carries condition + parcel inline (not files)", () => {
     renderWithConfig(<ProductForm {...base} onChange={vi.fn()} productType="PHYSICAL" page="commerce" />);
-    expect(screen.getByText("Postage and condition")).toBeInTheDocument();
+    expect(screen.getByLabelText("Condition")).toBeInTheDocument();
+    expect(screen.getByText("Parcel size")).toBeInTheDocument();
     // Files are the digital delivery channel — absent on a parcel.
     expect(screen.queryByText("Add files")).not.toBeInTheDocument();
   });

@@ -21,7 +21,7 @@ import { type DraftTier, type DonationDraft, TIER_LICENSE_TERMS_MAX } from "./Pr
 import { blankTier, blankDonation } from "./PriceEditModal/helpers";
 import { CategoryPickerRow, type CategoryOption } from "./CategoryPickerRow";
 import {
-  PhysicalDetailsFields, conditionLabel, parcelClassLabel,
+  PhysicalDetailsFields,
   type ProductConditionValue, type ParcelClassValue,
 } from "./PhysicalDetailsFields";
 import {
@@ -308,7 +308,6 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const [isLinksOpen, setIsLinksOpen] = useState(false);
   const [isLicenseOpen, setIsLicenseOpen] = useState(false);
   const [isCtaOpen, setIsCtaOpen] = useState(false);
-  const [isPhysicalOpen, setIsPhysicalOpen] = useState(false);
 
   /*
    * Physical-only state. Seeded from initialData like everything else, so a
@@ -377,22 +376,13 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   }
 
   /*
-   * The dialog must not outlive the field it edits.
-   *
-   * Caught by a test, not by review. The row is gated on `isPhysical`, but the
-   * dialog is a sibling and was not: open Postage and condition, step back in
-   * the wizard, switch to Digital, and the modal stayed on screen editing two
-   * values that no longer exist on the product. The row behind it was already
-   * gone.
-   *
-   * Resetting the FLAG rather than only hiding the dialog also stops the
-   * mirror-image bug: with the flag left true, switching back to Physical
-   * would spontaneously reopen a modal nobody asked for.
+   * A dialog must not outlive the field it edits. Switching type mid-flow used
+   * to leave a modal open editing values that no longer exist on the product,
+   * so close the digital-only dialogs when the type becomes physical. (Postage
+   * & condition are inline now, so there is no physical dialog to close.)
    */
   useEffect(() => {
-    if (!isPhysical) setIsPhysicalOpen(false);
-    // Same rule in the other direction: Files and the license that governs them
-    // do not apply to a parcel.
+    // Files and the license that governs them do not apply to a parcel.
     if (isPhysical) { setIsFilesOpen(false); setIsLicenseOpen(false); }
   }, [isPhysical]);
 
@@ -739,26 +729,26 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       {showCommerce && (
       <div className="space-y-2.5">
         {/*
-          * Physical only, and it renders NOTHING for anything else — not a
-          * disabled row, not a row that says "not applicable". A digital
-          * product has no parcel, so the question does not exist there.
-          *
-          * Never shows the empty-state styling the other rows use, because it
-          * is never unanswered: parcel size is STANDARD until someone says
-          * otherwise, so the summary always reads as a real answer.
+          * Physical only. Condition + parcel size are rendered INLINE and open
+          * (not behind a row/modal): a seller in a hurry would skip a modal and
+          * ship with both unset. A digital product has no parcel, so the block
+          * renders NOTHING there. Wrapped in the same soft card the other
+          * grouped controls use so it reads as one section.
           */}
         {isPhysical && (
-          <button type="button" onClick={() => setIsPhysicalOpen(true)}
-            className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
-            <Package className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />
-            <span className="flex-1 min-w-0">
-              <span className="block text-sm truncate font-medium text-zinc-800">Postage and condition</span>
-              <span className="block text-[12.5px] text-zinc-500 truncate">
-                {[conditionLabel(condition), parcelClassLabel(parcelClass)].filter(Boolean).join(" · ")}
-              </span>
-            </span>
-            <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
-          </button>
+          <div className="rounded-2xl bg-zinc-50 px-4 py-4">
+            <div className="flex items-center gap-3 mb-3">
+              <Package className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
+              <span className="text-sm font-medium text-zinc-800">Postage &amp; condition</span>
+              <span className="text-[12px] text-zinc-400">· you pack and post it yourself</span>
+            </div>
+            <PhysicalDetailsFields
+              condition={condition}
+              parcelClass={parcelClass}
+              onConditionChange={setCondition}
+              onParcelClassChange={setParcelClass}
+            />
+          </div>
         )}
 
         {/*
@@ -1024,26 +1014,8 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         </DialogContent>
       </Dialog>
 
-      {/* ─── Postage and condition ─── (physical only; same shell as Tags) */}
-      <Dialog open={isPhysical && isPhysicalOpen} onOpenChange={setIsPhysicalOpen}>
-        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Postage and condition</DialogTitle>
-            <DialogDescription>
-              You pack and post this item yourself. Both answers are optional.
-            </DialogDescription>
-          </DialogHeader>
-          <PhysicalDetailsFields
-            condition={condition}
-            parcelClass={parcelClass}
-            onConditionChange={setCondition}
-            onParcelClassChange={setParcelClass}
-          />
-          <DialogFooter>
-            <Button onClick={() => setIsPhysicalOpen(false)}>Done</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Postage & condition are inline now (see the commerce group above), so
+          there is no dialog here. */}
 
       {/* ─── Tags Modal ─── (matches the event Tags tap-row → modal) */}
       <Dialog open={isTagsOpen} onOpenChange={setIsTagsOpen}>

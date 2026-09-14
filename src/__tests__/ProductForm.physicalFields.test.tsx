@@ -26,30 +26,28 @@ function lastEmit(onChange: ReturnType<typeof vi.fn>) {
 }
 
 describe("the physical row only exists where the fields do", () => {
-  it("renders no row for a digital product", () => {
+  it("renders nothing for a digital product", () => {
     renderWithConfig(<ProductForm {...base} onChange={vi.fn()} />);
-    expect(screen.queryByText("Postage and condition")).not.toBeInTheDocument();
+    expect(screen.queryByText("Parcel size")).not.toBeInTheDocument();
   });
 
-  it("renders no row for a course either", () => {
+  it("renders nothing for a course either", () => {
     // A course is not posted. Same absence, different reason.
     renderWithConfig(<ProductForm {...base} onChange={vi.fn()} productType="COURSE" />);
-    expect(screen.queryByText("Postage and condition")).not.toBeInTheDocument();
+    expect(screen.queryByText("Parcel size")).not.toBeInTheDocument();
   });
 
-  it("renders the row for a physical product", () => {
+  it("renders the fields INLINE for a physical product (no modal to skip)", () => {
     renderWithConfig(<ProductForm {...base} onChange={vi.fn()} productType="PHYSICAL" />);
-    expect(screen.getByText("Postage and condition")).toBeInTheDocument();
-  });
-
-  it("summarises an untouched row as a real answer, not an empty one", () => {
-    /*
-     * Parcel size is STANDARD until someone says otherwise, so this row is
-     * never in the "nothing chosen yet" state the other rows show. Condition
-     * is absent from the summary because it is genuinely unset.
-     */
-    renderWithConfig(<ProductForm {...base} onChange={vi.fn()} productType="PHYSICAL" />);
+    expect(screen.getByLabelText("Condition")).toBeInTheDocument();
+    expect(screen.getByText("Parcel size")).toBeInTheDocument();
     expect(screen.getByText("Standard parcel")).toBeInTheDocument();
+  });
+
+  it("shows the parcel weight anchors so 'heavy' is not one seller's guess", () => {
+    renderWithConfig(<ProductForm {...base} onChange={vi.fn()} productType="PHYSICAL" />);
+    expect(screen.getByText("Up to 2 kg")).toBeInTheDocument();
+    expect(screen.getByText("2–20 kg")).toBeInTheDocument();
   });
 });
 
@@ -73,8 +71,7 @@ describe("what the form emits", () => {
     const onChange = vi.fn();
     renderWithConfig(<ProductForm {...base} onChange={onChange} productType="PHYSICAL" />);
 
-    fireEvent.click(screen.getByText("Postage and condition"));
-    fireEvent.click(screen.getByText("Good"));
+    fireEvent.change(screen.getByLabelText("Condition"), { target: { value: "GOOD" } });
     fireEvent.click(screen.getByText("Large or heavy"));
 
     expect(lastEmit(onChange).condition).toBe("GOOD");
@@ -86,11 +83,10 @@ describe("what the form emits", () => {
     const onChange = vi.fn();
     renderWithConfig(<ProductForm {...base} onChange={onChange} productType="PHYSICAL" />);
 
-    fireEvent.click(screen.getByText("Postage and condition"));
-    fireEvent.click(screen.getByText("Good"));
+    fireEvent.change(screen.getByLabelText("Condition"), { target: { value: "GOOD" } });
     expect(lastEmit(onChange).condition).toBe("GOOD");
 
-    fireEvent.click(screen.getByText("Not specified"));
+    fireEvent.change(screen.getByLabelText("Condition"), { target: { value: "" } });
     expect(lastEmit(onChange).condition).toBeNull();
   });
 
@@ -106,7 +102,7 @@ describe("what the form emits", () => {
     );
     expect(lastEmit(onChange).condition).toBe("VERY_GOOD");
     expect(lastEmit(onChange).parcelClass).toBe("HEAVY");
-    expect(screen.getByText("Very good · Large or heavy")).toBeInTheDocument();
+    expect((screen.getByLabelText("Condition") as HTMLSelectElement).value).toBe("VERY_GOOD");
   });
 
   it("NULLS a value the seller set before switching away from physical", () => {
@@ -133,8 +129,7 @@ describe("what the form emits", () => {
       <ProductForm {...base} onChange={onChange} productType="PHYSICAL" />,
     );
 
-    fireEvent.click(screen.getByText("Postage and condition"));
-    fireEvent.click(screen.getByText("Good"));
+    fireEvent.change(screen.getByLabelText("Condition"), { target: { value: "GOOD" } });
     fireEvent.click(screen.getByText("Large or heavy"));
     expect(lastEmit(onChange).condition).toBe("GOOD");
 
@@ -142,7 +137,7 @@ describe("what the form emits", () => {
 
     expect(lastEmit(onChange).condition).toBeNull();
     expect(lastEmit(onChange).parcelClass).toBeNull();
-    expect(screen.queryByText("Postage and condition")).not.toBeInTheDocument();
+    expect(screen.queryByText("Parcel size")).not.toBeInTheDocument();
   });
 });
 
