@@ -44,20 +44,23 @@ describe("link deliverables on the form", () => {
   });
 });
 
-describe("License & usage surfaced on the form", () => {
-  it("renders the section for a digital product", () => {
+describe("License & usage — a row that opens a modal (grouped with the deliverables)", () => {
+  it("shows the row for a digital product", () => {
     renderWithConfig(<ProductForm {...base} onChange={vi.fn()} />);
-    expect(screen.getByText("License & usage")).toBeInTheDocument();
+    // Empty state until terms/cap are set.
+    expect(screen.getByText("Add license & usage")).toBeInTheDocument();
   });
 
   it("does not render it for a physical product", () => {
     renderWithConfig(<ProductForm {...base} onChange={vi.fn()} productType="PHYSICAL" />);
-    expect(screen.queryByText("License & usage")).not.toBeInTheDocument();
+    expect(screen.queryByText(/license & usage/i)).not.toBeInTheDocument();
   });
 
   it("writes license terms onto the tier and ships that tier (configured predicate)", () => {
     const onChange = vi.fn();
     renderWithConfig(<ProductForm {...base} onChange={onChange} />);
+    // Open the modal, then type — the fields live behind the row now.
+    fireEvent.click(screen.getByText("Add license & usage"));
     // The default free Standard tier would normally be dropped at emit; setting
     // a license must make it ship carrying the terms.
     fireEvent.change(
@@ -72,9 +75,22 @@ describe("License & usage surfaced on the form", () => {
   it("writes a max-downloads cap onto the tier", () => {
     const onChange = vi.fn();
     renderWithConfig(<ProductForm {...base} onChange={onChange} />);
+    fireEvent.click(screen.getByText("Add license & usage"));
     fireEvent.change(screen.getByPlaceholderText("Unlimited"), { target: { value: "5" } });
     const emitted = lastEmit(onChange);
     expect(emitted.tiers.length).toBe(1);
     expect(emitted.tiers[0].maxDownloads).toBe("5");
+  });
+
+  it("the row summarises as filled once terms are set", () => {
+    const onChange = vi.fn();
+    renderWithConfig(<ProductForm {...base} onChange={onChange} />);
+    fireEvent.click(screen.getByText("Add license & usage"));
+    fireEvent.change(
+      screen.getByPlaceholderText(/License terms/i),
+      { target: { value: "Personal use only." } },
+    );
+    // Row flips from "Add license & usage" to the filled label.
+    expect(screen.getAllByText("License & usage").length).toBeGreaterThan(0);
   });
 });
