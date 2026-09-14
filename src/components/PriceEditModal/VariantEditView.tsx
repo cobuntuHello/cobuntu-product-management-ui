@@ -332,8 +332,8 @@ function PhysicalCore({ t, onUpdate }: { t: DraftTier; onUpdate: (p: Partial<Dra
         >
           <SelectTrigger className="h-[40px] text-[13px]"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {VARIANT_CONDITIONS.map((cd) => (
-              <SelectItem key={cd || NONE} value={cd || NONE}>{cd || "Not specified"}</SelectItem>
+            {VARIANT_CONDITIONS.map(([val, label]) => (
+              <SelectItem key={val || NONE} value={val || NONE}>{label}</SelectItem>
             ))}
           </SelectContent>
         </Select>

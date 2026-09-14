@@ -52,6 +52,11 @@ export interface Tier {
     installmentCount?: number | null;
     installmentIntervalMonths?: number | null;
     accessDurationMonths?: number | null;
+    /** Shape + physical fields on the tier's backing product
+     *  (feat/product-variants). Digital tiers carry null condition/parcelClass. */
+    productType?: string;
+    condition?: string | null;
+    parcelClass?: string | null;
   };
 }
 
@@ -178,13 +183,14 @@ export interface DraftTier {
  * shape-specific selects + the "Other attributes" key picker. Kept here so the
  * editor and any future persistence layer read a single source.
  */
-/** Physical condition — empty string = "Not specified". */
-export const VARIANT_CONDITIONS: ReadonlyArray<string> = [
-  "",
-  "New with tags",
-  "Very good",
-  "Good",
-  "Satisfactory",
+/** Physical condition — [ProductCondition enum value, display label].
+ *  Empty value = "Not specified" (sent as no condition). */
+export const VARIANT_CONDITIONS: ReadonlyArray<[string, string]> = [
+  ["", "Not specified"],
+  ["NEW_WITH_TAGS", "New with tags"],
+  ["VERY_GOOD", "Very good"],
+  ["GOOD", "Good"],
+  ["SATISFACTORY", "Satisfactory"],
 ];
 /** Parcel size — [value, label, weight hint]. */
 export const VARIANT_PARCELS: ReadonlyArray<[string, string, string]> = [

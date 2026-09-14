@@ -307,6 +307,9 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               salesEndAt: t.salesEndAt ?? "",
               // Structured attributes: server [{key,value}] → editor {k,v}.
               attrs: (t.attributes ?? []).map((a) => ({ k: a.key, v: a.value })),
+              // Physical shape fields off the backing product ("" = unset).
+              condition: t.products.condition ?? "",
+              parcelSize: t.products.parcelClass ?? "",
             };
           }));
         }
