@@ -27,6 +27,9 @@ export interface Tier {
    *  (feat/tier-max-downloads). Null = unlimited. */
   maxDownloads?: number | null;
   capacity: number | null;
+  /** Structured "Other attributes" — controlled-vocabulary key/value pairs
+   *  stored as JSON on the tier (feat/product-variants). Null when none. */
+  attributes?: { key: string; value: string }[] | null;
   /** Non-refunded sales for this tier (backend joins via product_snapshots). */
   salesCount?: number;
   priceMode?: "fixed" | "pwyw" | null;

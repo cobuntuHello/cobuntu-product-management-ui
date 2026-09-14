@@ -305,6 +305,8 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               autoScheduleEnabled: !!t.autoScheduleEnabled,
               salesStartAt: t.salesStartAt ?? "",
               salesEndAt: t.salesEndAt ?? "",
+              // Structured attributes: server [{key,value}] → editor {k,v}.
+              attrs: (t.attributes ?? []).map((a) => ({ k: a.key, v: a.value })),
             };
           }));
         }
