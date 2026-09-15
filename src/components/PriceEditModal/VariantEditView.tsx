@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  ChevronRight, Package, Calendar, ClipboardList, Eye, EyeOff, Info,
+  ChevronRight, Calendar, ClipboardList, Eye, EyeOff, Info,
   File as FileIcon, Upload, Link as LinkIcon, X, Plus, Lock,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
@@ -100,7 +100,6 @@ export function VariantEditView({
   const patchLinks = (next: string[]) => onUpdate({ links: next });
 
   // ── Advanced row values ──
-  const capVal = t.capacity ? `${t.capacity}` : "Unlimited";
   const salesVal = t.autoScheduleEnabled ? "Scheduled" : "Always on";
   const formCount = t.id
     ? (t.hasForm ? t.formFieldCount : 0)
@@ -220,29 +219,9 @@ export function VariantEditView({
       <div>
         <Eyebrow>Advanced</Eyebrow>
         <div className="mt-1.5 space-y-2">
-          {/* Physical uses Stock above; capacity only surfaces for digital. */}
-          {isDigital && (
-            <AdvancedAccordion
-              icon={<Package className="h-[17px] w-[17px]" />}
-              label="Capacity"
-              value={capVal}
-              open={advOpen === "capacity"}
-              onToggle={() => setAdvOpen(advOpen === "capacity" ? null : "capacity")}
-            >
-              <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">Copies for sale</label>
-              <Stepper
-                value={t.capacity}
-                onChange={(v) => onUpdate({ capacity: v })}
-                placeholder="Unlimited"
-                min={locked ? t.salesCount : 0}
-                ariaLabel="Copies for sale"
-              />
-              <p className="text-[11.5px] text-zinc-400 mt-2 leading-relaxed">
-                How many licences can be sold before this variant is sold out. Leave empty for unlimited.
-              </p>
-            </AdvancedAccordion>
-          )}
-
+          {/* Capacity is a visible stepper in the shape core (physical: Stock;
+              digital: Capacity), matching the Stock design + placement — not an
+              accordion row. Advanced now holds only sales window + form. */}
           <AdvancedAccordion
             icon={<Calendar className="h-[17px] w-[17px]" />}
             label="Sales window"
@@ -493,6 +472,22 @@ function DigitalCore({
           </p>
         </div>
       )}
+
+      {/* Capacity — same stepper design + placement as physical Stock (end of
+          the shape core), not an Advanced accordion row. */}
+      <div>
+        <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">Capacity</label>
+        <Stepper
+          value={t.capacity}
+          onChange={(v) => onUpdate({ capacity: v })}
+          placeholder="Unlimited"
+          min={isTierLocked(t) ? t.salesCount : 0}
+          ariaLabel="Capacity"
+        />
+        <p className="text-[11.5px] text-zinc-400 mt-2 leading-relaxed">
+          How many licences can be sold before this variant is sold out. Leave empty for unlimited.
+        </p>
+      </div>
     </div>
   );
 }
