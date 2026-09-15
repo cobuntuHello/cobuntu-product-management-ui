@@ -319,6 +319,13 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               files: Array.isArray((t as any).files)
                 ? (t as any).files.map((f: any) => ({ id: f?.id, name: f?.name ?? f?.filename ?? "File", url: f?.url }))
                 : [],
+              // Backing product id + the file ids present at load, so save can
+              // sync new/removed files to this variant's own product via the
+              // /comprehensive endpoint (bytes can't go in the JSON tier PUT).
+              productId: t.products?.id,
+              originalFileIds: Array.isArray((t as any).files)
+                ? (t as any).files.map((f: any) => f?.id).filter(Boolean)
+                : [],
               links: Array.isArray((t as any).links)
                 ? (t as any).links.map((l: any) => (typeof l === "string" ? l : l?.url)).filter(Boolean)
                 : [],
@@ -609,6 +616,35 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         return;
       }
 
+      // Sync a variant's FILE deliverables to its own (child) product on the
+      // manage page. Bytes can't ride the JSON tier PUT, so new/removed files
+      // go through the same /comprehensive channel EditProductDrawer uses,
+      // targeting the tier's child product id. Links ride the JSON PUT (the
+      // backend tier-update diffs them); this handles files only.
+      const syncTierFiles = async (childProductId: string, t: DraftTier) => {
+        const files = t.files ?? [];
+        const newFiles = files.filter((f) => f.file);
+        const keptIds = files.filter((f) => f.id).map((f) => f.id as string);
+        const removedIds = (t.originalFileIds ?? []).filter((id) => !keptIds.includes(id));
+        if (newFiles.length === 0 && removedIds.length === 0) return;
+        const fd = new FormData();
+        for (const f of newFiles) if (f.file) fd.append("attachments", f.file);
+        if (removedIds.length) fd.append("attachmentsToDelete", JSON.stringify(removedIds));
+        // Multipart: auth header only (browser sets the multipart boundary).
+        const res = await fetch(`${apiBaseUrl}/api/users/me/products/${childProductId}/comprehensive`, { method: "PUT", headers: authHeaders(), body: fd });
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Failed to save files for "${t.name}"`); }
+        const { jobId } = await res.json();
+        for (let i = 0; i < 60; i++) {
+          await new Promise((r) => setTimeout(r, 2000));
+          const s = await fetch(`${apiBaseUrl}/api/users/me/products/update/status/${jobId}`, { headers: authHeaders() });
+          if (s.ok) {
+            const st = await s.json();
+            if (st.status === "completed") return;
+            if (st.status === "failed") throw new Error(st.error || `File update failed for "${t.name}"`);
+          }
+        }
+      };
+
       // Tier writes
       for (const t of drafts) {
         const body = buildTierBody(t);
@@ -618,9 +654,17 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         } else if (t.id) {
           const res = await fetch(`${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/tiers/${t.id}`, { method: "PUT", headers: jsonHeaders(), body: JSON.stringify(body) });
           if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Failed to update "${t.name}"`); }
+          // Files: JSON PUT above handled scalars + links; sync files to the
+          // variant's child product.
+          if (t.productId) await syncTierFiles(t.productId, t);
         } else if (!t.deleted) {
           const res = await fetch(`${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/tiers`, { method: "POST", headers: jsonHeaders(), body: JSON.stringify(body) });
           if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Failed to create "${t.name}"`); }
+          // A tier created on manage: pull its new child product id from the
+          // response so any files added in the same session get uploaded.
+          const created = await res.json().catch(() => null);
+          const newChildId = created?.products?.id ?? created?.productId;
+          if (newChildId) await syncTierFiles(newChildId, t);
         }
       }
 
