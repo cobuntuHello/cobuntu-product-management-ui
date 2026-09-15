@@ -73,6 +73,23 @@ export const TIER_DESCRIPTION_MAX = 200;
  *  enforces the same maxLength + counter to keep saves from bouncing. */
 export const TIER_LICENSE_TERMS_MAX = 2000;
 
+/**
+ * A single per-tier deliverable file (feat/per-variant-deliverables).
+ *
+ * Two shapes share one type:
+ *   - NEW upload (create flow): carries a live `file` (the browser File the
+ *     seller picked) plus its `name`. community-app reads `file` and streams
+ *     the bytes over the multipart channel keyed by tier index.
+ *   - EXISTING file (edit flow): carries the server `id` + a `url` to show the
+ *     already-uploaded attachment as a row. No `file` — nothing to re-upload.
+ */
+export interface TierFile {
+  id?: string;
+  name: string;
+  file?: File;
+  url?: string;
+}
+
 /** Local draft state for a single tier card. Fields are display-unit
  *  strings (e.g. "20" for €20) so the input rows can be authored as-is
  *  without conversion. Save flips them to smallest-unit ints. */
@@ -156,7 +173,12 @@ export interface DraftTier {
   attrs?: { k: string; v: string }[];
   condition?: string;
   parcelSize?: string;
-  files?: string[];
+  /** Per-tier deliverable files. New uploads carry a live `file`; existing
+   *  files (edit mode) carry `id`+`url`. Bytes ship over a multipart channel
+   *  keyed by tier index — buildTierBody does NOT put them in the JSON body. */
+  files?: TierFile[];
+  /** Per-tier external link deliverables (URL strings). buildTierBody maps
+   *  these to the backend's `links: {url}[]` contract. */
   links?: string[];
   /** When this draft was created via "Duplicate", the source's tier
    *  id. The POST body sends it as copyFormFromTierId so the backend

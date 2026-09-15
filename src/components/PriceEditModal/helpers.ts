@@ -87,6 +87,7 @@ export function blankTier(seed: BlankTierSeed = {}): DraftTier {
     installmentCount: "",
     installmentInterval: "1",
     installmentAccessMonths: "",
+    files: [],
     expanded: true,
     // New tiers start published — matches the natural "create + ship"
     // flow. Hosts who want to stage a draft flip the toggle off before
@@ -305,10 +306,19 @@ export function buildTierBody(
     ...(t.condition ? { condition: t.condition } : {}),
     ...(t.parcelSize ? { parcelClass: t.parcelSize } : {}),
   };
+  // Per-tier external link deliverables. The editor holds them as URL strings;
+  // the backend contract is `links: {url}[]`. Trim + drop blanks, then wrap.
+  // File bytes are NOT emitted here — they ship over a multipart channel keyed
+  // by tier index (the consumer reads t.files[j].file directly).
+  const links = (t.links ?? [])
+    .map((u) => u.trim())
+    .filter(Boolean)
+    .map((url) => ({ url }));
   return {
     name: t.name.trim(),
     description: t.description.trim() || null,
     attributes,
+    links,
     ...physicalBody,
     // Blank → null so an empty box clears any prior terms (the backend
     // normalizeLicenseTerms does the same trim/blank→null server-side).

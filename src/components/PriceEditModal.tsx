@@ -310,6 +310,18 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               // Physical shape fields off the backing product ("" = unset).
               condition: t.products.condition ?? "",
               parcelSize: t.products.parcelClass ?? "",
+              // Per-tier deliverables (feat/per-variant-deliverables). Mapped
+              // defensively: the tier-read shape for existing files/links is not
+              // pinned yet, so round-trip whatever the backend returns (files as
+              // {id,name,url} rows carrying no live `file`; links as URL strings)
+              // and fall back to empty when absent — no crash, CREATE is the
+              // priority path. See VariantEditView for the editor surface.
+              files: Array.isArray((t as any).files)
+                ? (t as any).files.map((f: any) => ({ id: f?.id, name: f?.name ?? f?.filename ?? "File", url: f?.url }))
+                : [],
+              links: Array.isArray((t as any).links)
+                ? (t as any).links.map((l: any) => (typeof l === "string" ? l : l?.url)).filter(Boolean)
+                : [],
             };
           }));
         }
