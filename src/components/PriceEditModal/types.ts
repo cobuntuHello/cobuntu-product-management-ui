@@ -177,6 +177,13 @@ export interface DraftTier {
    *  files (edit mode) carry `id`+`url`. Bytes ship over a multipart channel
    *  keyed by tier index — buildTierBody does NOT put them in the JSON body. */
   files?: TierFile[];
+  /** The tier's backing (child) product id, on a SAVED tier. Files on the
+   *  manage page are synced to this product via the /comprehensive endpoint
+   *  (bytes can't ride the JSON tier PUT). Absent on a not-yet-saved draft. */
+  productId?: string;
+  /** File attachment ids present when this tier loaded, so save can compute
+   *  which existing files the user removed (delete diff). */
+  originalFileIds?: string[];
   /** Per-tier external link deliverables (URL strings). buildTierBody maps
    *  these to the backend's `links: {url}[]` contract. */
   links?: string[];
