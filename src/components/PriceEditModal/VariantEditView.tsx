@@ -377,6 +377,11 @@ function DigitalCore({
   patchFiles: (next: TierFile[]) => void;
   patchLinks: (next: string[]) => void;
 }) {
+  const [dragActive, setDragActive] = useState(false);
+  // Append picked/dropped files as TierFile rows carrying the live File object.
+  const addFiles = (picked: File[]) => {
+    if (picked.length) patchFiles([...files, ...picked.map((file) => ({ name: file.name, file }))]);
+  };
   return (
     <div className="space-y-4">
       {/* Files — a REAL file picker. Selecting files appends TierFile rows that
@@ -391,7 +396,12 @@ function DigitalCore({
             {files.map((f, i) => (
               <div key={i} className="flex items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-3 py-2">
                 <FileIcon className="h-[18px] w-[18px] shrink-0" style={{ color: "var(--brand-color, #71717a)" }} />
-                <span className="flex-1 min-w-0 text-[13px] text-zinc-900 truncate py-0.5">{f.name}</span>
+                <input
+                  value={f.name}
+                  placeholder="Name this file"
+                  onChange={(e) => patchFiles(files.map((x, xi) => (xi === i ? { ...x, name: e.target.value } : x)))}
+                  className="flex-1 min-w-0 bg-transparent border-none outline-none text-[13px] text-zinc-900 placeholder:text-zinc-400 py-0.5"
+                />
                 {f.file && (
                   <span className="text-[11.5px] text-zinc-400 shrink-0">
                     {(f.file.size / 1024 / 1024).toFixed(1)} MB
@@ -407,17 +417,17 @@ function DigitalCore({
           </div>
         )}
         <label
-          className="flex w-full items-center gap-3 rounded-xl border-2 border-dashed border-zinc-200 bg-zinc-50 px-4 py-3.5 text-left transition-colors hover:border-zinc-300 cursor-pointer"
+          onDragOver={(e) => { e.preventDefault(); if (!dragActive) setDragActive(true); }}
+          onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
+          onDrop={(e) => { e.preventDefault(); setDragActive(false); addFiles(Array.from(e.dataTransfer.files ?? [])); }}
+          className={`flex w-full items-center gap-3 rounded-xl border-2 border-dashed px-4 py-3.5 text-left transition-colors cursor-pointer ${dragActive ? "border-[var(--brand-color,#71717a)] bg-[color-mix(in_srgb,var(--brand-color,#71717a)_6%,transparent)]" : "border-zinc-200 bg-zinc-50 hover:border-zinc-300"}`}
         >
           <input
             type="file"
             multiple
             className="hidden"
             onChange={(e) => {
-              const picked = Array.from(e.target.files ?? []);
-              if (picked.length) {
-                patchFiles([...files, ...picked.map((file) => ({ name: file.name, file }))]);
-              }
+              addFiles(Array.from(e.target.files ?? []));
               // Reset so re-picking the same file fires onChange again.
               e.target.value = "";
             }}
