@@ -15,7 +15,7 @@ import { FormStep } from "./steps/FormStep";
 import {
   TIER_NAME_MAX, TIER_DESCRIPTION_MAX, TIER_LICENSE_TERMS_MAX,
   VARIANT_CONDITIONS, VARIANT_PARCELS, VARIANT_ATTR_KEYS,
-  type DraftTier,
+  type DraftTier, type TierFile,
 } from "./types";
 import { isTierLocked } from "./helpers";
 import type { MemberPricingRow, MemberPricingTierState } from "./member-pricing";
@@ -96,7 +96,7 @@ export function VariantEditView({
   const links = t.links ?? [];
 
   const patchAttrs = (next: { k: string; v: string }[]) => onUpdate({ attrs: next });
-  const patchFiles = (next: string[]) => onUpdate({ files: next });
+  const patchFiles = (next: TierFile[]) => onUpdate({ files: next });
   const patchLinks = (next: string[]) => onUpdate({ links: next });
 
   // ── Advanced row values ──
@@ -372,14 +372,18 @@ function DigitalCore({
 }: {
   t: DraftTier;
   onUpdate: (p: Partial<DraftTier>) => void;
-  files: string[];
+  files: TierFile[];
   links: string[];
-  patchFiles: (next: string[]) => void;
+  patchFiles: (next: TierFile[]) => void;
   patchLinks: (next: string[]) => void;
 }) {
   return (
     <div className="space-y-4">
-      {/* Files */}
+      {/* Files — a REAL file picker. Selecting files appends TierFile rows that
+          carry the live File object; the create flow reads t.files[j].file and
+          streams the bytes over the multipart channel keyed by tier index.
+          Existing files (edit mode) come through as {id,name,url} rows with no
+          `file` — shown but not re-uploaded. */}
       <div>
         <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">Files</label>
         {files.length > 0 && (
@@ -387,12 +391,12 @@ function DigitalCore({
             {files.map((f, i) => (
               <div key={i} className="flex items-center gap-2.5 rounded-lg border border-zinc-200 bg-white px-3 py-2">
                 <FileIcon className="h-[18px] w-[18px] shrink-0" style={{ color: "var(--brand-color, #71717a)" }} />
-                <input
-                  value={f}
-                  placeholder="Name this file"
-                  onChange={(e) => patchFiles(files.map((x, xi) => (xi === i ? e.target.value : x)))}
-                  className="flex-1 min-w-0 bg-transparent border-none outline-none text-[13px] text-zinc-900 placeholder:text-zinc-400 py-0.5"
-                />
+                <span className="flex-1 min-w-0 text-[13px] text-zinc-900 truncate py-0.5">{f.name}</span>
+                {f.file && (
+                  <span className="text-[11.5px] text-zinc-400 shrink-0">
+                    {(f.file.size / 1024 / 1024).toFixed(1)} MB
+                  </span>
+                )}
                 <button type="button" aria-label="Remove file"
                   onClick={() => patchFiles(files.filter((_, xi) => xi !== i))}
                   className="p-1 text-zinc-400 hover:text-red-500 cursor-pointer shrink-0">
@@ -402,11 +406,22 @@ function DigitalCore({
             ))}
           </div>
         )}
-        <button
-          type="button"
-          onClick={() => patchFiles([...files, ""])}
-          className="flex w-full items-center gap-3 rounded-xl border-2 border-dashed border-zinc-200 bg-zinc-50 px-4 py-3.5 text-left transition-colors hover:border-zinc-300 cursor-text"
+        <label
+          className="flex w-full items-center gap-3 rounded-xl border-2 border-dashed border-zinc-200 bg-zinc-50 px-4 py-3.5 text-left transition-colors hover:border-zinc-300 cursor-pointer"
         >
+          <input
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              const picked = Array.from(e.target.files ?? []);
+              if (picked.length) {
+                patchFiles([...files, ...picked.map((file) => ({ name: file.name, file }))]);
+              }
+              // Reset so re-picking the same file fires onChange again.
+              e.target.value = "";
+            }}
+          />
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-white text-zinc-500">
             <Upload className="h-[18px] w-[18px]" />
           </span>
@@ -414,7 +429,7 @@ function DigitalCore({
             <span className="text-[13px] font-semibold text-zinc-700">Drag files here or browse</span>
             <span className="text-[11.5px] text-zinc-400">PDF, ZIP, MP4, images — this is what buyers download</span>
           </span>
-        </button>
+        </label>
       </div>
 
       {/* External links */}
