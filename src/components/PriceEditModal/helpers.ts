@@ -64,7 +64,7 @@ export function blankTier(seed: BlankTierSeed = {}): DraftTier {
   const indexHint = seed.indexHint ?? 1;
   return {
     localId: newLocalId(),
-    name: indexHint === 1 ? "Standard" : `Tier ${indexHint}`,
+    name: indexHint === 1 ? "Standard" : `Variant ${indexHint}`,
     description: "",
     licenseTerms: "",
     maxDownloads: "",

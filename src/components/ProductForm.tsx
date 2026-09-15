@@ -758,9 +758,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <DollarSign className="h-[18px] w-[18px] text-zinc-400" />
-                    <span className="text-sm font-medium text-zinc-800">Pricing</span>
+                    <span className="text-sm font-medium text-zinc-800">Variants</span>
                   </div>
-                  <span className="text-xs text-zinc-400">{configuredTiers.length === 0 ? "Free" : `${configuredTiers.length} tier${configuredTiers.length > 1 ? "s" : ""}`}{donation.enabled ? " · Donations" : ""}</span>
+                  <span className="text-xs text-zinc-400">{configuredTiers.length === 0 ? "Free" : `${configuredTiers.length} variant${configuredTiers.length > 1 ? "s" : ""}`}{donation.enabled ? " · Donations" : ""}</span>
                 </div>
                 {configuredTiers.length > 0 && (
                   <div className="space-y-2 mb-3">
@@ -775,7 +775,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                           <DollarSign className="h-3.5 w-3.5" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-zinc-800 truncate">{t.name.trim() || "Unnamed tier"}</p>
+                          <p className="text-[13px] font-medium text-zinc-800 truncate">{t.name.trim() || "Unnamed variant"}</p>
                           <p className="text-[11px] text-zinc-400">{t.price && parseFloat(t.price) > 0 ? `${getCurrencySymbol(t.currency)}${t.price}` : "Free"}</p>
                         </div>
                         <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
@@ -788,7 +788,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                   onMouseLeave={e => { e.currentTarget.style.color = ""; e.currentTarget.style.borderColor = ""; e.currentTarget.style.background = ""; }}
                   className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[13px] font-medium text-zinc-500 border border-dashed border-zinc-200 rounded-xl cursor-pointer transition-all duration-150">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  {configuredTiers.length === 0 ? "Set pricing" : "Add pricing tier"}
+                  {configuredTiers.length === 0 ? "Add variant" : "Add variant"}
                 </button>
               </div>
             )}
