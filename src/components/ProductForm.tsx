@@ -37,7 +37,7 @@ import {
 } from "@cobuntu/management-ui-shared";
 import {
   FileText, Tag as TagIcon, Package,
-  DollarSign, MousePointerClick, ChevronRight,
+  Layers, MousePointerClick, ChevronRight,
   Eye, EyeOff, UserCheck, Lock, ClipboardCheck,
   Image as ImageIcon, Plus, Check, X,
 } from "lucide-react";
@@ -757,7 +757,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               <div className="px-5 py-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <DollarSign className="h-[18px] w-[18px] text-zinc-400" />
+                    <Layers className="h-[18px] w-[18px] text-zinc-400" />
                     <span className="text-sm font-medium text-zinc-800">Variants</span>
                   </div>
                   <span className="text-xs text-zinc-400">{configuredTiers.length === 0 ? "Free" : `${configuredTiers.length} variant${configuredTiers.length > 1 ? "s" : ""}`}{donation.enabled ? " · Donations" : ""}</span>
@@ -772,7 +772,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                       <button key={i} type="button" onClick={() => openTierEditor(t.localId)}
                         className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white hover:bg-zinc-100 transition-all duration-150 text-left cursor-pointer">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-zinc-200 text-zinc-600">
-                          <DollarSign className="h-3.5 w-3.5" />
+                          <Layers className="h-3.5 w-3.5" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[13px] font-medium text-zinc-800 truncate">{t.name.trim() || "Unnamed variant"}</p>
