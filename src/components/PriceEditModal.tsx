@@ -41,6 +41,8 @@ import {
 import { SortableTierRow } from "./PriceEditModal/TierRow";
 import { StepFade } from "./PriceEditModal/_primitives";
 import { VariantEditView } from "./PriceEditModal/VariantEditView";
+import { StepView } from "./PriceEditModal/StepView";
+import { STEP_TITLES, STEP_SUBTITLES } from "./PriceEditModal/steps";
 import { FooterSlotContext } from "./PriceEditModal/footer-slot";
 import { DonationsSection } from "./PriceEditModal/DonationsSection";
 // Backwards-compat export — the original module exported CURRENCIES
@@ -182,6 +184,20 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   // is one scroll now. State lives at the modal level so siblings, Add
   // Variant, and Donations disappear when the user opens a variant.
   const [activeTier, setActiveTier] = useState<string | null>(null);
+
+  // Drill-in sub-step within the variant editor. When set (alongside
+  // activeTier), the modal swaps the single-scroll VariantEditView for a
+  // focused sub-screen (Sales window / Registration form) rendered via
+  // StepView — a screen swap inside the same modal, with the breadcrumb +
+  // Back handling the return. null = the variant editor itself.
+  const [activeStep, setActiveStep] = useState<"config" | "form" | null>(null);
+
+  // Leaving a variant (opening another, or closing back to the list) must
+  // drop any open sub-step so the next variant opens on its editor, not on a
+  // stale sub-screen.
+  useEffect(() => {
+    setActiveStep(null);
+  }, [activeTier]);
 
   // Opened directly on a tier from the form's inline list: jump to Level 2
   // (edit screen) once drafts have loaded, once. `openedDirect` also tells the
@@ -771,24 +787,40 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   //                      title = variant name · "Buyers pick one at checkout."
   const tierName = activeDraft?.name?.trim() || "Untitled variant";
   const title =
-    activeDraft
-      ? tierName
-      : isEmpty
-        ? "Add pricing"
-        : visible.length === 1
-          ? "Edit pricing"
-          : "Pricing tiers";
+    activeDraft && activeStep
+      ? STEP_TITLES[activeStep]
+      : activeDraft
+        ? tierName
+        : isEmpty
+          ? "Add pricing"
+          : visible.length === 1
+            ? "Edit pricing"
+            : "Pricing tiers";
   const subtitle =
-    activeDraft
-      ? "Buyers pick one at checkout."
-      : "Tiers, donations, and per-tier registration forms.";
+    activeDraft && activeStep
+      ? STEP_SUBTITLES[activeStep]
+      : activeDraft
+        ? "Buyers pick one at checkout."
+        : "Tiers, donations, and per-tier registration forms.";
 
-  // Breadcrumb — the only crumb is "Pricing tiers" (back to the list). When
-  // opened directly on a variant (list lives in the form) there is no list to
-  // return to, so no crumb.
+  // Breadcrumb — "Pricing tiers" returns to the list (unless opened directly
+  // on a variant, where the list lives in the form so there is nothing to
+  // return to). From a drill-in sub-step, the variant-name crumb returns to
+  // the variant editor.
   const crumbs: Array<{ label: string; onClick?: () => void }> = [];
-  if (activeDraft && !openedDirect) {
-    crumbs.push({ label: "Pricing tiers", onClick: () => setActiveTier(null) });
+  if (activeDraft) {
+    if (!openedDirect) {
+      crumbs.push({
+        label: "Pricing tiers",
+        onClick: () => {
+          setActiveStep(null);
+          setActiveTier(null);
+        },
+      });
+    }
+    if (activeStep) {
+      crumbs.push({ label: tierName, onClick: () => setActiveStep(null) });
+    }
   }
 
   // Stripe gate — show the "Connect Stripe" warning instead of the tier
@@ -846,13 +878,35 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
       {/* Cross-fade between levels/steps. Keyed on the current view so
           each navigation re-mounts and animates in (see StepFade). */}
-      <StepFade stepKey={`${activeTier ?? "list"}:${loading ? "loading" : "ready"}`}>
+      <StepFade stepKey={`${activeTier ?? "list"}:${activeStep ?? "editor"}:${loading ? "loading" : "ready"}`}>
       {loading ? (
         <div className="py-12 text-center text-[13px] text-zinc-400">Loading…</div>
+      ) : activeDraft && activeStep ? (
+        // Drill-in sub-step: a focused sub-screen (Sales window / Registration
+        // form) INSIDE the modal, swapped in for the variant editor. Edits the
+        // same draft tier via onUpdate; Back / breadcrumb return to the editor.
+        <StepView
+          t={activeDraft}
+          step={activeStep}
+          communityTag={communityTag}
+          onUpdate={(patch) => {
+            const idx = activeIdx();
+            if (idx != null) updateDraft(idx, patch);
+          }}
+          draftMode={draftMode}
+          showMemberPricing={!!showMemberPricing}
+          memberPricingState={activeDraft.id ? memberPricingByTier.get(activeDraft.id) : undefined}
+          onMemberPricingRowChange={
+            activeDraft.id
+              ? (idx, patch) => updateMemberPricingRow(activeDraft.id!, idx, patch)
+              : undefined
+          }
+          showToast={showToast}
+        />
       ) : activeDraft ? (
         // The single-scroll variant editor. Keyed on localId so its local UI
-        // state (open accordion, form builder) resets when moving to another
-        // variant. Hides siblings + Add Variant + Donations.
+        // state (form builder) resets when moving to another variant. Hides
+        // siblings + Add Variant + Donations.
         <VariantEditView
           key={activeDraft.localId}
           t={activeDraft}
@@ -876,6 +930,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             if (idx != null) togglePublish(idx);
           }}
           publishToggling={publishToggling}
+          onOpenStep={setActiveStep}
         />
       ) : (
         // L1: default tier list. Add tier + Donations + Save.
@@ -946,7 +1001,32 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
           {saveError}
         </div>
       )}
-      {activeDraft ? (
+      {activeDraft && activeStep ? (
+        // Drill-in sub-step footer: Back returns to the variant editor (not the
+        // list / close). Save still commits the whole tier — the sub-step edits
+        // the same draft. The footer slot stays so FormStep's "+ Question"
+        // action still portals in, left of Save.
+        <div className="shrink-0 flex items-center gap-2 mt-4 pt-4 border-t border-zinc-100">
+          <button
+            type="button"
+            onClick={() => setActiveStep(null)}
+            className="px-4 py-2 text-[13px] font-medium text-zinc-600 rounded-lg hover:bg-zinc-100 cursor-pointer"
+          >
+            Back
+          </button>
+          <div className="flex-1" />
+          <div ref={setFooterSlot} className="contents" />
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving || loading || memberPricingPending}
+            title={memberPricingPending ? "Loading member pricing…" : undefined}
+            className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer transition-colors"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      ) : activeDraft ? (
         // Equal-width Cancel | Delete | Save (Delete hidden → two equal when
         // this is the only variant). flex-1 basis-0 keeps the primary buttons
         // equal to each other even when the form builder portals extra actions.

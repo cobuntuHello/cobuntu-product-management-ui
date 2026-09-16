@@ -7,11 +7,9 @@ import {
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
 import {
-  Eyebrow, StepInput, StepTextarea, Stepper, Switch, Collapse,
+  Eyebrow, StepInput, StepTextarea, Stepper, Switch,
 } from "./_primitives";
 import { BasicsStep } from "./steps/BasicsStep";
-import { ConfigStep } from "./steps/ConfigStep";
-import { FormStep } from "./steps/FormStep";
 import {
   TIER_NAME_MAX, TIER_DESCRIPTION_MAX, TIER_LICENSE_TERMS_MAX,
   VARIANT_CONDITIONS, VARIANT_PARCELS, VARIANT_ATTR_KEYS,
@@ -39,8 +37,10 @@ import type { MemberPricingRow, MemberPricingTierState } from "./member-pricing"
  *   5+6. Pricing + Billing mode — reuses the existing, tested BasicsStep
  *        (pricing model, price+currency, PWYW min, billing radios, installment
  *        schedule, member pricing) rather than re-authoring that surface.
- *   7. Advanced — inline accordion rows (capacity[digital] / sales window /
- *      registration form) reusing ConfigStep + FormStep.
+ *   7. Advanced — drill-in rows (sales window / registration form) that open
+ *      as sub-screens INSIDE the modal (ConfigStep / FormStep rendered by
+ *      PriceEditModal's StepView), not inline accordions. Capacity is a
+ *      stepper in the shape core, not an Advanced row.
  *   8. Availability — the Published card + info note.
  *
  * Data flow is preserved: Stock→capacity, Licence→licenseTerms,
@@ -66,6 +66,12 @@ export interface VariantEditViewProps {
   /** Availability card publish toggle. */
   onTogglePublish?: () => void;
   publishToggling?: boolean;
+  /**
+   * Open one of the Advanced sections as a drill-in sub-screen inside the
+   * modal (breadcrumb + Back), instead of expanding inline. The modal renders
+   * the step body via StepView and owns the header/footer navigation.
+   */
+  onOpenStep: (step: "config" | "form") => void;
 }
 
 /** Sentinel for a Radix Select option that maps to a stored empty string —
@@ -84,12 +90,9 @@ export function VariantEditView({
   showToast,
   onTogglePublish,
   publishToggling,
+  onOpenStep,
 }: VariantEditViewProps) {
   const locked = isTierLocked(t);
-  // Single open accordion key, mirroring the prototype's `advOpen`. Local
-  // because this view is keyed on the tier's localId in the parent, so it
-  // resets when the editor moves to another variant.
-  const [advOpen, setAdvOpen] = useState<null | "capacity" | "sales" | "form">(null);
 
   const attrs = t.attrs ?? [];
   const files = t.files ?? [];
@@ -215,38 +218,26 @@ export function VariantEditView({
         </div>
       </div>
 
-      {/* 7 · Advanced — inline accordion rows. */}
+      {/* 7 · Advanced — drill-in rows. Each opens as a sub-screen INSIDE the
+          modal (ConfigStep / FormStep via StepView), with a breadcrumb + Back,
+          rather than expanding inline. Capacity stays a stepper in the shape
+          core (physical: Stock; digital: Capacity) — not a row here. */}
       <div>
         <Eyebrow>Advanced</Eyebrow>
         <div className="mt-1.5 space-y-2">
-          {/* Capacity is a visible stepper in the shape core (physical: Stock;
-              digital: Capacity), matching the Stock design + placement — not an
-              accordion row. Advanced now holds only sales window + form. */}
-          <AdvancedAccordion
+          <AdvancedRow
             icon={<Calendar className="h-[17px] w-[17px]" />}
             label="Sales window"
             value={salesVal}
-            open={advOpen === "sales"}
-            onToggle={() => setAdvOpen(advOpen === "sales" ? null : "sales")}
-          >
-            <ConfigStep t={t} onUpdate={onUpdate} />
-          </AdvancedAccordion>
+            onClick={() => onOpenStep("config")}
+          />
 
-          <AdvancedAccordion
+          <AdvancedRow
             icon={<ClipboardList className="h-[17px] w-[17px]" />}
             label="Registration form"
             value={formVal}
-            open={advOpen === "form"}
-            onToggle={() => setAdvOpen(advOpen === "form" ? null : "form")}
-          >
-            <FormStep
-              t={t}
-              communityTag={communityTag}
-              showToast={showToast ?? (() => {})}
-              draftMode={draftMode}
-              onDraftFormChange={(form) => onUpdate({ draftForm: form })}
-            />
-          </AdvancedAccordion>
+            onClick={() => onOpenStep("form")}
+          />
         </div>
       </div>
 
@@ -492,39 +483,29 @@ function DigitalCore({
   );
 }
 
-/* ── Advanced accordion row + inline panel ────────────────────────────── */
-function AdvancedAccordion({
-  icon, label, value, open, onToggle, children,
+/* ── Advanced drill-in row ─────────────────────────────────────────────
+   A tappable row (icon + label + current-value summary + chevron) that opens
+   its section as a sub-screen inside the modal, rather than expanding inline.
+   Same card styling as the other tappable rows in this view. */
+function AdvancedRow({
+  icon, label, value, onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
-  open: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
+  onClick: () => void;
 }) {
   return (
-    <div>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className={`w-full flex items-center gap-3 px-4 py-3 text-left border border-zinc-200 bg-white transition-colors hover:border-zinc-300 cursor-pointer ${open ? "rounded-t-xl border-b-0" : "rounded-xl"}`}
-      >
-        <span className="text-zinc-500 shrink-0">{icon}</span>
-        <span className="flex-1 text-[14px] font-medium text-zinc-900">{label}</span>
-        <span className="text-[13px] text-zinc-500">{value}</span>
-        <ChevronRight className={`h-4 w-4 shrink-0 text-zinc-300 transition-transform ${open ? "rotate-90" : ""}`} />
-      </button>
-      {/* Children mount only while open. Keeps FormStep (which fetches the
-          tier's form on mount) from firing a request until the row is opened,
-          matching the old drill-in behaviour. */}
-      <Collapse open={open}>
-        <div className="rounded-b-xl border border-t-0 border-zinc-200 bg-zinc-50 p-4">
-          {open ? children : null}
-        </div>
-      </Collapse>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center gap-3 px-4 py-3 text-left border border-zinc-200 bg-white rounded-xl transition-colors hover:border-zinc-300 cursor-pointer"
+    >
+      <span className="text-zinc-500 shrink-0">{icon}</span>
+      <span className="flex-1 text-[14px] font-medium text-zinc-900">{label}</span>
+      <span className="text-[13px] text-zinc-500">{value}</span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300" />
+    </button>
   );
 }
 
