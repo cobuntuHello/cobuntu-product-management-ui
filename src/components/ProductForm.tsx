@@ -38,7 +38,7 @@ import {
 import {
   FileText, Tag as TagIcon, Package,
   Layers, MousePointerClick, ChevronRight,
-  Eye, EyeOff, UserCheck, Lock, ClipboardCheck,
+  Eye, EyeOff, UserCheck, Lock, ClipboardCheck, Repeat,
   Image as ImageIcon, Plus, Check, X,
 } from "lucide-react";
 
@@ -117,6 +117,25 @@ export interface ProductFormData {
    * the event Require-Approval toggle; backend column products.requiresApproval.
    */
   requiresApproval?: boolean;
+  /**
+   * The seller's answer to "can a buyer who owns this buy it again?", or
+   * undefined when they have not given one.
+   *
+   * THREE states, not two, and the third is why this is optional rather than
+   * defaulted. undefined means the column stays NULL, which the backend reads
+   * as "work it out from the listing" (a course or a digital product with
+   * files cannot be re-bought; anything else can). Emitting a concrete boolean
+   * for an untouched switch would freeze that derivation for ever, on every
+   * product anyone happens to open the form for.
+   */
+  allowRepeatPurchase?: boolean;
+  /**
+   * The RESOLVED answer as the backend currently sees it, seeding the switch.
+   * Read-only: the form never emits this. It exists so the switch can show the
+   * truth for a listing whose seller has said nothing, WITHOUT this component
+   * reimplementing the derivation and drifting from it.
+   */
+  canRepeatPurchase?: boolean;
   /**
    * Tier list — populated only when the consumer renders this form with
    * `showTiers={true}` AND the user has flipped on multi-tier mode.
@@ -286,6 +305,17 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   };
   const [accessibility, setAccessibility] = useState<"PUBLIC" | "MEMBERS_ONLY">(initialData?.accessibility || "PUBLIC");
   const [requiresApproval, setRequiresApproval] = useState(initialData?.requiresApproval || false);
+  /*
+   * undefined until the seller touches it, so an untouched switch emits
+   * NOTHING and the column stays NULL. `??` and not `||`: an existing "no"
+   * is false, and `||` would read that as untouched and silently re-derive it.
+   */
+  const [allowRepeatPurchase, setAllowRepeatPurchase] = useState<boolean | undefined>(
+    initialData?.allowRepeatPurchase,
+  );
+  /* What the switch SHOWS: the seller's answer if they gave one, else the
+     backend's resolved value, else yes. Never a local re-derivation. */
+  const repeatShown = allowRepeatPurchase ?? initialData?.canRepeatPurchase ?? true;
 
   // Multi-tier mode — opt-in even when `showTiers` is true. Single-price
   // stays the default so the simple "I just want one price" path doesn't
@@ -514,6 +544,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       viewTierIds: viewResolved.tierIds,
       buyTierIds: buyResolved.tierIds,
       requiresApproval,
+      // Spread, not a key: an untouched switch must not put the field in the
+      // payload at all, or the backend records an answer nobody gave.
+      ...(allowRepeatPurchase === undefined ? {} : { allowRepeatPurchase }),
       /*
        * NULLED for anything that is not physical, and this is the guard, not a
        * tidy-up. normalisePhysicalFields THROWS a ValidationError when a
@@ -532,7 +565,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       tiers: configured.length > 0 ? named : [],
       donation,
     });
-  }, [name, description, tags, categoryId, subCategoryId, mediaItems, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, tiers, donation, condition, parcelClass, isPhysical]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [name, description, tags, categoryId, subCategoryId, mediaItems, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, allowRepeatPurchase, tiers, donation, condition, parcelClass, isPhysical]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Configured tiers drive the Pricing row summary + tier cards. A blank
   // seed tier ("Standard") counts once the user has named it.
@@ -820,6 +853,30 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               </div>
             </div>
           )}
+
+          {/* ─── Purchases ───
+              Its own card rather than a second row under Approval: approval is
+              about who may buy, this is about what an owner is shown after
+              they already have. Not gated on `hideApproval`, because the two
+              are unrelated rules and a consumer hiding one should not lose the
+              other. */}
+          <div>
+            <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Purchases</p>
+            <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
+              <div
+                onClick={() => setAllowRepeatPurchase(!repeatShown)}
+                className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-100/60 transition-colors">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Repeat className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
+                  <div className="min-w-0">
+                    <span className="text-sm font-medium text-zinc-800">Can be bought more than once</span>
+                    <p className="text-[11px] text-zinc-400 mt-0.5">On for anything delivered per purchase, like a session or a consultation. Off for a download or a course, where a second purchase gives the buyer nothing new and their page points at what they already own instead.</p>
+                  </div>
+                </div>
+                <Switch checked={repeatShown} onCheckedChange={setAllowRepeatPurchase} onClick={e => e.stopPropagation()} />
+              </div>
+            </div>
+          </div>
 
           {/* ─── Community access ───
               Visibility and Purchase exist ONLY because a community owns this
