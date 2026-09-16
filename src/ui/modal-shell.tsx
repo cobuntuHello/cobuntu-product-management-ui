@@ -48,12 +48,19 @@ export function ModalShell({ children, onClose, width }: ModalShellProps) {
   if (typeof document === "undefined") return null;
 
   const w = width ?? "w-[420px]";
-  // Width applies on desktop only; on mobile the sheet is full-width. Prefix any
-  // `w-` class with `sm:` so it kicks in at the modal breakpoint.
-  const smWidth = w
-    .split(/\s+/)
-    .map((c) => (c.startsWith("w-") ? `sm:${c}` : c))
-    .join(" ");
+  // Desktop panel width via a REAL media query, not a Tailwind class.
+  //
+  // The old code turned the `width` prop ("w-[600px]") into "sm:w-[600px]" at
+  // RUNTIME — a class Tailwind's scanner never sees, so unless an app happened
+  // to generate it (community's bare `@source ".../src"` did; the admin's
+  // globbed `@source` did not), it had no CSS and the panel fell back to w-full.
+  // That is why the admin app's variant modal rendered near full-viewport while
+  // the community app's was 600px. Parse the VALUE and emit a scoped rule that
+  // always exists, independent of any app's Tailwind config. The doubled class
+  // in the selector lifts specificity above Tailwind's `sm:w-auto` without
+  // `!important`.
+  const widthValue = /w-\[([^\]]+)\]/.exec(w)?.[1] ?? "420px";
+  const widthClass = `pmui-mw-${widthValue.replace(/[^a-z0-9]/gi, "")}`;
 
   const onTouchStart = (e: React.TouchEvent) => {
     startY.current = e.touches[0]?.clientY ?? null;
@@ -76,7 +83,7 @@ export function ModalShell({ children, onClose, width }: ModalShellProps) {
 
   return createPortal(
     <>
-      <style>{`@keyframes pmuiSheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes pmuiModalIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
+      <style>{`@keyframes pmuiSheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes pmuiModalIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}@media(min-width:640px){.${widthClass}.${widthClass}{width:${widthValue}}}.pmui-modal-scroll{scrollbar-width:none;-ms-overflow-style:none}.pmui-modal-scroll::-webkit-scrollbar{display:none}`}</style>
       <div
         className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center sm:items-center sm:p-4"
         onClick={onClose}
@@ -93,7 +100,7 @@ export function ModalShell({ children, onClose, width }: ModalShellProps) {
           className={
             "relative bg-white text-zinc-900 flex flex-col overflow-hidden shadow-xl " +
             "w-full max-h-[92dvh] rounded-t-2xl [animation:pmuiSheetUp_.24s_ease-out] " +
-            `sm:w-auto ${smWidth} sm:max-h-[90vh] sm:rounded-xl sm:[animation:pmuiModalIn_.16s_ease-out]`
+            `sm:w-auto ${widthClass} sm:max-h-[90vh] sm:rounded-xl sm:[animation:pmuiModalIn_.16s_ease-out]`
           }
         >
           {/* Drag handle — mobile only. A real grab target: swipe down to close.
@@ -110,7 +117,7 @@ export function ModalShell({ children, onClose, width }: ModalShellProps) {
           </div>
           {/* Scroll container — matches the shared shell so the parent's header
               and footer keep their pinned layout while the body scrolls. */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">{children}</div>
+          <div className="pmui-modal-scroll flex-1 min-h-0 overflow-y-auto px-6 py-5">{children}</div>
         </div>
       </div>
     </>,
