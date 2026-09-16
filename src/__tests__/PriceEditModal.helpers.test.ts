@@ -600,3 +600,34 @@ describe("draftTiersToCreatePayload — staged registration form", () => {
     expect((buildTierBody(t as any) as any).form).toBeUndefined();
   });
 });
+
+/*
+ * Member (tier) pricing rides the create payload the SAME way the form does:
+ * held on the draft (draftMemberPricing) until the tier exists, then emitted
+ * by draftTiersToCreatePayload — never by buildTierBody (a saved product's
+ * overrides go through the per-tier member-pricing endpoint, so putting them
+ * on every tier update body would be dead weight). This pins that split.
+ */
+describe("draftTiersToCreatePayload — staged member pricing", () => {
+  const mp = [{ segmentId: "seg-1", mode: "PERCENT_OFF" as const, value: 20, priority: 0 }];
+
+  it("includes memberPricing only when the draft has overrides", () => {
+    const withMp = { ...blankTier({ currency: "EUR" }), name: "Standard", price: "10", draftMemberPricing: mp };
+    const withoutMp = { ...blankTier({ currency: "EUR" }), name: "Basic", price: "5" };
+    const emptyMp = { ...blankTier({ currency: "EUR" }), name: "Empty", price: "5", draftMemberPricing: [] };
+    const nullMp = { ...blankTier({ currency: "EUR" }), name: "Null", price: "5", draftMemberPricing: null };
+
+    const payload = draftTiersToCreatePayload([withMp, withoutMp, emptyMp, nullMp] as any);
+
+    expect((payload[0] as any).memberPricing).toEqual(mp);
+    // Absent, not empty: an empty array is nothing to create.
+    expect((payload[1] as any).memberPricing).toBeUndefined();
+    expect((payload[2] as any).memberPricing).toBeUndefined();
+    expect((payload[3] as any).memberPricing).toBeUndefined();
+  });
+
+  it("does NOT put memberPricing on the tier update body", () => {
+    const t = { ...blankTier({ currency: "EUR" }), name: "Standard", price: "10", draftMemberPricing: mp };
+    expect((buildTierBody(t as any) as any).memberPricing).toBeUndefined();
+  });
+});

@@ -10,6 +10,11 @@
  *     installmentAccessMonths alongside the event publish/schedule fields.
  */
 
+// Type-only import — the backend member-pricing payload shape lives with
+// the member-pricing domain module. Type-only keeps this circular-free
+// (member-pricing.ts → helpers.ts → types.ts) at runtime.
+import type { MemberPricingUpsert } from "./member-pricing";
+
 /** Backend tier shape returned by GET /tiers. Installment fields are
  *  four-or-none for products: all four null = no plan, all four set =
  *  plan active. accessDurationMonths bounds how long a buyer keeps
@@ -131,6 +136,21 @@ export interface DraftTier {
    * describe the server's copy and this stays undefined.
    */
   draftForm?: { fields: any[]; stepLabels?: string[] } | null;
+  /**
+   * Draft-mode member (tier) pricing, held locally until the tier exists.
+   *
+   * Mirrors draftForm exactly. Community-owned per-segment price overrides
+   * are keyed server-side by tierId, so a tier being CREATED had no id to
+   * attach them to and the Members step showed "Save tier first". The backend
+   * now accepts a `memberPricing[]` array inline on the create payload (each
+   * override created atomically with the tier), so during create the modal's
+   * member-pricing rows are folded into this and shipped with the tier.
+   *
+   * Only meaningful in draftMode. On a saved tier the overrides live
+   * server-side (fetched per tier id) and this stays undefined. Each entry is
+   * the exact backend payload object (money in smallest unit).
+   */
+  draftMemberPricing?: MemberPricingUpsert[] | null;
   /** Non-refunded sales count. > 0 → price/currency/priceMode locked. */
   salesCount: number;
   /** 'fixed' = listed price is the price. 'pwyw' = listed price is

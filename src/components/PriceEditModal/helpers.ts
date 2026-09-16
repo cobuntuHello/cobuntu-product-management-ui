@@ -347,8 +347,10 @@ export function buildTierBody(
  * backend's `ProductTierInput` shape 1:1 — `ProductService.createProduct`
  * runs each through `ProductTierHelpers.createTier`. Soft-deleted and
  * blank-name drafts are dropped so an untouched placeholder tier is never
- * sent. Member-pricing + per-tier forms need a saved tier id, so they are
- * configured post-create in edit mode (the wizard shows "Save tier first").
+ * sent. A per-tier registration form (`form`) and community member pricing
+ * (`memberPricing[]`) are attached inline when staged on the draft — the
+ * backend creates each atomically with the tier, so neither needs a saved
+ * tier id any more.
  */
 export function draftTiersToCreatePayload(drafts: DraftTier[]): Record<string, unknown>[] {
   return drafts
@@ -361,6 +363,12 @@ export function draftTiersToCreatePayload(drafts: DraftTier[]): Record<string, u
       // through its own endpoint and this key would be dead weight. Only the
       // create payload can carry a form for a tier that has no id yet.
       if (t.draftForm && t.draftForm.fields?.length) body.form = t.draftForm;
+      // Member (tier) pricing staged during create — same rationale as the
+      // form above: only the create payload can carry per-segment overrides
+      // for a tier that has no id yet. The backend creates each atomically
+      // with the tier. On a SAVED product these go through the per-tier
+      // member-pricing endpoint instead, so buildTierBody never emits this.
+      if (t.draftMemberPricing?.length) body.memberPricing = t.draftMemberPricing;
       return body;
     });
 }

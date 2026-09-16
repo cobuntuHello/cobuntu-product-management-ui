@@ -236,6 +236,15 @@ interface ProductFormProps {
    * never loses its contents.
    */
   page?: "listing" | "commerce" | "all";
+  /**
+   * Surfaces community member (tier) pricing inside the draftMode tier wizard
+   * so per-segment discount overrides can be configured at CREATE time (they
+   * ride the create payload, created atomically with each tier). Community-
+   * owned products only — the consumer passes its own ownership signal
+   * (e.g. `isCommunityOwned`). Off → the section is not rendered, matching a
+   * member selling their own product. Default false.
+   */
+  showMemberPricing?: boolean;
 }
 
 /**
@@ -247,7 +256,7 @@ const AUTO_SEED_NAME = /^(Standard|Tier \d+)$/;
 
 // ─── Component ─────────────────────────────────────────────────
 
-export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all" }: ProductFormProps) {
+export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false }: ProductFormProps) {
   // Form state
   const [name, setName] = useState(initialData?.name || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -1019,11 +1028,12 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       </Dialog>
 
       {/* ─── Tier wizard (draftMode) ─── the same PriceEditModal events use,
-          seeded from this form's own draft state. draftMode → no API calls;
-          on Save it hands the drafts back via onDraftCommit and the parent
-          POSTs them as part of the create-product payload. Member-pricing +
-          forms that need a saved tier id show "Save tier first" and are
-          configured post-create in edit mode. */}
+          seeded from this form's own draft state. draftMode → no backend
+          WRITES; on Save it hands the drafts back via onDraftCommit and the
+          parent POSTs them as part of the create-product payload. When
+          showMemberPricing is on (community-owned), the modal reads community
+          segments and folds per-tier member pricing into the create payload
+          too. Per-tier registration forms ride the payload the same way. */}
       {showTierModal && (
         <ProductManagementConfigProvider value={DRAFT_CONFIG_STUB}>
           <PriceEditModal
@@ -1051,7 +1061,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
              * the fix is to thread its own through, not to fill this in.
              */
             showToast={() => {}}
-            showMemberPricing={false}
+            showMemberPricing={showMemberPricing}
           />
         </ProductManagementConfigProvider>
       )}
