@@ -214,6 +214,7 @@ export function VariantEditView({
             memberPricingState={memberPricingState}
             onMemberPricingRowChange={onMemberPricingRowChange}
             showToast={showToast}
+            draftMode={draftMode}
           />
         </div>
       </div>

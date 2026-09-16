@@ -22,6 +22,23 @@ import { fromSmallestUnit, toSmallestUnit } from "./helpers";
 export type MemberPricingMode = "FREE" | "PERCENT_OFF" | "FLAT_OFF" | "FIXED_PRICE";
 export type RecurringScope = "ALWAYS" | "FIRST_ONLY";
 
+/**
+ * The backend member-pricing payload object — one per (tier, segment)
+ * override. This is exactly what buildUpsertBody emits and what the
+ * create-product/create-event endpoints now accept inline on a tier's
+ * `memberPricing[]` array (created atomically with the tier). Money
+ * (FLAT_OFF / FIXED_PRICE `value`) is in the currency's smallest unit;
+ * PERCENT_OFF `value` is 1-100; FREE ignores `value`. `recurringScope`
+ * is product-only (subscription tiers) — events omit it.
+ */
+export interface MemberPricingUpsert {
+  segmentId: string;
+  mode: MemberPricingMode;
+  value?: number;
+  recurringScope?: RecurringScope;
+  priority?: number;
+}
+
 export interface CommunitySegment {
   id: string;
   name: string;
@@ -157,14 +174,14 @@ export function buildUpsertBody(
   r: MemberPricingRow,
   currencyCode: string,
   isRecurringTier: boolean,
-): Record<string, unknown> {
+): MemberPricingUpsert {
   let backendValue = 0;
   if (r.mode === "PERCENT_OFF") {
     backendValue = parseInt(r.value, 10);
   } else if (r.mode === "FLAT_OFF" || r.mode === "FIXED_PRICE") {
     backendValue = toSmallestUnit(parseFloat(r.value), currencyCode);
   }
-  const body: Record<string, unknown> = {
+  const body: MemberPricingUpsert = {
     segmentId: r.segmentId,
     mode: r.mode,
     value: backendValue,

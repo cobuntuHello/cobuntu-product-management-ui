@@ -108,8 +108,10 @@ export interface PriceEditModalProps {
    * community-app `/manage` omits / passes false (user-owned products
    * don't get the section).
    *
-   * Default: false. The section requires saved-tier ids; rows are
-   * hidden for unsaved drafts (no `id`).
+   * Default: false. On the MANAGE page the section requires saved-tier ids —
+   * rows are hidden for unsaved drafts (no `id`). In draftMode (create wizard)
+   * the rows are editable anyway and ride the create payload; they're keyed by
+   * localId there. ProductForm forwards its own showMemberPricing here.
    */
   showMemberPricing?: boolean;
   /**
@@ -121,8 +123,11 @@ export interface PriceEditModalProps {
    * In draftMode:
    *   - No GET /tiers (initialDraftTiers seeds drafts instead)
    *   - No GET /stripe status (gate happens at the parent's submit time)
-   *   - Member-pricing segments fetch is skipped; the Members step Edit
-   *     buttons stay disabled ("Save tier first" copy covers it)
+   *   - Community segments ARE fetched when showMemberPricing is on
+   *     (segments predate the product), so member pricing is editable on a
+   *     tier with no id; its rows are keyed by localId and folded into each
+   *     draft's draftMemberPricing on Save (they ride the create payload,
+   *     mirroring how the registration form does)
    *   - On Save: validate locally, then call onDraftCommit instead of
    *     POSTing
    */
@@ -225,6 +230,14 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   // map below keyed by tier id.
   const [memberPricingSegments, setMemberPricingSegments] = useState<CommunitySegment[]>([]);
   const [memberPricingByTier, setMemberPricingByTier] = useState<Map<string, MemberPricingTierState>>(new Map());
+
+  // Key the per-tier member-pricing map by the tier's server id on the manage
+  // page, but by its localId in draftMode — a draft tier has no server id yet,
+  // so localId is the only stable handle to hang its rows on until create.
+  const mpKey = useCallback(
+    (d: DraftTier): string | undefined => (draftMode ? d.localId : d.id),
+    [draftMode],
+  );
 
   const updateMemberPricingRow = useCallback(
     (tierId: string, idx: number, patch: Partial<MemberPricingRow>) => {
@@ -358,9 +371,12 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   // Fetch community segments once when the modal opens with
   // showMemberPricing on. Mirrors the events package's effect.
   useEffect(() => {
-    // Skipped in draftMode — unsaved tiers have no id to attach overrides
-    // to, so the Members step shows "Save tier first" instead.
-    if (!showMemberPricing || draftMode) return;
+    // Runs in draftMode too: community segments exist BEFORE the product
+    // does (they're community-wide), so the create wizard can offer member
+    // pricing on a tier that has no id yet — the overrides ride the create
+    // payload (see the draftMode branch of the seeding effect + the Save
+    // fold below). Only skipped when the feature is off.
+    if (!showMemberPricing) return;
     let cancelled = false;
     (async () => {
       try {
@@ -380,6 +396,28 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   // Lazy per-tier override fetch once segments are loaded.
   useEffect(() => {
     if (!showMemberPricing || memberPricingSegments.length === 0) return;
+    // Draft mode: there are no server overrides to fetch (a draft tier has no
+    // id). Seed each draft's rows synchronously from the member pricing it
+    // already carries locally (draftMemberPricing — the exact server-shape
+    // buildRowsFromOverrides accepts), keyed by localId. Skips any draft that
+    // already has a slot so re-opening a tier keeps its edited rows.
+    if (draftMode) {
+      setMemberPricingByTier((prev) => {
+        let changed = false;
+        const next = new Map(prev);
+        for (const d of drafts) {
+          if (d.deleted || next.has(d.localId)) continue;
+          next.set(d.localId, {
+            loading: false,
+            error: null,
+            rows: buildRowsFromOverrides(memberPricingSegments, d.draftMemberPricing ?? [], d.currency),
+          });
+          changed = true;
+        }
+        return changed ? next : prev;
+      });
+      return;
+    }
     const savedTierIds = drafts
       .filter((d) => d.id && !d.deleted)
       .map((d) => d.id!) as string[];
@@ -415,7 +453,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
       })();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showMemberPricing, memberPricingSegments, drafts.map((d) => d.id).join(",")]);
+  }, [showMemberPricing, memberPricingSegments, draftMode, drafts.map((d) => d.id ?? d.localId).join(",")]);
 
   function updateDraft(idx: number, patch: Partial<DraftTier>) {
     setDrafts(d => d.map((t, i) => i === idx ? { ...t, ...patch } : t));
@@ -621,12 +659,32 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
 
       // Draft mode: hand the validated drafts to the parent and close. No
       // backend writes — the parent (ProductForm) owns the source of truth
-      // and POSTs these as part of the create-product payload. Member-
-      // pricing + forms need a saved tier id, so they stay edit-time (same
-      // as events); the modal already shows "Save tier first" for them.
+      // and POSTs these as part of the create-product payload. Member pricing
+      // now rides that payload too (the backend accepts it inline on create),
+      // so before committing we FOLD each draft's member-pricing rows into its
+      // draftMemberPricing — exactly mirroring how draftForm rides create.
       if (draftMode) {
         const liveDrafts = drafts.filter((d) => !d.deleted);
-        onDraftCommit?.({ tiers: liveDrafts, donation });
+        const foldedDrafts = liveDrafts.map((d) => {
+          const state = memberPricingByTier.get(d.localId);
+          // No slot (segments never loaded / community has none) or an errored
+          // slot → nothing the user could have configured; leave the draft's
+          // existing draftMemberPricing untouched.
+          if (!state || state.loading || state.error) return d;
+          // Same validation the manage path runs before its network writes.
+          const valErr = findFirstValidationError(state.rows);
+          if (valErr) throw new Error(valErr);
+          // Keep enabled rows (a disabled row is "no override"). Each enabled
+          // row is either freshly turned on (dirty) or seeded from a prior
+          // draftMemberPricing (already set) — both belong in the payload.
+          // Map through the SAME buildUpsertBody the manage path uses so the
+          // cents conversion + mode rules have one source of truth.
+          const memberPricing = state.rows
+            .filter((r) => r.enabled)
+            .map((r) => buildUpsertBody(r, d.currency, d.isRecurring));
+          return { ...d, draftMemberPricing: memberPricing.length ? memberPricing : null };
+        });
+        onDraftCommit?.({ tiers: foldedDrafts, donation });
         showToast("Pricing saved");
         onSaved();
         return;
@@ -771,6 +829,10 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   const activeDraft = activeTier
     ? drafts.find(d => d.localId === activeTier && !d.deleted)
     : null;
+  // The map key for the active draft's member pricing (localId in draftMode,
+  // server id on manage). undefined for an unsaved tier on the manage page —
+  // which is what keeps the Members step's "Save tier first" placeholder there.
+  const activeMpKey = activeDraft ? mpKey(activeDraft) : undefined;
 
   function activeIdx(): number | null {
     if (!activeDraft) return null;
@@ -895,10 +957,10 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
           }}
           draftMode={draftMode}
           showMemberPricing={!!showMemberPricing}
-          memberPricingState={activeDraft.id ? memberPricingByTier.get(activeDraft.id) : undefined}
+          memberPricingState={activeMpKey ? memberPricingByTier.get(activeMpKey) : undefined}
           onMemberPricingRowChange={
-            activeDraft.id
-              ? (idx, patch) => updateMemberPricingRow(activeDraft.id!, idx, patch)
+            activeMpKey
+              ? (idx, patch) => updateMemberPricingRow(activeMpKey, idx, patch)
               : undefined
           }
           showToast={showToast}
@@ -918,10 +980,10 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
           }}
           draftMode={draftMode}
           showMemberPricing={!!showMemberPricing}
-          memberPricingState={activeDraft.id ? memberPricingByTier.get(activeDraft.id) : undefined}
+          memberPricingState={activeMpKey ? memberPricingByTier.get(activeMpKey) : undefined}
           onMemberPricingRowChange={
-            activeDraft.id
-              ? (idx, patch) => updateMemberPricingRow(activeDraft.id!, idx, patch)
+            activeMpKey
+              ? (idx, patch) => updateMemberPricingRow(activeMpKey, idx, patch)
               : undefined
           }
           showToast={showToast}
