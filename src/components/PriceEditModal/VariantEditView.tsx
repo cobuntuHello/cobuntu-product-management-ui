@@ -147,7 +147,28 @@ export function VariantEditView({
         </div>
       </div>
 
-      {/* 3 · Shape-specific core */}
+      {/* 3 · Capacity / Stock — lifted directly under Description (was at the
+          end of the shape core) to match the event tier editor: the cap is a
+          core fact of the variant, set alongside name/description before the
+          deliverables and pricing. Digital → "Capacity"; physical → "Stock".
+          Same stepper + stored shape (t.capacity, "" = unlimited; on a locked
+          tier the floor is the already-sold count). */}
+      <div>
+        <Eyebrow help="How many can be sold before this variant is sold out. Leave empty for unlimited.">
+          {isDigital ? "Capacity" : "Stock"}
+        </Eyebrow>
+        <div className="mt-1.5">
+          <Stepper
+            value={t.capacity}
+            onChange={(v) => onUpdate({ capacity: v })}
+            placeholder="Unlimited"
+            min={isTierLocked(t) ? t.salesCount : 0}
+            ariaLabel={isDigital ? "Capacity" : "Stock"}
+          />
+        </div>
+      </div>
+
+      {/* 4 · Shape-specific core */}
       {isDigital ? (
         <DigitalCore
           t={t}
@@ -323,16 +344,6 @@ function PhysicalCore({ t, onUpdate }: { t: DraftTier; onUpdate: (p: Partial<Dra
           </SelectContent>
         </Select>
       </div>
-      <div>
-        <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">Stock</label>
-        <Stepper
-          value={t.capacity}
-          onChange={(v) => onUpdate({ capacity: v })}
-          placeholder="Unlimited"
-          min={isTierLocked(t) ? t.salesCount : 0}
-          ariaLabel="Stock"
-        />
-      </div>
     </div>
   );
 }
@@ -465,21 +476,6 @@ function DigitalCore({
         </div>
       )}
 
-      {/* Capacity — same stepper design + placement as physical Stock (end of
-          the shape core), not an Advanced accordion row. */}
-      <div>
-        <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">Capacity</label>
-        <Stepper
-          value={t.capacity}
-          onChange={(v) => onUpdate({ capacity: v })}
-          placeholder="Unlimited"
-          min={isTierLocked(t) ? t.salesCount : 0}
-          ariaLabel="Capacity"
-        />
-        <p className="text-[11.5px] text-zinc-400 mt-2 leading-relaxed">
-          How many licences can be sold before this variant is sold out. Leave empty for unlimited.
-        </p>
-      </div>
     </div>
   );
 }
