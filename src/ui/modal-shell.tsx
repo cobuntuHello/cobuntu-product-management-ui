@@ -84,8 +84,14 @@ export function ModalShell({ children, onClose, width }: ModalShellProps) {
   return createPortal(
     <>
       <style>{`@keyframes pmuiSheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}@keyframes pmuiModalIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}@media(min-width:640px){.${widthClass}.${widthClass}{width:${widthValue}}}.pmui-modal-scroll{scrollbar-width:none;-ms-overflow-style:none}.pmui-modal-scroll::-webkit-scrollbar{display:none}`}</style>
+      {/* z-[120], not z-50: the community app's left nav sidebar sits at
+          z-52/z-53/z-60, so a z-50 backdrop dims the page but leaves the
+          sidebar bright above it. z-[120] clears the whole nav stack and
+          matches @cobuntu/management-ui-shared's ModalShell, which documents
+          this same fix. The panel is a child of this backdrop, so it rides
+          along above the scrim with no z-index of its own. */}
       <div
-        className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center sm:items-center sm:p-4"
+        className="fixed inset-0 z-[120] bg-black/40 flex items-end justify-center sm:items-center sm:p-4"
         onClick={onClose}
         role="dialog"
         aria-modal="true"
