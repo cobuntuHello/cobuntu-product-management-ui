@@ -16,7 +16,10 @@ export interface DonationsSectionProps {
  * from tiers by the parent PriceEditModal via
  * PUT /products/:id/donations. Two modes:
  *   - Suggested amounts: chip list. Buyer picks one at checkout.
- *   - Pay-what-you-want (PWYW): buyer enters any amount; optional minimum.
+ *   - Any amount: buyer enters any amount; optional minimum. (This is the
+ *     donation-amount presentation — NOT the tier-level pay-what-you-want
+ *     price mode, which sets the price of the item itself. A donation is an
+ *     optional contribution ON TOP of whatever the buyer already pays.)
  *
  * This is a pure controlled component — it owns no fetch/save logic; the
  * parent PriceEditModal persists the donation config to the product
@@ -80,7 +83,7 @@ export function DonationsSection({ donation, onUpdate, defaultCurrency }: Donati
                 type="button"
                 onClick={() => onUpdate({ mode: "pwyw" })}
                 className={`px-3 py-2 text-[13px] rounded-lg border cursor-pointer transition-colors ${donation.mode === "pwyw" ? "border-zinc-900 bg-zinc-50 text-zinc-900 font-medium" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"}`}
-              >Pay what you want</button>
+              >Any amount</button>
             </div>
           </div>
 
@@ -123,7 +126,7 @@ export function DonationsSection({ donation, onUpdate, defaultCurrency }: Donati
             </div>
           </Collapse>
 
-          {/* PWYW: optional minimum */}
+          {/* Any amount: optional minimum */}
           <Collapse open={donation.mode === "pwyw"}>
             <div>
               <Eyebrow>Minimum (optional)</Eyebrow>
