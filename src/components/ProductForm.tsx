@@ -19,6 +19,7 @@ import { PriceEditModal } from "./PriceEditModal";
 import { ProductManagementConfigProvider } from "../config";
 import { type DraftTier, type DonationDraft } from "./PriceEditModal/types";
 import { blankTier, blankDonation } from "./PriceEditModal/helpers";
+import { DonationsField } from "./PriceEditModal/DonationsField";
 import { CategoryPickerRow, type CategoryOption } from "./CategoryPickerRow";
 import {
   PhysicalDetailsFields,
@@ -836,6 +837,15 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             )}
             </div>
           )}
+
+          {/* ─── Donations ─── listing-level; its own row that opens a modal
+              (desktop) / drawer (mobile). Outside the Variants card because a
+              donation applies to the whole listing, not a single variant. */}
+          <DonationsField
+            donation={donation}
+            onUpdate={(patch) => setDonation((d) => ({ ...d, ...patch }))}
+            defaultCurrency={currency}
+          />
 
           {/* ─── Approval ───
               NOT community-scoped. requiresApproval is outside
