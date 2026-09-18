@@ -120,6 +120,7 @@ export { ProductSettingsDrawer, type ProductSettingsDrawerProps } from "./page/P
 export { ProductDescriptionEditModal, ProductCtaEditModal } from "./components/ProductDescriptionEditModal";
 export { ProductMediaModal } from "./components/ProductMediaModal";
 export { ProductVisibilityEditModal, type VisibilityAxis } from "./components/ProductVisibilityEditModal";
+export { ProductRefundPolicyEditModal } from "./components/ProductRefundPolicyEditModal";
 /*
  * The edit stack, exported under BOTH names.
  *

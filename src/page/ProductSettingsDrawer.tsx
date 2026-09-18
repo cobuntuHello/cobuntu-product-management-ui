@@ -4,6 +4,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { ProductVisibilityEditModal, type VisibilityAxis } from "../components/ProductVisibilityEditModal";
 import { ProductDistributionModal } from "../components/ProductDistributionModal";
+import { ProductRefundPolicyEditModal } from "../components/ProductRefundPolicyEditModal";
 import { AfterCheckoutCard } from "./sections/AfterCheckoutCard";
 import { ModalShell } from "./helpers";
 import { tierAccessSummary, toTierAccessValue, fetchMembershipTiers } from "@cobuntu/management-ui-shared";
@@ -42,7 +43,7 @@ import { useProductManagementConfig } from "../config";
  * and calls onSaved.
  */
 
-type ModalKey = VisibilityAxis | "distribution" | "after-checkout" | null;
+type ModalKey = VisibilityAxis | "distribution" | "after-checkout" | "refund-policy" | null;
 
 export interface ProductSettingsDrawerProps {
   product: any;
@@ -272,6 +273,19 @@ export function ProductSettingsDrawer({
       </ModalShell>
     );
   }
+  // Refund policy is the SELLER's own setting (like approval) — not community-
+  // scoped, so it renders on both ownership kinds.
+  if (modal === "refund-policy") {
+    return (
+      <ProductRefundPolicyEditModal
+        product={product}
+        productId={productId}
+        onClose={closeModalAndReopenDrawer}
+        onSaved={modalSaved}
+        showToast={showToast}
+      />
+    );
+  }
 
   if (!visible) return null;
   if (typeof document === "undefined") return null;
@@ -406,6 +420,26 @@ export function ProductSettingsDrawer({
             </div>
           )}
 
+          {/* Refund policy — the seller's own setting (like approval), so it
+              renders on both ownership kinds. The "Your settings" header above
+              is gated on approval; this row stands on its own when it's absent. */}
+          {!onSaveApproval && (
+            <p className="px-5 pt-4 pb-1 text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
+              Your settings
+            </p>
+          )}
+          <SettingsRow
+            label="Refund policy"
+            summary={refundPolicySummary(product)}
+            onClick={() => openModal("refund-policy")}
+            icon={
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-zinc-400">
+                <path d="M3 7v6h6" />
+                <path d="M21 17a9 9 0 0 0-15-6.7L3 13" />
+              </svg>
+            }
+          />
+
           {!hideAfterCheckout && (
             <SettingsRow
               label="After checkout"
@@ -432,6 +466,15 @@ function afterCheckoutSummary(product: any): string {
   if (mode === "UPSELL") return "Promotes a membership";
   if (mode === "REDIRECT") return "Redirects to a page";
   return "Cobuntu confirmation";
+}
+
+function refundPolicySummary(product: any): string {
+  const p = product?.refundPolicy;
+  const mode = p?.mode === "extended" ? "Extended" : "Standard";
+  const w = p?.customBuyerWindowDays;
+  if (w === 0) return `${mode} · buyer self-refunds off`;
+  if (typeof w === "number") return `${mode} · buyers ${w}d after purchase`;
+  return `${mode} · buyers refund during escrow`;
 }
 
 function SettingsRow({
