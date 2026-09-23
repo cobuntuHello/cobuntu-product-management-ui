@@ -45,9 +45,22 @@ import type { MemberPricingRow, MemberPricingTierState } from "./member-pricing"
  *
  * Data flow is preserved: Stock→capacity, Licence→licenseTerms,
  * Downloads-per-file→maxDownloads, and the pricing/publish/schedule/form
- * fields are the same DraftTier fields as before. attrs / condition /
- * parcelSize / files / links are LOCAL-ONLY draft state (not yet persisted —
- * buildTierBody does not emit them); see types.ts.
+ * fields are the same DraftTier fields as before.
+ *
+ * PERSISTENCE, since this said the opposite for a while and sent at least one
+ * reader off to rebuild what already existed:
+ *
+ *   - attrs → `attributes`, condition, parcelSize → `parcelClass`, and links →
+ *     `links: [{url}]` ARE emitted by buildTierBody and persisted. The backend
+ *     validates attribute keys against its vocabulary and creates/replaces
+ *     per-tier LINK rows.
+ *   - files are the exception, and deliberately so: bytes cannot ride the JSON
+ *     tier body, so they ship over a multipart channel keyed by tier index
+ *     (`tierFiles:<index>`) that the CONSUMER app assembles from
+ *     `t.files[j].file`. A consumer that does not send that channel drops the
+ *     file while saving everything else on the variant.
+ *
+ * See types.ts and helpers.ts (buildTierBody).
  *
  * The footer (Cancel | Delete | Save) is owned by PriceEditModal.
  */
