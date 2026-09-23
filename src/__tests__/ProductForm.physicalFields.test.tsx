@@ -248,3 +248,53 @@ describe("the digital delivery channel does not follow a parcel", () => {
     expect(lastEmit(onChange).productFiles).toHaveLength(1);
   });
 });
+
+describe("postage and condition step aside once variants exist", () => {
+  /*
+   * A variant is not a sub-row of a product: product_tiers.productId is
+   * unique, so every variant owns its OWN `products` row, and that is where
+   * condition / parcelClass / shippingPrice live. The variant editor writes
+   * them per variant (buildTierBody emits condition + parcelClass), the
+   * buyer's detail page describes the SELECTED variant, and checkout charges
+   * postage off `selectedTier.products.shippingPrice`
+   * (use-listing-purchase: `selectedTier?.products?.id || product.id`).
+   *
+   * So this block above a multi-variant listing was a second control writing
+   * the PARENT row that nothing on the buying side reads. A seller set the
+   * condition here and the variants kept their own, with no sign of it.
+   *
+   * Stock already had this guard. Postage did not. These pin that they now
+   * agree, because the two got out of step once already.
+   */
+  const physical = { ...base, productType: "PHYSICAL" as const };
+  const twoVariants = {
+    tiers: [
+      { localId: "a", name: "Small", description: "", price: "10", currency: "EUR", capacity: "", priceMode: "fixed" },
+      { localId: "b", name: "Large", description: "", price: "20", currency: "EUR", capacity: "", priceMode: "fixed" },
+    ],
+  } as any;
+
+  it("shows postage on a listing with no variants", () => {
+    renderWithConfig(<ProductForm {...physical} onChange={vi.fn()} />);
+    expect(screen.getByText("Parcel size")).toBeInTheDocument();
+  });
+
+  it("hides postage once the listing has variants", () => {
+    renderWithConfig(<ProductForm {...physical} onChange={vi.fn()} initialData={twoVariants} />);
+    expect(screen.queryByText("Parcel size")).not.toBeInTheDocument();
+  });
+
+  it("hides the condition select too, not just the parcel picker", () => {
+    // Both fields ship in one block; asserting only one would pass on a
+    // half-applied guard.
+    renderWithConfig(<ProductForm {...physical} onChange={vi.fn()} initialData={twoVariants} />);
+    expect(screen.queryByLabelText("Condition")).not.toBeInTheDocument();
+  });
+
+  it("hides it on the same condition Stock uses", () => {
+    // The point of the change: one rule, not two that drift.
+    renderWithConfig(<ProductForm {...physical} onChange={vi.fn()} initialData={twoVariants} />);
+    expect(screen.queryByText("How many do you have?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Parcel size")).not.toBeInTheDocument();
+  });
+});
