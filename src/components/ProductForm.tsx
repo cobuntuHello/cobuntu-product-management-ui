@@ -889,7 +889,12 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                   <Repeat className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
                   <div className="min-w-0">
                     <span className="text-sm font-medium text-zinc-800">Can be bought more than once</span>
-                    <p className="text-[11px] text-zinc-400 mt-0.5">On for anything delivered per purchase, like a session or a consultation. Off for a download or a course, where a second purchase gives the buyer nothing new and their page points at what they already own instead.</p>
+                    {/* Capped rather than left to fill the row: `justify-between`
+                        runs this paragraph right up to the Switch, so the last
+                        line of each wrap sits a few pixels from the toggle and
+                        the row reads as one cramped block. A measure cap wraps
+                        it earlier and leaves the gutter the gap alone could not. */}
+                    <p className="text-[11px] text-zinc-400 mt-0.5 max-w-[62ch]">On for anything delivered per purchase, like a session or a consultation. Off for a download or a course, where a second purchase gives the buyer nothing new and their page points at what they already own instead.</p>
                   </div>
                 </div>
                 <Switch checked={repeatShown} onCheckedChange={setAllowRepeatPurchase} onClick={e => e.stopPropagation()} />
