@@ -225,16 +225,24 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
         if (item.file && !item.isExisting) formData.append("media", item.file);
       }
 
-      const existingAttachmentIds = data.productFiles.filter(f => f.isExisting).map(f => f.id);
-      // Only FILE-kind rows take part in the file-delete diff — LINK rows are
-      // tracked separately (linksToDelete) so an untouched link is never nuked.
-      const originalAttachmentIds = (product.attachments || [])
-        .filter((a: any) => (a.kind ?? "FILE") !== "LINK")
-        .map((a: any) => a.id);
-      const attachmentsToDelete = [
-        ...originalAttachmentIds.filter((id: string) => !existingAttachmentIds.includes(id)),
-        ...linksToDelete,
-      ];
+      /*
+       * DELETE ONLY WHAT THE USER ACTUALLY REMOVED.
+       *
+       * This used to diff `data.productFiles` against the product's existing
+       * FILE attachments: anything the form no longer listed was deleted. That
+       * was right while the form owned product-level files. It stopped being
+       * right when deliverables moved INSIDE each variant — ProductForm now
+       * emits `productFiles: []` unconditionally (see its onChange), so the
+       * diff saw zero surviving files and marked EVERY existing attachment for
+       * deletion on EVERY save. A seller editing a product's title would lose
+       * its downloads.
+       *
+       * The form no longer manages product-level files, so it cannot express
+       * an intent to remove one, and this path must not infer one from an
+       * absence. Only links, which this drawer still owns explicitly, are
+       * deleted here.
+       */
+      const attachmentsToDelete = [...linksToDelete];
       if (attachmentsToDelete.length > 0) formData.append("attachmentsToDelete", JSON.stringify(attachmentsToDelete));
 
       for (const file of data.productFiles) {

@@ -157,6 +157,37 @@ describe("EditProductDrawer", () => {
     expect(toDelete).not.toContain("att-file-1");
   }, 10000);
 
+  it("a plain save does NOT delete existing file attachments", async () => {
+    /*
+     * The regression this guards. The delete list used to be a DIFF against
+     * `data.productFiles`, which was correct while the form owned product-level
+     * files. Once deliverables moved inside each variant, ProductForm began
+     * emitting `productFiles: []` unconditionally — so the diff saw no
+     * survivors and marked every existing attachment for deletion. Editing a
+     * product's title would have destroyed its downloads.
+     *
+     * Asserted on a save that changes NOTHING, because that is the weakest
+     * possible intent: if an untouched save deletes a file, every save does.
+     */
+    const fetchMock = mockFetch([
+      { method: "PUT", url: "/products/p-1/comprehensive", body: { jobId: "j-1" } },
+      { method: "GET", url: "/products/update/status/j-1", body: { status: "completed" } },
+    ]);
+    const user = userEvent.setup();
+    const props = baseProps({ product: productWithLinks });
+    renderWithConfig(<EditProductDrawer {...props} />);
+
+    await waitFor(() => expect(screen.getByText("Download page")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+    await waitFor(() => expect(props.onSaved).toHaveBeenCalled(), { timeout: 8000 });
+
+    const putCall = fetchMock.mock.calls.find(c => (c[1] as RequestInit | undefined)?.method === "PUT");
+    const fd = putCall![1]!.body as FormData;
+    const toDelete = JSON.parse((fd.get("attachmentsToDelete") as string) || "[]");
+    expect(toDelete).not.toContain("att-file-1");
+    expect(toDelete).toHaveLength(0);
+  }, 10000);
+
   it("on a partial link-POST failure: surfaces the error and does not duplicate the posted link on retry", async () => {
     // First link POST succeeds, second fails. On retry only the un-posted link
     // should be sent again (no duplicate of the first).
