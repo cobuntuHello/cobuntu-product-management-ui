@@ -373,6 +373,40 @@ export function draftTiersToCreatePayload(drafts: DraftTier[]): Record<string, u
     });
 }
 
+/**
+ * The per-variant file uploads for a create request, as multipart field names.
+ *
+ * The backend routes each variant's deliverables by the field `tierFiles:<i>`,
+ * where `i` is the index of that variant in the `tiers` JSON array it received
+ * (services/core ProductService.processUploadJob → tierFilesMap → the tier's
+ * CHILD product). So the index MUST be counted over the same list
+ * `draftTiersToCreatePayload` emits, not over the raw drafts.
+ *
+ * That distinction is the whole reason this lives here rather than in each
+ * consumer. The payload builder drops soft-deleted and blank-name drafts. A
+ * consumer that indexed over the raw array would, for a seller who adds three
+ * variants and deletes the middle one, upload the third variant's files onto
+ * the SECOND variant's product — silently, with a successful save and the
+ * wrong buyer receiving the wrong download. Sharing the filter with the
+ * builder makes the two impossible to drift apart.
+ *
+ * Returns only NEW uploads (a live `File`). Existing files carry an id and are
+ * already attached server-side.
+ */
+export function tierFileUploads(
+  drafts: DraftTier[],
+): Array<{ field: string; file: File }> {
+  const out: Array<{ field: string; file: File }> = [];
+  drafts
+    .filter((t) => !t.deleted && t.name.trim())
+    .forEach((t, i) => {
+      (t.files ?? []).forEach((f) => {
+        if (f.file) out.push({ field: `tierFiles:${i}`, file: f.file });
+      });
+    });
+  return out;
+}
+
 /** Builds the donation-config sidecar body. Returns null when the
  *  draft is disabled — caller PUTs null to clear server state. */
 export function buildDonationBody(

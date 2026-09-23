@@ -44,6 +44,10 @@ export {
 // + tierDraftsToPayload above stay exported for any legacy caller.
 export { type DraftTier } from "./components/PriceEditModal/types";
 export { draftTiersToCreatePayload } from "./components/PriceEditModal/helpers";
+// Per-variant file uploads for the SAME create request. Exported beside the
+// payload builder deliberately: both must count over the same filtered list,
+// or a consumer uploads one variant's files onto another variant's product.
+export { tierFileUploads } from "./components/PriceEditModal/helpers";
 export { EditProductDrawer } from "./components/EditProductDrawer";
 
 // UI primitives — duplicated from @cobuntu/event-management-ui by design
