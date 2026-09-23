@@ -726,8 +726,21 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           * ship with both unset. A digital product has no parcel, so the block
           * renders NOTHING there. Wrapped in the same soft card the other
           * grouped controls use so it reads as one section.
+          *
+          * Hidden once Advanced pricing is on, for the same reason Stock below
+          * is: condition and parcel size are NOT product-level facts. A variant
+          * owns its own `products` row (product_tiers.productId is unique), so
+          * both columns live per variant, the variant editor writes them per
+          * variant (buildTierBody emits condition/parcelClass), the buyer's
+          * detail page describes the SELECTED variant, and checkout charges
+          * postage off `selectedTier.products.shippingPrice`. Left visible
+          * above several variants this wrote the PARENT row nobody reads, so a
+          * seller set a condition here and saw the variants keep their own.
+          * With no variants it stays, and is correct: checkout falls back to
+          * the parent row (`selectedTier?.products?.id || product.id`), so the
+          * parent IS the thing being bought and these are its own fields.
           */}
-        {isPhysical && (
+        {isPhysical && !multiTier && (
           <div className="rounded-2xl bg-zinc-50 px-4 py-4">
             <div className="flex items-center gap-3 mb-3">
               <Package className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
