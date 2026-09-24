@@ -83,7 +83,7 @@ function tierRowNames(): string[] {
   return screen
     .queryAllByRole("button")
     .map((b) => b.textContent || "")
-    .filter((t) => /Standard|Tier \d|Unnamed tier/.test(t))
+    .filter((t) => /Standard|Variant \d|Unnamed variant/.test(t))
     .map((t) => t.trim());
 }
 
@@ -99,7 +99,7 @@ async function priceTheOpenTier(user: ReturnType<typeof userEvent.setup>, dialog
 }
 
 async function openTierModal(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole("button", { name: /set pricing|add pricing tier/i }));
+  await user.click(screen.getByRole("button", { name: /add variant/i }));
   await waitFor(() => expect(screen.getByRole("dialog")).toBeInTheDocument());
 }
 
@@ -165,6 +165,6 @@ describe("ProductForm — adding a pricing tier", () => {
     const names = tierRowNames();
     // Seeded "Standard" + the one just added.
     expect(names).toHaveLength(2);
-    expect(names.some((n) => /Tier 2/.test(n))).toBe(true);
+    expect(names.some((n) => /Variant 2/.test(n))).toBe(true);
   });
 });

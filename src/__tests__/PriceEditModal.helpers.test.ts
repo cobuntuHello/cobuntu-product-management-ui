@@ -13,6 +13,7 @@ import {
   validateTier,
   blankTier,
   blankDonation,
+  normalizeDraftTier,
 } from "../components/PriceEditModal/helpers";
 import {
   TIER_NAME_MAX,
@@ -495,9 +496,9 @@ describe("PriceEditModal helpers (product) — isTierLocked", () => {
 });
 
 describe("PriceEditModal helpers (product) — blank builders", () => {
-  it("blankTier picks 'Standard' for the first tier", () => {
+  it("blankTier picks 'Standard' for the first tier, then numbers by position", () => {
     expect(blankTier({ indexHint: 1 }).name).toBe("Standard");
-    expect(blankTier({ indexHint: 2 }).name).toBe("Tier 2");
+    expect(blankTier({ indexHint: 2 }).name).toBe("Variant 2");
   });
 
   it("blankTier defaults to one-time + fixed + monthly interval", () => {
@@ -629,5 +630,61 @@ describe("draftTiersToCreatePayload — staged member pricing", () => {
   it("does NOT put memberPricing on the tier update body", () => {
     const t = { ...blankTier({ currency: "EUR" }), name: "Standard", price: "10", draftMemberPricing: mp };
     expect((buildTierBody(t as any) as any).memberPricing).toBeUndefined();
+  });
+});
+
+describe("validateTier / normalizeDraftTier — tiers that predate the variant redesign", () => {
+  /*
+   * The per-variant redesign added `licenseTerms` and `maxDownloads` to
+   * DraftTier. Tiers created before it - and any consumer mapping API data
+   * through a looser type - arrive without them.
+   *
+   * Two seeding paths disagreed about that. The fetched path builds each draft
+   * field by field and coalesces every optional column; the DRAFT path (the
+   * create/edit wizard, via `initialDraftTiers`) took the caller's objects
+   * verbatim. validateTier then read `.length` on undefined and threw.
+   *
+   * A throw here is far worse than a validation failure, because it happens
+   * INSIDE the Save handler: there is no message, the modal simply stops
+   * responding to Save, and the seller cannot save the product at all.
+   */
+  const legacy = () => ({
+    localId: "t1",
+    name: "Standard",
+    description: "",
+    price: "10",
+    currency: "USD",
+    capacity: "",
+    priceMode: "fixed" as const,
+    pwywMin: "",
+    isRecurring: false,
+    recurringInterval: "monthly" as const,
+    hasForm: false,
+    formFieldCount: 0,
+    salesCount: 0,
+    deleted: false,
+    // licenseTerms and maxDownloads deliberately absent.
+  });
+
+  it("validates a tier missing licenseTerms / maxDownloads instead of throwing", () => {
+    expect(() => validateTier(legacy() as any)).not.toThrow();
+    // And it is VALID - a legacy tier is a perfectly good tier, so the fix must
+    // not turn a crash into a spurious "fix this field" the seller cannot act on.
+    expect(validateTier(legacy() as any)).toBeNull();
+  });
+
+  it("normalizeDraftTier fills the absent strings so later readers can trust them", () => {
+    const n = normalizeDraftTier(legacy() as any);
+    expect(n.licenseTerms).toBe("");
+    expect(n.maxDownloads).toBe("");
+    // Everything else is carried through untouched.
+    expect(n.name).toBe("Standard");
+    expect(n.price).toBe("10");
+  });
+
+  it("normalizeDraftTier leaves real values alone", () => {
+    const n = normalizeDraftTier({ ...legacy(), licenseTerms: "Personal use", maxDownloads: "3" } as any);
+    expect(n.licenseTerms).toBe("Personal use");
+    expect(n.maxDownloads).toBe("3");
   });
 });

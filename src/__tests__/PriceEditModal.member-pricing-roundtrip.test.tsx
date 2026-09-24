@@ -107,10 +107,10 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     // L1 → click tier row → L2 (per-tier hub).
     await user.click(await screen.findByRole("button", { name: /Pro/ }));
 
-    // L2 → click Pricing configuration SectionCard → L3. Member pricing is
-    // folded into the pricing-config step in the product modal (no separate
-    // tile), so this is where the per-segment override rows live.
-    await user.click(await screen.findByRole("button", { name: /Pricing configuration/ }));
+    // The per-variant redesign flattened the editor: there is no longer a
+    // "Pricing configuration" drill-in below the tier. Member pricing renders
+    // INLINE in the variant editor, so L2 is already where the per-segment
+    // override rows live.
 
     // Toggle VIPs override + set value.
     const vipsCheckbox = await screen.findByLabelText(
@@ -125,16 +125,12 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
 
     expect(await screen.findByText(/unsaved/i)).toBeInTheDocument();
 
-    // Back to L2 hub via the footer Back button. MembersStep is the
-    // same instance — modal-level state map keeps the dirty row.
-    await user.click(screen.getByRole("button", { name: /^Back$/ }));
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Pricing configuration/ })).toBeInTheDocument(),
-    );
-
-    // The hub is a pure menu with no Save — Back once more to the tier list
-    // (L1), where the outer Save lives.
-    await user.click(screen.getByRole("button", { name: /^Back$/ }));
+    // Back to the tier list (L1), where the outer Save lives. The footer Back
+    // button now belongs to the drill-in sub-steps; the way up from the variant
+    // editor is the breadcrumb. One hop, and the dirty rows must survive it -
+    // the whole point of holding them in the modal's state map rather than
+    // inside the section that unmounts.
+    await user.click(screen.getByRole("button", { name: "Pricing tiers" }));
 
     // Outer Save commits both the tier PUT AND the member-pricing POST.
     await user.click(screen.getByRole("button", { name: /^save$/i }));
@@ -176,30 +172,19 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     await waitFor(() => expect(saveBtn).not.toBeDisabled());
   });
 
-  it("re-entering Members step shows the previously-toggled state (mount stability)", async () => {
-    const user = userEvent.setup();
-    mockFetch(stubLoadRoutes());
-    renderWithConfig(<PriceEditModal {...baseProps()} />);
-
-    // L1 → row → L2 → click Pricing configuration card → L3.
-    await user.click(await screen.findByRole("button", { name: /Pro/ }));
-    await user.click(await screen.findByRole("button", { name: /Pricing configuration/ }));
-
-    const vipsCheckbox = await screen.findByLabelText(
-      /Offer member pricing for VIPs/,
-    );
-    await user.click(vipsCheckbox);
-    expect(vipsCheckbox).toBeChecked();
-
-    // Footer Back → L2, then re-enter Pricing configuration.
-    await user.click(screen.getByRole("button", { name: /^Back$/ }));
-    await user.click(await screen.findByRole("button", { name: /Pricing configuration/ }));
-
-    const vipsAfter = await screen.findByLabelText(
-      /Offer member pricing for VIPs/,
-    );
-    expect(vipsAfter).toBeChecked();
-  });
+  /*
+   * REMOVED: "re-entering Members step shows the previously-toggled state
+   * (mount stability)".
+   *
+   * It pinned state surviving the L2 hub ↔ L3 pricing-config transition. The
+   * per-variant redesign flattened the editor and that transition no longer
+   * exists, so the test could only ever have been kept alive by pointing it at
+   * a different hop - which would have made it a duplicate of the L1 ↔ L2 test
+   * below, not a check of anything new.
+   *
+   * The surviving property (dirty rows outlive leaving and re-entering the
+   * variant) is covered by that test.
+   */
 
   it("leaving the tier (back to tiers) mid-edit no longer drops the dirty rows (papercut #1 fix)", async () => {
     // Pre-state-lift: rows lived inside MemberPricingSection. Leaving
@@ -219,9 +204,8 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
 
     renderWithConfig(<PriceEditModal {...baseProps()} />);
 
-    // L1 → row → L2 → Pricing configuration card → L3 → dirty.
+    // L1 → row → L2 (the variant editor, member pricing inline) → dirty.
     await user.click(await screen.findByRole("button", { name: /Pro/ }));
-    await user.click(await screen.findByRole("button", { name: /Pricing configuration/ }));
 
     await user.click(
       await screen.findByLabelText(/Offer member pricing for VIPs/),
@@ -232,9 +216,8 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     fireEvent.change(valueInput, { target: { value: "20" } });
     expect(await screen.findByText(/unsaved/i)).toBeInTheDocument();
 
-    // Back to L2, then back to L1 (tiers) via the footer Back button.
-    await user.click(screen.getByRole("button", { name: /^Back$/ }));
-    await user.click(screen.getByRole("button", { name: /^Back$/ }));
+    // Back to L1 (the tier list) via the breadcrumb.
+    await user.click(screen.getByRole("button", { name: "Pricing tiers" }));
 
     // Save from L1 — the dirty member-pricing row should commit.
     await user.click(screen.getByRole("button", { name: /^save$/i }));
