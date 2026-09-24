@@ -9,6 +9,7 @@ import {
 } from "../ui/dialog";
 import { EventTags } from "../ui/event-tags";
 import { htmlToPlainText } from "../lib/htmlToPlainText";
+import { LISTING_NAME_MAX, NAME_COUNTER_FROM, listingNameTooLong } from "../lib/listingNameLimit";
 import { dataUrlToFile } from "../lib/dataUrlToFile";
 import { RichTextEditor } from "../ui/rich-text-editor";
 import { type MediaItem } from "../ui/sortable-media-gallery";
@@ -579,6 +580,14 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   // seed tier ("Standard") counts once the user has named it.
   const configuredTiers = tiers.filter(t => !t.deleted && t.name.trim());
 
+  /*
+   * Name length. The counter stays hidden until the last fifth of the budget,
+   * so a seller typing a normal title never sees a number at all -- it appears
+   * when it starts to matter, which is also the moment a paste blows past it.
+   */
+  const nameLeft = LISTING_NAME_MAX - name.trim().length;
+  const nameTooLong = listingNameTooLong(name);
+
   // Which page's blocks to render. Default "all" → both true → byte-identical
   // to before, so the drawer and admin single-page form are unaffected.
   const showListing = page !== "commerce";
@@ -590,11 +599,24 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       {/* ─── Product name — big inline title (borderless, matches event) ─── */}
       <div>
         <input value={name} onChange={e => setName(e.target.value)} placeholder="Product Name"
+          aria-invalid={nameTooLong || undefined}
           className="w-full text-[28px] font-bold text-zinc-900 placeholder:text-zinc-300 bg-transparent border-none outline-none p-0 leading-tight" />
         {showErrors && !name.trim() && (
           <p className="text-[13px] text-amber-600 mt-2 flex items-center gap-1.5">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" className="shrink-0"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 16h2v2h-2zm0-6h2v4h-2z" /></svg>
             Give your product a name
+          </p>
+        )}
+        {/*
+          * Silent until it is nearly relevant, then a countdown, then a plain
+          * statement of how much has to go. Absent entirely for the ordinary
+          * short title, which is almost every title.
+          */}
+        {nameLeft <= NAME_COUNTER_FROM && (
+          <p className={`mt-2 text-[13px] tabular-nums ${nameTooLong ? "text-red-600 font-medium" : "text-zinc-400"}`}>
+            {nameTooLong
+              ? `${-nameLeft} too many. A name this long is a description, not a title.`
+              : `${nameLeft} left`}
           </p>
         )}
       </div>
