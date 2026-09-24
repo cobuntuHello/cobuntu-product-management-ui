@@ -59,6 +59,36 @@ export interface BlankTierSeed {
   recurringInterval?: string;
 }
 
+/**
+ * Fill in the string fields a DraftTier is typed to have but a caller-supplied
+ * tier may be missing.
+ *
+ * There are two ways drafts get seeded and they did not agree. The FETCHED path
+ * builds each draft field by field and coalesces every optional backend column
+ * (`t.licenseTerms ?? ""`). The DRAFT path — the create/edit wizard, which
+ * passes `initialDraftTiers` — took the caller's objects verbatim. So a tier
+ * that predates the per-variant redesign, or any consumer mapping API data
+ * through a looser type, arrives with `licenseTerms` and `maxDownloads`
+ * undefined.
+ *
+ * `validateTier` then read `.length` / `.trim()` on them and threw. That throw
+ * happens inside the Save handler, on the FIRST tier it validates, so the
+ * seller cannot save the product at all and the modal just stops responding to
+ * Save. Nothing on screen explains it.
+ *
+ * Normalising here rather than only guarding in validateTier means every later
+ * reader (buildTierBody, the editor's inputs) gets the same guarantee, instead
+ * of each one having to remember the field might be absent.
+ */
+export function normalizeDraftTier(t: DraftTier): DraftTier {
+  return {
+    ...t,
+    description: t.description ?? "",
+    licenseTerms: t.licenseTerms ?? "",
+    maxDownloads: t.maxDownloads ?? "",
+  };
+}
+
 export function blankTier(seed: BlankTierSeed = {}): DraftTier {
   const currency = seed.currency || "EUR";
   const indexHint = seed.indexHint ?? 1;
@@ -144,13 +174,17 @@ export function validateTier(t: DraftTier): string | null {
   if (t.name.length > TIER_NAME_MAX) {
     return `Tier name must be ${TIER_NAME_MAX} characters or fewer.`;
   }
-  if (t.description.length > TIER_DESCRIPTION_MAX) {
+  // `?? ""` on each of these: validation must never be the thing that throws.
+  // It runs inside the Save handler, so a TypeError here does not surface as a
+  // validation message - it kills the save outright and the button goes dead.
+  // normalizeDraftTier fills these at the seam; this is the belt to that brace.
+  if ((t.description ?? "").length > TIER_DESCRIPTION_MAX) {
     return `Description for "${t.name}" must be ${TIER_DESCRIPTION_MAX} characters or fewer.`;
   }
-  if (t.licenseTerms.length > TIER_LICENSE_TERMS_MAX) {
+  if ((t.licenseTerms ?? "").length > TIER_LICENSE_TERMS_MAX) {
     return `License terms for "${t.name}" must be ${TIER_LICENSE_TERMS_MAX} characters or fewer.`;
   }
-  if (t.maxDownloads.trim()) {
+  if ((t.maxDownloads ?? "").trim()) {
     const n = Number(t.maxDownloads);
     if (!Number.isInteger(n) || n < 1) {
       return `Max downloads for "${t.name}" must be a whole number of 1 or more, or blank for unlimited.`;

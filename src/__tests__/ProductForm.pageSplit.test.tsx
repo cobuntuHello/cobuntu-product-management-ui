@@ -7,7 +7,8 @@ import { ProductForm } from "../components/ProductForm";
  * `page` lets a wizard spread ONE mounted ProductForm across two steps without
  * splitting its state:
  *   - "listing"  → name, photos, description, tags, category, CTA
- *   - "commerce" → postage/condition, stock, files, links, pricing, license…
+ *   - "commerce" → postage/condition, stock, variants (each carrying its own
+ *                  files, links and licence), visibility, approval
  *   - "all"      → everything (the default; drawer + admin single-page form)
  *
  * Only VISIBLE blocks change — onChange still emits the whole payload on either
@@ -26,8 +27,10 @@ describe("page split — listing vs commerce", () => {
     expect(screen.getByPlaceholderText("Product Name")).toBeInTheDocument();
     expect(screen.getByText("Add description")).toBeInTheDocument();
     expect(screen.getByText("Call to Action Label")).toBeInTheDocument();
-    expect(screen.queryByText("Pricing")).not.toBeInTheDocument();
-    expect(screen.queryByText("Add files")).not.toBeInTheDocument();
+    expect(screen.queryByText("Variants")).not.toBeInTheDocument();
+    // Deliverables are no longer a product-level row at all - they live inside
+    // each variant now - so the commerce half is marked by Variants + approval.
+    expect(screen.queryByText("Require approval")).not.toBeInTheDocument();
   });
 
   it('page="commerce" shows commerce and hides the listing', () => {
@@ -35,23 +38,26 @@ describe("page split — listing vs commerce", () => {
     expect(screen.queryByPlaceholderText("Product Name")).not.toBeInTheDocument();
     expect(screen.queryByText("Add description")).not.toBeInTheDocument();
     expect(screen.queryByText("Call to Action Label")).not.toBeInTheDocument();
-    expect(screen.getByText("Pricing")).toBeInTheDocument();
-    expect(screen.getByText("Add files")).toBeInTheDocument();
+    expect(screen.getByText("Variants")).toBeInTheDocument();
+    expect(screen.getByText("Require approval")).toBeInTheDocument();
   });
 
   it('default "all" shows both halves — the drawer/admin form is unaffected', () => {
     renderWithConfig(<ProductForm {...base} onChange={vi.fn()} />);
     expect(screen.getByPlaceholderText("Product Name")).toBeInTheDocument();
     expect(screen.getByText("Add description")).toBeInTheDocument();
-    expect(screen.getByText("Pricing")).toBeInTheDocument();
-    expect(screen.getByText("Add files")).toBeInTheDocument();
+    expect(screen.getByText("Variants")).toBeInTheDocument();
+    expect(screen.getByText("Require approval")).toBeInTheDocument();
   });
 
-  it("the physical commerce page carries condition + parcel inline (not files)", () => {
+  it("the physical commerce page carries condition + parcel inline", () => {
     renderWithConfig(<ProductForm {...base} onChange={vi.fn()} productType="PHYSICAL" page="commerce" />);
     expect(screen.getByLabelText("Condition")).toBeInTheDocument();
     expect(screen.getByText("Parcel size")).toBeInTheDocument();
-    // Files are the digital delivery channel — absent on a parcel.
+    // Files are absent here for EVERY product type now, not just parcels: the
+    // digital delivery channel moved inside the variant. The parcel-specific
+    // half of that rule is asserted where it now lives, in
+    // VariantEditView.deliverables.test.tsx.
     expect(screen.queryByText("Add files")).not.toBeInTheDocument();
   });
 

@@ -210,42 +210,59 @@ describe("stock", () => {
 });
 
 describe("the digital delivery channel does not follow a parcel", () => {
-  it("hides Add files for a physical product", () => {
+  it("offers no product-level file row at all any more", () => {
     /*
-     * productFiles is DELIVERY, not description: attachments land in a private
-     * bucket and are handed over on purchase. The label does not say so, so a
-     * seller could attach a care guide believing it is a description.
+     * Files are DELIVERY, not description: attachments land in a private
+     * bucket and are handed over on purchase. The label did not say so, so a
+     * seller could attach a care guide believing it was a description.
+     *
+     * That row is now gone from the product entirely - for every type, not
+     * just parcels - because deliverables belong to a variant. What replaced
+     * the physical-specific half of the rule is the emit guard below.
      */
     renderWithConfig(<ProductForm {...base} onChange={vi.fn()} productType="PHYSICAL" />);
     expect(screen.queryByText("Add files")).not.toBeInTheDocument();
-  });
-
-  it("still offers it for a digital product", () => {
     renderWithConfig(<ProductForm {...base} onChange={vi.fn()} />);
-    expect(screen.getByText("Add files")).toBeInTheDocument();
+    expect(screen.queryByText("Add files")).not.toBeInTheDocument();
   });
 
-  it("DROPS files already attached when the type becomes physical", () => {
+  it("DROPS a VARIANT's files and links when the type becomes physical", () => {
     /*
      * The worst version of this bug: attach a file, switch to Physical, and
      * without the emit rule the parcel seller also ships a download they had
      * stopped being able to see. Nothing on screen would have shown it.
      *
+     * The per-variant redesign moved deliverables from the product onto each
+     * variant, and this guarantee did NOT move with them: files and links
+     * survived the switch. It is restored here, at the level they now live at.
+     *
      * Emptied on EMIT, not cleared from state, so switching back brings them.
      */
     const onChange = vi.fn();
-    const seeded = { productFiles: [{ id: "f1", name: "guide.pdf", size: 10, type: "application/pdf", url: "u", isExisting: true }] } as any;
+    const seeded = {
+      tiers: [{
+        localId: "a", name: "Small", description: "", price: "10",
+        currency: "EUR", capacity: "", priceMode: "fixed",
+        files: [{ id: "f1", name: "guide.pdf", url: "u" }],
+        links: ["https://example.test/extras"],
+      }],
+    } as any;
 
     const { rerender } = renderWithConfig(
       <ProductForm {...base} onChange={onChange} initialData={seeded} />,
     );
-    expect(lastEmit(onChange).productFiles).toHaveLength(1);
+    expect(lastEmit(onChange).tiers[0].files).toHaveLength(1);
+    expect(lastEmit(onChange).tiers[0].links).toHaveLength(1);
 
     rerender(<ProductForm {...base} onChange={onChange} initialData={seeded} productType="PHYSICAL" />);
-    expect(lastEmit(onChange).productFiles).toEqual([]);
+    expect(lastEmit(onChange).tiers[0].files).toEqual([]);
+    expect(lastEmit(onChange).tiers[0].links).toEqual([]);
 
+    // Back to digital: the seller gets their deliverables back, because the
+    // rule is applied on emit and never touches the form's own state.
     rerender(<ProductForm {...base} onChange={onChange} initialData={seeded} />);
-    expect(lastEmit(onChange).productFiles).toHaveLength(1);
+    expect(lastEmit(onChange).tiers[0].files).toHaveLength(1);
+    expect(lastEmit(onChange).tiers[0].links).toHaveLength(1);
   });
 });
 

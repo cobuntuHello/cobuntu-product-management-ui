@@ -40,7 +40,13 @@ describe("EditProductDrawer", () => {
 
     await waitFor(() => expect(screen.getByText(/edit product/i)).toBeInTheDocument());
     expect(screen.getByDisplayValue("Cool product")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Buy Now")).toBeInTheDocument();
+    // The CTA is no longer an inline input: it collapsed into a summary row
+    // that opens a modal, so the preloaded value shows as the row's subtitle
+    // (in curly quotes) rather than as a field value. That it reaches the
+    // submitted payload is pinned separately, below.
+    expect(
+      screen.getByText((_t, el) => el?.textContent?.trim() === "\u201cBuy Now\u201d"),
+    ).toBeInTheDocument();
   });
 
   it("Cancel triggers onClose after the exit animation", async () => {

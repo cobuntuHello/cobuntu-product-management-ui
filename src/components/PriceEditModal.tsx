@@ -29,6 +29,7 @@ import {
 } from "./PriceEditModal/types";
 import {
   blankTier,
+  normalizeDraftTier,
   buildDonationBody,
   buildTierBody,
   fromSmallestUnit,
@@ -263,8 +264,12 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
     // drafts from initialDraftTiers (or a single blank tier).
     if (draftMode) {
       setDrafts(
+        // normalizeDraftTier, because the parent's tiers do NOT go through the
+        // field-by-field mapping the fetched path below applies. A tier built
+        // from API data can arrive without licenseTerms / maxDownloads, and
+        // Save's validation then threw on the first one - see the helper.
         initialDraftTiers && initialDraftTiers.length > 0
-          ? initialDraftTiers
+          ? initialDraftTiers.map(normalizeDraftTier)
           : [blankTier()],
       );
       setLoading(false);

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ProductForm, type ProductFormData } from "../components/ProductForm";
 import { renderWithConfig } from "./test-utils";
@@ -28,15 +28,41 @@ const baseProps = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+/** A saved-looking variant that carries the price, as the API returns one. */
+const pricedTier = (price: string) => ({
+  localId: "t1",
+  name: "Standard",
+  description: "",
+  licenseTerms: "",
+  maxDownloads: "",
+  price,
+  currency: "USD",
+  capacity: "",
+  priceMode: "fixed" as const,
+  pwywMin: "",
+  isRecurring: false,
+  recurringInterval: "monthly" as const,
+  hasForm: false,
+  formFieldCount: 0,
+  salesCount: 0,
+  deleted: false,
+  publishedAt: new Date().toISOString(),
+});
+
 describe("ProductForm", () => {
   it("renders the major sections", () => {
-    renderWithConfig(<ProductForm {...baseProps()} />);
+    // The form is collapsed rows now, not headed sections - it renders no
+    // headings at all - so each section is identified by the control that
+    // opens it. "Product files" is absent on purpose: deliverables moved
+    // inside each variant.
+    renderWithConfig(<ProductForm {...baseProps({ showTiers: true })} />);
 
-    expect(screen.getByRole("heading", { name: /product name/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /^description$/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /product gallery/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /product files/i })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /call-to-action text/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Product Name")).toBeInTheDocument();
+    expect(screen.getByText("Add description")).toBeInTheDocument();
+    // Several add-photo affordances (one per empty slot) - one is enough.
+    expect(screen.getAllByLabelText("Add photo").length).toBeGreaterThan(0);
+    expect(screen.getByText("Call to Action Label")).toBeInTheDocument();
+    expect(screen.getByText("Variants")).toBeInTheDocument();
   });
 
   it("preloads initialData (name + CTA text)", () => {
@@ -47,7 +73,11 @@ describe("ProductForm", () => {
     } })} />);
 
     expect(screen.getByDisplayValue("Pre-filled")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("Buy Now")).toBeInTheDocument();
+    // The CTA collapsed into a summary row that opens a modal, so its value
+    // shows as the row subtitle (curly-quoted) rather than as a field value.
+    expect(
+      screen.getByText((_t, el) => el?.textContent?.trim() === "\u201cBuy Now\u201d"),
+    ).toBeInTheDocument();
   });
 
   it("notifies parent via onChange when the name changes", async () => {
@@ -66,34 +96,44 @@ describe("ProductForm", () => {
     });
   });
 
-  it("starts in Free mode and switches to Paid when the toggle is clicked", async () => {
-    const onChange = vi.fn();
-    const user = userEvent.setup();
-    renderWithConfig(<ProductForm {...baseProps({ onChange })} />);
+  it("derives isPaid from the variant price instead of a Free/Paid toggle", async () => {
+    /*
+     * The product-level Free/Paid toggle was removed: pricing lives per
+     * variant now, and a toggle beside it was a second control writing the
+     * same answer. isPaid is still emitted - it gates the Stripe connect
+     * check - but it is now strictly PRICE-derived.
+     *
+     * Worth pinning precisely because it is derived: if it ever stopped
+     * tracking the variants, a seller could price a product and still be told
+     * they need no payment setup, and the failure would only show at checkout.
+     */
+    const free = vi.fn();
+    renderWithConfig(<ProductForm {...baseProps({ onChange: free, showTiers: true })} />);
+    await waitFor(() => expect(free).toHaveBeenCalled());
+    expect((free.mock.calls.at(-1)?.[0] as ProductFormData).isPaid).toBe(false);
 
-    // Free segment is active by default (isPaid false).
-    onChange.mockClear();
-
-    await user.click(screen.getByRole("button", { name: "Paid" }));
-
-    await waitFor(() => {
-      const last = onChange.mock.calls.at(-1)?.[0] as ProductFormData | undefined;
-      expect(last?.isPaid).toBe(true);
-    });
+    const paid = vi.fn();
+    renderWithConfig(<ProductForm {...baseProps({
+      onChange: paid,
+      showTiers: true,
+      initialData: { ...baseProps().initialData, tiers: [pricedTier("25")] as any },
+    })} />);
+    await waitFor(() => expect(paid).toHaveBeenCalled());
+    expect((paid.mock.calls.at(-1)?.[0] as ProductFormData).isPaid).toBe(true);
   });
 
-  it("showTiers={false}: tier toggle is NOT rendered, even when Paid", async () => {
-    const user = userEvent.setup();
+  it("showTiers={false}: no Variants card at all", () => {
+    // There is no longer an "Advanced pricing" opt-in gating the card - the
+    // Variants card IS the pricing surface, so showTiers is the only gate.
     renderWithConfig(<ProductForm {...baseProps()} />);
-    await user.click(screen.getByRole("button", { name: "Paid" }));
-    expect(screen.queryByText(/advanced pricing/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Variants")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /add variant/i })).not.toBeInTheDocument();
   });
 
-  it("showTiers={true}: 'Advanced pricing' toggle is visible once Paid is selected", async () => {
-    const user = userEvent.setup();
+  it("showTiers={true}: the Variants card is there immediately, no opt-in", () => {
     renderWithConfig(<ProductForm {...baseProps({ showTiers: true })} />);
-    await user.click(screen.getByRole("button", { name: "Paid" }));
-    await waitFor(() => expect(screen.getByText(/advanced pricing/i)).toBeInTheDocument());
+    expect(screen.getByText("Variants")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add variant/i })).toBeInTheDocument();
   });
 
   it("emits viewability + accessibility defaulting to PUBLIC", async () => {
@@ -188,36 +228,39 @@ describe("ProductForm", () => {
     expect(emitted.accessibility).toBe("MEMBERS_ONLY");
   });
 
-  it("multi-tier mode: emits a tiers array and clears parent price", async () => {
+  it("emits the tiers array and leaves the parent price empty", async () => {
+    // The parent price must stay empty whenever variants carry the price, or
+    // the product has two prices and the backend has to guess which is real.
     const onChange = vi.fn();
-    const user = userEvent.setup();
-    renderWithConfig(<ProductForm {...baseProps({ onChange, showTiers: true })} />);
-    await user.click(screen.getByRole("button", { name: "Paid" })); // → Paid
-    await waitFor(() => expect(screen.getByText(/advanced pricing/i)).toBeInTheDocument());
-
-    // Flip on multi-tier (also opens the wizard)
-    onChange.mockClear();
-    await user.click(screen.getByText(/advanced pricing/i));
+    renderWithConfig(<ProductForm {...baseProps({
+      onChange,
+      showTiers: true,
+      initialData: { ...baseProps().initialData, tiers: [pricedTier("25")] as any },
+    })} />);
 
     await waitFor(() => {
       const last = onChange.mock.calls.at(-1)?.[0] as ProductFormData | undefined;
       expect(last?.tiers?.length).toBeGreaterThanOrEqual(1);
       expect(last?.tiers?.[0]?.name).toBe("Standard");
-      expect(last?.price).toBe(""); // parent price MUST be empty in multi-tier mode
+      expect(last?.price).toBe("");
     });
   });
 
-  it("Advanced pricing opens the shared tier wizard (draftMode PriceEditModal)", async () => {
+  it("'Add variant' opens the shared tier wizard (draftMode PriceEditModal)", async () => {
     const user = userEvent.setup();
     renderWithConfig(<ProductForm {...baseProps({ showTiers: true })} />);
-    await user.click(screen.getByRole("button", { name: "Paid" }));
-    await user.click(await screen.findByText(/advanced pricing/i));
 
-    // The wizard mounts in draftMode — its "Pricing tiers" header + a seeded
-    // "Standard" tier row appear, with no network calls (stub config). The
-    // name "Standard" shows in both the summary row and the modal's tier row,
-    // so assert at least one such control exists.
-    expect(await screen.findByRole("heading", { name: /pricing tiers|add pricing|edit pricing/i })).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /Standard/ }).length).toBeGreaterThanOrEqual(1);
+    await user.click(screen.getByRole("button", { name: /add variant/i }));
+
+    // The wizard mounts in draftMode, with no network calls (stub config).
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    // It opens straight into the variant editor - the name field is the first
+    // thing in it - rather than onto a list the seller has to navigate.
+    // The variant-name field specifically - "Personal" alone also matches the
+    // licence field's placeholder.
+    expect(
+      within(dialog).getByPlaceholderText(/Blue \/ M/),
+    ).toBeInTheDocument();
   });
 });

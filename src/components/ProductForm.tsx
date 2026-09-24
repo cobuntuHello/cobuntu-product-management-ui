@@ -513,6 +513,10 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
      * requires no Stripe for one, persists capacity and the form, and enforces
      * stock inside the free-checkout transaction.
      */
+    /* A parcel has no download channel — see the `tiers:` emit below. */
+    const withoutDigitalDelivery = (t: DraftTier): DraftTier =>
+      isPhysical ? { ...t, files: [], links: [] } : t;
+
     const named = tiers.filter(t => !t.deleted && t.name.trim());
     const paid = named.some(t => t.priceMode === "pwyw" || (!!t.price && parseFloat(t.price) > 0));
     const configured = named.filter(t =>
@@ -571,8 +575,25 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
        */
       condition: isPhysical ? condition : null,
       parcelClass: isPhysical ? parcelClass : null,
-      // Every configured tier, free or paid — not only the paid ones.
-      tiers: configured.length > 0 ? named : [],
+      /*
+       * Every configured tier, free or paid — not only the paid ones.
+       *
+       * `withoutDigitalDelivery` when the product is physical: the deliverables
+       * that used to hang off the product now hang off each VARIANT, and the
+       * rule that protected them has to move with them.
+       *
+       * The rule: files and external links are DELIVERY, not description. They
+       * land in a private bucket and are handed to the buyer on purchase. A
+       * seller who fills in a variant while the listing is Digital, then steps
+       * back and switches it to Physical, can no longer see those rows — the
+       * variant editor renders the physical shape core instead. Emitting them
+       * anyway ships the parcel buyer a download the seller believes they
+       * removed, with nothing on screen having said so.
+       *
+       * Emptied on EMIT, not cleared from state, exactly as the product-level
+       * rule did: switch back to Digital and the deliverables are still there.
+       */
+      tiers: configured.length > 0 ? named.map(withoutDigitalDelivery) : [],
       donation,
     });
   }, [name, description, tags, categoryId, subCategoryId, mediaItems, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, allowRepeatPurchase, tiers, donation, condition, parcelClass, isPhysical]); // eslint-disable-line react-hooks/exhaustive-deps
