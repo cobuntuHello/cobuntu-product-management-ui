@@ -22,7 +22,6 @@ import { blankTier, blankDonation } from "./PriceEditModal/helpers";
 import { DonationsField } from "./PriceEditModal/DonationsField";
 import { CategoryPickerRow, type CategoryOption } from "./CategoryPickerRow";
 import {
-  PhysicalDetailsFields,
   type ProductConditionValue, type ParcelClassValue,
 } from "./PhysicalDetailsFields";
 import {
@@ -37,7 +36,7 @@ import {
   type MembershipTier,
 } from "@cobuntu/management-ui-shared";
 import {
-  FileText, Tag as TagIcon, Package,
+  FileText, Tag as TagIcon,
   Layers, MousePointerClick, ChevronRight,
   Eye, EyeOff, UserCheck, Lock, ClipboardCheck, Repeat,
   Image as ImageIcon, Plus, Check, X,
@@ -342,51 +341,29 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const [isCtaOpen, setIsCtaOpen] = useState(false);
 
   /*
-   * Physical-only state. Seeded from initialData like everything else, so a
-   * resumed draft or an edit reopens on what was saved.
+   * Condition, parcel size and stock are NOT product-level facts, and this
+   * form no longer asks for them. Every one of them is a property of a single
+   * VARIANT: a variant owns its own `products` row (product_tiers.productId is
+   * unique) carrying condition/parcelClass/shippingPrice, and its stock is
+   * `product_tiers.capacity`. The variant editor already asks for all three
+   * (its "The item" block and its Stock stepper), the buyer's detail page
+   * describes the SELECTED variant, and checkout charges postage off
+   * `selectedTier.products.shippingPrice`.
    *
-   * parcelClass is never null in state: STANDARD is the answer until the
-   * seller says otherwise, which is what lets the row read "Standard parcel"
-   * before anyone has opened it. The null in ProductFormData is about the
-   * OTHER product types, not about an unanswered question.
+   * They used to render here for the single-variant case, hidden once Advanced
+   * pricing was on. That escape hatch is gone: the redesigned form ALWAYS seeds
+   * a variant ("Standard"), so there is no longer a shape where the parent row
+   * is the thing being bought. Left on the form they were a second control
+   * writing a row nobody reads, and a seller who set a condition here watched
+   * the variant keep its own.
+   *
+   * `condition` / `parcelClass` are still EMITTED, unchanged, from whatever the
+   * product already had. Dropping them from the payload would have this form
+   * silently clear a stored value on every edit, which is a different bug.
    */
-  const [condition, setCondition] = useState<ProductConditionValue | null>(initialData?.condition ?? null);
-  const [parcelClass, setParcelClass] = useState<ParcelClassValue>(initialData?.parcelClass ?? "STANDARD");
+  const condition = initialData?.condition ?? null;
+  const parcelClass: ParcelClassValue = initialData?.parcelClass ?? "STANDARD";
   const isPhysical = productType === "PHYSICAL";
-
-  /*
-   * Stock, as ONE number, written onto the tier that already holds it.
-   *
-   * There is no `products.stockQuantity` and there deliberately is not going to
-   * be: stock lives on `product_tiers.capacity`, enforced by a SELECT ... FOR
-   * UPDATE row lock that serialises concurrent buyers, and DERIVED from
-   * seat-holding sales rather than decremented — so a refund frees its unit
-   * with no restock path to write and no counter that can drift.
-   *
-   * A seller listing one jacket should never meet the word "tier" to say so.
-   * So this writes `capacity` onto the seed tier, and the emit rule below
-   * already treats a tier carrying a capacity as configured, which is what
-   * makes the tier appear on the payload without anything else changing.
-   *
-   * BLANK means unlimited, which is the honest reading of "no capacity row"
-   * and the right default for a community running print-on-demand merch.
-   */
-  const stockTier = tiers.find(t => !t.deleted) ?? null;
-  const quantity = stockTier?.capacity ?? "";
-
-  function setQuantity(raw: string) {
-    // Digits only, and leading zeros collapsed so "007" reads as 7. "0" is
-    // KEPT: this form also edits a live product, where zero is a real answer
-    // meaning sold out, not an empty one.
-    const digits = raw.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-    setTiers(prev => {
-      const idx = prev.findIndex(t => !t.deleted);
-      if (idx === -1) return prev;
-      const next = [...prev];
-      next[idx] = { ...next[idx], capacity: digits };
-      return next;
-    });
-  }
 
   // ─── Inline photo upload ───
   // Tap a slot → native device picker (our own hidden input) → the square
@@ -741,75 +718,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
 
       {showCommerce && (
       <div className="space-y-2.5">
-        {/*
-          * Physical only. Condition + parcel size are rendered INLINE and open
-          * (not behind a row/modal): a seller in a hurry would skip a modal and
-          * ship with both unset. A digital product has no parcel, so the block
-          * renders NOTHING there. Wrapped in the same soft card the other
-          * grouped controls use so it reads as one section.
-          *
-          * Hidden once Advanced pricing is on, for the same reason Stock below
-          * is: condition and parcel size are NOT product-level facts. A variant
-          * owns its own `products` row (product_tiers.productId is unique), so
-          * both columns live per variant, the variant editor writes them per
-          * variant (buildTierBody emits condition/parcelClass), the buyer's
-          * detail page describes the SELECTED variant, and checkout charges
-          * postage off `selectedTier.products.shippingPrice`. Left visible
-          * above several variants this wrote the PARENT row nobody reads, so a
-          * seller set a condition here and saw the variants keep their own.
-          * With no variants it stays, and is correct: checkout falls back to
-          * the parent row (`selectedTier?.products?.id || product.id`), so the
-          * parent IS the thing being bought and these are its own fields.
-          */}
-        {isPhysical && !multiTier && (
-          <div className="rounded-2xl bg-zinc-50 px-4 py-4">
-            <div className="flex items-center gap-3 mb-3">
-              <Package className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
-              <span className="text-sm font-medium text-zinc-800">Postage &amp; condition</span>
-              <span className="text-[12px] text-zinc-400">· you pack and post it yourself</span>
-            </div>
-            <PhysicalDetailsFields
-              condition={condition}
-              parcelClass={parcelClass}
-              onConditionChange={setCondition}
-              onParcelClassChange={setParcelClass}
-            />
-          </div>
-        )}
-
-        {/*
-          * Stock is VISIBLE, not behind a row like postage and condition.
-          *
-          * The other two have a right answer the seller can walk past. This one
-          * does not: how many exist is the whole difference between a listing
-          * that closes when the jacket is gone and one that keeps taking money
-          * for an object already in the post. It is worth the space.
-          *
-          * Hidden once Advanced pricing is on, because each tier then carries
-          * its own capacity and one number above several tiers would be a
-          * second control writing the first one's value.
-          */}
-        {isPhysical && !multiTier && (
-          <div className="w-full flex items-center gap-3 rounded-2xl bg-zinc-50 px-4 py-3">
-            <Package className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
-            <label htmlFor="product-quantity" className="flex-1 min-w-0">
-              <span className="block text-sm font-medium text-zinc-800">How many do you have?</span>
-              <span className="block text-[12.5px] text-zinc-500">
-                Leave blank if you can keep making them
-              </span>
-            </label>
-            <input
-              id="product-quantity"
-              type="text"
-              inputMode="numeric"
-              value={quantity}
-              onChange={e => setQuantity(e.target.value)}
-              placeholder="Unlimited"
-              className="w-[104px] shrink-0 text-right px-3 py-1.5 text-sm text-zinc-800 bg-white rounded-lg ring-1 ring-zinc-200 focus:outline-none focus:ring-zinc-400 placeholder:text-zinc-400"
-            />
-          </div>
-        )}
-
+        {/* Condition, parcel size and stock used to render here for the
+            single-variant case. They are per-VARIANT facts and the variant
+            editor owns all three - see the note beside `condition` above. */}
         {/* Files, external links, and the licence that governs them are no
             longer product-level rows: every deliverable now lives INSIDE its
             variant (VariantEditView's Files / External links / Licence

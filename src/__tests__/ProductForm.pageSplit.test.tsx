@@ -50,15 +50,19 @@ describe("page split — listing vs commerce", () => {
     expect(screen.getByText("Require approval")).toBeInTheDocument();
   });
 
-  it("the physical commerce page carries condition + parcel inline", () => {
+  it("the physical commerce page sends the item's own fields to the variant", () => {
     renderWithConfig(<ProductForm {...base} onChange={vi.fn()} productType="PHYSICAL" page="commerce" />);
-    expect(screen.getByLabelText("Condition")).toBeInTheDocument();
-    expect(screen.getByText("Parcel size")).toBeInTheDocument();
-    // Files are absent here for EVERY product type now, not just parcels: the
-    // digital delivery channel moved inside the variant. The parcel-specific
-    // half of that rule is asserted where it now lives, in
-    // VariantEditView.deliverables.test.tsx.
+    // Condition, parcel size and stock are per-VARIANT and the variant editor
+    // owns all three - see ProductForm.physicalFields.test.tsx. Files are
+    // absent here for EVERY product type now, not just parcels: the digital
+    // delivery channel moved inside the variant too, asserted where it now
+    // lives, in VariantEditView.deliverables.test.tsx.
+    expect(screen.queryByLabelText("Condition")).not.toBeInTheDocument();
+    expect(screen.queryByText("Parcel size")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/How many do you have/)).not.toBeInTheDocument();
     expect(screen.queryByText("Add files")).not.toBeInTheDocument();
+    // The variants card is still here - that is where they get answered.
+    expect(screen.getByText("Variants")).toBeInTheDocument();
   });
 
   it("emits the full payload even from the commerce page (shared state)", () => {
