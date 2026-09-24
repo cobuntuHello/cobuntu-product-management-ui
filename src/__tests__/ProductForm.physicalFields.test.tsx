@@ -25,30 +25,36 @@ function lastEmit(onChange: ReturnType<typeof vi.fn>) {
   return onChange.mock.calls[onChange.mock.calls.length - 1][0];
 }
 
-describe("the physical row only exists where the fields do", () => {
-  it("renders nothing for a digital product", () => {
-    renderWithConfig(<ProductForm {...base} onChange={vi.fn()} />);
-    expect(screen.queryByText("Parcel size")).not.toBeInTheDocument();
-  });
+describe("the product form does not ask per-variant questions", () => {
+  /*
+   * Condition, parcel size and stock are properties of a single VARIANT, not of
+   * the product: a variant owns its own `products` row (product_tiers.productId
+   * is unique) carrying condition / parcelClass / shippingPrice, and its stock
+   * is product_tiers.capacity. The variant editor asks for all three, the
+   * buyer's detail page describes the SELECTED variant, and checkout charges
+   * postage off `selectedTier.products.shippingPrice`.
+   *
+   * They used to render on the form for the single-variant case. That escape
+   * hatch is gone: the redesigned form always seeds a variant, so there is no
+   * shape left where the parent row is the thing being bought. Left on the form
+   * they were a second control writing a row nobody reads, and a seller who set
+   * a condition here watched the variant keep its own.
+   */
+  const shapes = [
+    ["a digital product", {}],
+    ["a course", { productType: "COURSE" as const }],
+    ["a physical product", { productType: "PHYSICAL" as const }],
+  ] as const;
 
-  it("renders nothing for a course either", () => {
-    // A course is not posted. Same absence, different reason.
-    renderWithConfig(<ProductForm {...base} onChange={vi.fn()} productType="COURSE" />);
-    expect(screen.queryByText("Parcel size")).not.toBeInTheDocument();
-  });
-
-  it("renders the fields INLINE for a physical product (no modal to skip)", () => {
-    renderWithConfig(<ProductForm {...base} onChange={vi.fn()} productType="PHYSICAL" />);
-    expect(screen.getByLabelText("Condition")).toBeInTheDocument();
-    expect(screen.getByText("Parcel size")).toBeInTheDocument();
-    expect(screen.getByText("Standard parcel")).toBeInTheDocument();
-  });
-
-  it("shows the parcel weight anchors so 'heavy' is not one seller's guess", () => {
-    renderWithConfig(<ProductForm {...base} onChange={vi.fn()} productType="PHYSICAL" />);
-    expect(screen.getByText("Up to 2 kg")).toBeInTheDocument();
-    expect(screen.getByText("2–20 kg")).toBeInTheDocument();
-  });
+  for (const [label, props] of shapes) {
+    it(`asks nothing about condition, parcel or stock on ${label}`, () => {
+      renderWithConfig(<ProductForm {...base} {...(props as any)} onChange={vi.fn()} />);
+      expect(screen.queryByLabelText("Condition")).not.toBeInTheDocument();
+      expect(screen.queryByText("Parcel size")).not.toBeInTheDocument();
+      expect(screen.queryByText("Postage & condition")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/How many do you have/)).not.toBeInTheDocument();
+    });
+  }
 });
 
 describe("what the form emits", () => {
@@ -67,29 +73,6 @@ describe("what the form emits", () => {
     expect(lastEmit(onChange).condition).toBeNull();
   });
 
-  it("emits what the seller chose", () => {
-    const onChange = vi.fn();
-    renderWithConfig(<ProductForm {...base} onChange={onChange} productType="PHYSICAL" />);
-
-    fireEvent.change(screen.getByLabelText("Condition"), { target: { value: "GOOD" } });
-    fireEvent.click(screen.getByText("Large or heavy"));
-
-    expect(lastEmit(onChange).condition).toBe("GOOD");
-    expect(lastEmit(onChange).parcelClass).toBe("HEAVY");
-  });
-
-  it("lets the seller go back to saying nothing about condition", () => {
-    // Not-specified is a choice, so it has to be reachable after picking one.
-    const onChange = vi.fn();
-    renderWithConfig(<ProductForm {...base} onChange={onChange} productType="PHYSICAL" />);
-
-    fireEvent.change(screen.getByLabelText("Condition"), { target: { value: "GOOD" } });
-    expect(lastEmit(onChange).condition).toBe("GOOD");
-
-    fireEvent.change(screen.getByLabelText("Condition"), { target: { value: "" } });
-    expect(lastEmit(onChange).condition).toBeNull();
-  });
-
   it("seeds from initialData, so a resumed draft reopens on what was saved", () => {
     const onChange = vi.fn();
     renderWithConfig(
@@ -102,7 +85,6 @@ describe("what the form emits", () => {
     );
     expect(lastEmit(onChange).condition).toBe("VERY_GOOD");
     expect(lastEmit(onChange).parcelClass).toBe("HEAVY");
-    expect((screen.getByLabelText("Condition") as HTMLSelectElement).value).toBe("VERY_GOOD");
   });
 
   it("NULLS a value the seller set before switching away from physical", () => {
@@ -125,15 +107,13 @@ describe("what the form emits", () => {
      * still there.
      */
     const onChange = vi.fn();
+    const seeded = { condition: "GOOD", parcelClass: "HEAVY" } as any;
     const { rerender } = renderWithConfig(
-      <ProductForm {...base} onChange={onChange} productType="PHYSICAL" />,
+      <ProductForm {...base} onChange={onChange} productType="PHYSICAL" initialData={seeded} />,
     );
-
-    fireEvent.change(screen.getByLabelText("Condition"), { target: { value: "GOOD" } });
-    fireEvent.click(screen.getByText("Large or heavy"));
     expect(lastEmit(onChange).condition).toBe("GOOD");
 
-    rerender(<ProductForm {...base} onChange={onChange} productType="DIGITAL" />);
+    rerender(<ProductForm {...base} onChange={onChange} productType="DIGITAL" initialData={seeded} />);
 
     expect(lastEmit(onChange).condition).toBeNull();
     expect(lastEmit(onChange).parcelClass).toBeNull();
@@ -151,61 +131,12 @@ describe("what the form emits", () => {
  * the buyer a download the seller thought they had removed.
  */
 describe("stock", () => {
-  it("asks how many only for a physical product", () => {
-    const { rerender } = renderWithConfig(
-      <ProductForm {...base} onChange={vi.fn()} productType="PHYSICAL" />,
-    );
-    expect(screen.getByLabelText(/How many do you have/)).toBeInTheDocument();
-
-    rerender(<ProductForm {...base} onChange={vi.fn()} />);
-    expect(screen.queryByLabelText(/How many do you have/)).not.toBeInTheDocument();
-  });
-
-  it("emits no tier at all when the quantity is blank", () => {
+  it("emits no tier at all when nothing seeded one", () => {
     // Blank means unlimited, which is the honest reading of "no capacity row".
+    // The form no longer writes capacity itself - the variant editor does.
     const onChange = vi.fn();
     renderWithConfig(<ProductForm {...base} onChange={onChange} productType="PHYSICAL" />);
     expect(lastEmit(onChange).tiers).toEqual([]);
-  });
-
-  it("puts the number on a tier, because that is where stock lives", () => {
-    /*
-     * There is no products.stockQuantity and deliberately will not be. Stock
-     * is product_tiers.capacity, row-locked and derived from seat-holding
-     * sales, so a refund frees its unit with no counter that can drift.
-     *
-     * The seller types one number and never meets the word "tier".
-     */
-    const onChange = vi.fn();
-    renderWithConfig(<ProductForm {...base} onChange={onChange} productType="PHYSICAL" />);
-
-    fireEvent.change(screen.getByLabelText(/How many do you have/), { target: { value: "3" } });
-
-    const tiers = lastEmit(onChange).tiers;
-    expect(tiers).toHaveLength(1);
-    expect(tiers[0].capacity).toBe("3");
-  });
-
-  it("keeps a zero, because on a live product that means sold out", () => {
-    // This form edits as well as creates. Silently clearing 0 to "unlimited"
-    // would put a sold-out listing back on sale.
-    const onChange = vi.fn();
-    renderWithConfig(<ProductForm {...base} onChange={onChange} productType="PHYSICAL" />);
-
-    fireEvent.change(screen.getByLabelText(/How many do you have/), { target: { value: "0" } });
-    expect(lastEmit(onChange).tiers[0].capacity).toBe("0");
-  });
-
-  it("refuses anything that is not a number", () => {
-    const onChange = vi.fn();
-    renderWithConfig(<ProductForm {...base} onChange={onChange} productType="PHYSICAL" />);
-    const input = screen.getByLabelText(/How many do you have/) as HTMLInputElement;
-
-    fireEvent.change(input, { target: { value: "12x" } });
-    expect(input.value).toBe("12");
-
-    fireEvent.change(input, { target: { value: "007" } });
-    expect(input.value).toBe("7");
   });
 });
 
@@ -263,55 +194,5 @@ describe("the digital delivery channel does not follow a parcel", () => {
     rerender(<ProductForm {...base} onChange={onChange} initialData={seeded} />);
     expect(lastEmit(onChange).tiers[0].files).toHaveLength(1);
     expect(lastEmit(onChange).tiers[0].links).toHaveLength(1);
-  });
-});
-
-describe("postage and condition step aside once variants exist", () => {
-  /*
-   * A variant is not a sub-row of a product: product_tiers.productId is
-   * unique, so every variant owns its OWN `products` row, and that is where
-   * condition / parcelClass / shippingPrice live. The variant editor writes
-   * them per variant (buildTierBody emits condition + parcelClass), the
-   * buyer's detail page describes the SELECTED variant, and checkout charges
-   * postage off `selectedTier.products.shippingPrice`
-   * (use-listing-purchase: `selectedTier?.products?.id || product.id`).
-   *
-   * So this block above a multi-variant listing was a second control writing
-   * the PARENT row that nothing on the buying side reads. A seller set the
-   * condition here and the variants kept their own, with no sign of it.
-   *
-   * Stock already had this guard. Postage did not. These pin that they now
-   * agree, because the two got out of step once already.
-   */
-  const physical = { ...base, productType: "PHYSICAL" as const };
-  const twoVariants = {
-    tiers: [
-      { localId: "a", name: "Small", description: "", price: "10", currency: "EUR", capacity: "", priceMode: "fixed" },
-      { localId: "b", name: "Large", description: "", price: "20", currency: "EUR", capacity: "", priceMode: "fixed" },
-    ],
-  } as any;
-
-  it("shows postage on a listing with no variants", () => {
-    renderWithConfig(<ProductForm {...physical} onChange={vi.fn()} />);
-    expect(screen.getByText("Parcel size")).toBeInTheDocument();
-  });
-
-  it("hides postage once the listing has variants", () => {
-    renderWithConfig(<ProductForm {...physical} onChange={vi.fn()} initialData={twoVariants} />);
-    expect(screen.queryByText("Parcel size")).not.toBeInTheDocument();
-  });
-
-  it("hides the condition select too, not just the parcel picker", () => {
-    // Both fields ship in one block; asserting only one would pass on a
-    // half-applied guard.
-    renderWithConfig(<ProductForm {...physical} onChange={vi.fn()} initialData={twoVariants} />);
-    expect(screen.queryByLabelText("Condition")).not.toBeInTheDocument();
-  });
-
-  it("hides it on the same condition Stock uses", () => {
-    // The point of the change: one rule, not two that drift.
-    renderWithConfig(<ProductForm {...physical} onChange={vi.fn()} initialData={twoVariants} />);
-    expect(screen.queryByText("How many do you have?")).not.toBeInTheDocument();
-    expect(screen.queryByText("Parcel size")).not.toBeInTheDocument();
   });
 });
