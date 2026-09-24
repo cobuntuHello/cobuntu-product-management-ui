@@ -269,14 +269,12 @@ export function isTierLocked(t: DraftTier): boolean {
   return !!t.id && t.salesCount > 0;
 }
 
-/** Whether any draft has a non-zero price. Drives the
- *  StripeRequiredWarning gate — Stripe needs onboarding for paid
- *  flows but not for free products. */
-export function hasPaidTier(drafts: DraftTier[]): boolean {
-  return drafts.some(
-    (t) => !t.deleted && parseFloat(t.price || "0") > 0,
-  );
-}
+// `hasPaidTier` lived here to drive the StripeRequiredWarning gate in
+// PriceEditModal. That gate is gone (it blocked EDITING a price, which is not
+// when money moves — the real check belongs at listing time, server-side), and
+// the helper had no other caller, so it goes with it rather than lingering as
+// a plausible-looking utility someone reintroduces the same bug with. It was
+// never part of the package's public API.
 
 /** Builds the per-tier POST/PUT body. Locked tiers omit price /
  *  currency / priceMode / installment fields so the existing

@@ -11,7 +11,9 @@ import {
 } from "@dnd-kit/sortable";
 import { ModalShell } from "../ui/modal-shell";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
-import { useStripeStatus, StripeRequiredWarning } from "./stripe-status";
+// NOTE: `useStripeStatus` / `StripeRequiredWarning` are deliberately NOT
+// imported here any more. See the long comment at the old gate site below for
+// why editing a price is the wrong moment to check a payment account.
 import {
   buildRowsFromOverrides,
   buildUpsertBody,
@@ -160,12 +162,6 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   const isDigital = productType !== "PHYSICAL";
   const { apiBaseUrl, authHeaders } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
-  // Stripe gate — mirrors the event-side wiring. Hides the tier editor
-  // and surfaces a "Connect Stripe" prompt when the community hasn't
-  // connected Stripe yet AND any tier on this product is paid. Cached
-  // per communityTag inside useStripeStatus so repeated opens of the
-  // modal don't re-hit the API.
-  const stripe = useStripeStatus(communityTag, { enabled: !draftMode });
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<DraftTier[]>([]);
   const [saving, setSaving] = useState(false);
@@ -890,18 +886,33 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
     }
   }
 
-  // Stripe gate — show the "Connect Stripe" warning instead of the tier
-  // editor when (a) the community isn't connected (or has charges
-  // disabled) AND (b) at least one tier on this product is paid. We
-  // wait until the initial tier fetch completes (`loading=false`) and
-  // the Stripe status resolves (`stripe.loading=false`) to avoid
-  // flashing the warning on the way to a benign all-free product.
-  // Stripe gate doesn't apply in draftMode — the parent's create-product
-  // submit does the connected-account check at the right moment.
-  const hasPaidTier = drafts.some((d) => !d.deleted && parseFloat(d.price || "0") > 0);
-  if (!draftMode && !loading && !stripe.loading && !stripe.chargesEnabled && hasPaidTier) {
-    return <StripeRequiredWarning communityTag={communityTag} onClose={onClose} />;
-  }
+  // NO STRIPE GATE HERE — deliberately. This used to replace the whole tier
+  // editor with a "Connect Stripe" warning whenever the community had no
+  // connected account and any tier was paid. That was wrong three times over:
+  //
+  //   1. WRONG MOMENT. Editing a price is not when money moves. The gate
+  //      belongs where an item becomes BUYABLE — at listing — which is where
+  //      the backend already moved it (see the core repo's
+  //      stripe-gate-moves-to-listing test and the comment in
+  //      EventLifecycleService). Blocking the editor stranded work someone had
+  //      already done: you could create a paid product, then be locked out of
+  //      fixing a typo in its price.
+  //
+  //   2. WRONG ACCOUNT, AND UNFIXABLE. It tested the COMMUNITY's account while
+  //      the "Connect Stripe" button it offered links to the current USER's
+  //      payouts onboarding. Completing that flow could never satisfy the check
+  //      that raised it — a dead end by construction.
+  //
+  //   3. USUALLY NOT EVEN TRUE. The status endpoint behind `stripe` is gated on
+  //      ACCESS_ADMIN_APP, and the hook maps any error to
+  //      `chargesEnabled: false`. For every non-admin member the 403 read as
+  //      "this community has no payment account" — regardless of the facts.
+  //
+  // The real constraint is narrower than the old gate implied: the community's
+  // account is NOT in the checkout path (the buyer pays the platform; payouts
+  // are separate transfers), so it is needed only to receive COMMISSION. The
+  // server enforces exactly that, at listing time, where it can see the rate.
+  // A 0%-commission community carrying paid member listings is legitimate.
 
   return (
     <ModalShell onClose={onClose} width="w-[600px]">
