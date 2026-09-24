@@ -51,6 +51,20 @@ export { draftTiersToCreatePayload } from "./components/PriceEditModal/helpers";
 // payload builder deliberately: both must count over the same filtered list,
 // or a consumer uploads one variant's files onto another variant's product.
 export { tierFileUploads } from "./components/PriceEditModal/helpers";
+/*
+ * The whole create request, assembled in one place.
+ *
+ * Exported because the create flow is about to exist twice: /marketplace/new and
+ * the forked course wizard at /learning/new. The two diverge above this line and
+ * must not diverge below it, for the reason the file's header records.
+ */
+export {
+  buildProductCreateFormData,
+  type ProductCreatePayloadInput,
+  type ProductCreateType,
+  type ProductCreateOwnership,
+  type ResolvedAccess,
+} from "./lib/productCreatePayload";
 export { EditProductDrawer } from "./components/EditProductDrawer";
 
 // UI primitives — duplicated from @cobuntu/event-management-ui by design
