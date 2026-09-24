@@ -27,20 +27,22 @@ export function mockFetch(routes: Array<{
   body?: unknown;
   bodyFn?: (init: RequestInit | undefined) => unknown;
 }>): ReturnType<typeof vi.fn> {
-  // Default Stripe-status response so any test that opens PriceEditModal
-  // doesn't have to remember to mock /stripe/connected — the modal calls
-  // useStripeStatus on mount to gate paid-tier editing. Tests can still
-  // override by passing their own /stripe/connected stub earlier in the
-  // routes array (first-match-wins).
-  const defaultRoutes = [{
-    method: "GET",
-    url: /\/api\/communities\/[^/]+\/stripe\/connected$/,
-    body: { connected: true, chargesEnabled: true },
-  }];
-  const allRoutes = [...routes, ...defaultRoutes];
+  // NO default /stripe/connected stub any more. There used to be one, always
+  // answering `{ connected: true, chargesEnabled: true }`, because the modal
+  // called useStripeStatus on mount to gate paid-tier editing.
+  //
+  // That default is why the suite never caught the bug it was covering for:
+  // every test ran the happy path, so the gate's failure mode — a community
+  // with no Stripe, or (far more often) a 403 from the admin-only status
+  // endpoint being read as "no payment account" — was untested and shipped.
+  // A mock that silently supplies the good answer hides the only cases worth
+  // asserting.
+  //
+  // The gate is gone and the modal no longer fetches that endpoint at all, so
+  // any request for it now correctly falls through to "Unmocked fetch".
   const fn = vi.fn(async (url: string, init?: RequestInit) => {
     const method = (init?.method || "GET").toUpperCase();
-    for (const r of allRoutes) {
+    for (const r of routes) {
       const methodOk = !r.method || r.method.toUpperCase() === method;
       const urlOk = typeof r.url === "string" ? url === r.url || url.endsWith(r.url) : r.url.test(url);
       if (methodOk && urlOk) {
