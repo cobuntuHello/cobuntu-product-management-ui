@@ -28,7 +28,7 @@ export {
   type ProductDistributionModalProps,
   type ProductDistributionFields,
 } from "./components/ProductDistributionModal";
-export { ProductForm, type ProductFormData } from "./components/ProductForm";
+export { ProductForm, type ProductFormData, type ProductFormLabels } from "./components/ProductForm";
 // The name cap, exported so a consumer's own submit gate reads the same number
 // the form's counter does rather than hard-coding a second copy of it.
 export { LISTING_NAME_MAX, listingNameTooLong } from "./lib/listingNameLimit";
