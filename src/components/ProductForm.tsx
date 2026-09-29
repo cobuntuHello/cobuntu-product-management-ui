@@ -75,6 +75,47 @@ function getCurrencySymbol(code: string): string {
 
 interface Tag { id: string; name: string; }
 
+/**
+ * The words this form uses for the thing being sold.
+ *
+ * ── Why a prop and not a `noun` string ─────────────────────────────────────
+ *
+ * The form says "product" in six places, and the course wizard renders the
+ * same form for something nobody calls a product. Passing a single noun and
+ * interpolating it would produce "Add tags to help people discover your
+ * course" correctly and "About your product" only by luck - the sentences
+ * differ by more than one word, and a template that pretends otherwise reads
+ * like a translation.
+ *
+ * So each string is overridable and every one defaults to what it says today.
+ * A consumer that passes nothing is byte-identical to before, which is what
+ * makes this safe to land under the marketplace.
+ *
+ * These are NOT translated, and neither are the strings they replace: this
+ * package hardcodes its English. That is a real gap and a separate piece of
+ * work; naming it here so the next person does not assume the override is the
+ * thing that broke i18n.
+ */
+export interface ProductFormLabels {
+  namePlaceholder?: string;
+  descriptionTitle?: string;
+  descriptionHint?: string;
+  descriptionPlaceholder?: string;
+  tagsTitle?: string;
+  tagsHint?: string;
+  ctaHint?: string;
+}
+
+const DEFAULT_LABELS: Required<ProductFormLabels> = {
+  namePlaceholder: "Product Name",
+  descriptionTitle: "Product Description",
+  descriptionHint: "Describe your product. What will customers get?",
+  descriptionPlaceholder: "Write your product description...",
+  tagsTitle: "Product Tags",
+  tagsHint: "Add tags to help people discover your product.",
+  ctaHint: "The action button on your product card. Default: \u201cBuy Now\u201d. Max 15 characters.",
+};
+
 export interface ProductFormData {
   name: string;
   description: string;
@@ -164,6 +205,14 @@ export interface ProductFormData {
 
 interface ProductFormProps {
   communityTag: string;
+  /**
+   * Override the words this form uses for the thing being sold.
+   *
+   * Omitted everywhere except the course wizard, which renders this form for
+   * something nobody calls a product. Every key defaults to what it says
+   * today, so an omitted prop is byte-identical to before.
+   */
+  labels?: ProductFormLabels;
   /**
    * The community's product categories, loaded by the CONSUMER.
    *
@@ -257,7 +306,10 @@ const AUTO_SEED_NAME = /^(Standard|Tier \d+)$/;
 
 // ─── Component ─────────────────────────────────────────────────
 
-export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false }: ProductFormProps) {
+export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false, labels }: ProductFormProps) {
+  /* Merged once rather than at each use, so a partial override cannot leave
+   * one string reading "course" beside another still reading "product". */
+  const L = { ...DEFAULT_LABELS, ...(labels ?? {}) };
   // Form state
   const [name, setName] = useState(initialData?.name || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -598,7 +650,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       {showListing && (<>
       {/* ─── Product name — big inline title (borderless, matches event) ─── */}
       <div>
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="Product Name"
+        <input value={name} onChange={e => setName(e.target.value)} placeholder={L.namePlaceholder}
           aria-invalid={nameTooLong || undefined}
           className="w-full text-[28px] font-bold text-zinc-900 placeholder:text-zinc-300 bg-transparent border-none outline-none p-0 leading-tight" />
         {showErrors && !name.trim() && (
@@ -949,11 +1001,11 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       <Dialog open={isDescriptionOpen} onOpenChange={setIsDescriptionOpen}>
         <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Product Description</DialogTitle>
-            <DialogDescription>Describe your product. What will customers get?</DialogDescription>
+            <DialogTitle>{L.descriptionTitle}</DialogTitle>
+            <DialogDescription>{L.descriptionHint}</DialogDescription>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <RichTextEditor content={description} onChange={setDescription} placeholder="Write your product description..." />
+            <RichTextEditor content={description} onChange={setDescription} placeholder={L.descriptionPlaceholder} />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDescriptionOpen(false)}>Cancel</Button>
@@ -969,8 +1021,8 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       <Dialog open={isTagsOpen} onOpenChange={setIsTagsOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Product Tags</DialogTitle>
-            <DialogDescription>Add tags to help people discover your product.</DialogDescription>
+            <DialogTitle>{L.tagsTitle}</DialogTitle>
+            <DialogDescription>{L.tagsHint}</DialogDescription>
           </DialogHeader>
           <EventTags selectedTags={tags} onTagsChange={setTags} placeholder="Search or create tags..." />
           <DialogFooter>
@@ -1000,7 +1052,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Call to Action Label</DialogTitle>
-            <DialogDescription>The action button on your product card. Default: &ldquo;Buy Now&rdquo;. Max 15 characters.</DialogDescription>
+            <DialogDescription>{L.ctaHint}</DialogDescription>
           </DialogHeader>
           <Input value={ctaText} onChange={e => setCtaText(e.target.value)} placeholder="Buy Now" maxLength={15} />
           <DialogFooter>
