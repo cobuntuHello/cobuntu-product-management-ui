@@ -97,6 +97,49 @@ describe("visibleProductViews", () => {
  * "details" being added to the nav and not to the allowed set, which made
  * editing a product unreachable in production.
  */
+describe("the syllabus tab", () => {
+    const owner = { ownerId: "u1", collaborators: [] };
+
+    it("is absent when the host passes no panel", () => {
+        /*
+         * A download has no syllabus and never will, and a host on an older
+         * pin passes nothing - both must see exactly the tabs they see today
+         * rather than an eighth that opens onto an empty panel. Same rule as
+         * the ledger, for the same reason.
+         */
+        expect(visibleProductViews({ product: owner, viewerUserId: "u1" }))
+            .not.toContain("syllabus");
+    });
+
+    it("appears when it does, before the ledger", () => {
+        const views = visibleProductViews({
+            product: owner, viewerUserId: "u1", hasSyllabus: true, hasLedger: true,
+        });
+        expect(views).toEqual([
+            "overview", "details", "syllabus", "ledger", "collaborators", "buyers", "activity",
+        ]);
+    });
+
+    it("does not need the ledger to be there", () => {
+        // The two flags are independent: a course with no ledger panel still
+        // has lessons to arrange.
+        const views = visibleProductViews({ product: owner, viewerUserId: "u1", hasSyllabus: true });
+        expect(views).toContain("syllabus");
+        expect(views).not.toContain("ledger");
+    });
+
+    it("is offered to a moderator too, like every other tab", () => {
+        /*
+         * `isModerator` no longer changes what is VISIBLE - only what
+         * `canEdit` permits - so a community leader carrying somebody's course
+         * can read its syllabus. The reduced set is what once locked carriers
+         * and the superadmin out of Details and Collaborators.
+         */
+        expect(visibleProductViews({ product: owner, forceModerator: true, hasSyllabus: true }))
+            .toContain("syllabus");
+    });
+});
+
 describe("the ledger tab", () => {
     const owner = { ownerId: "u1", collaborators: [] };
 

@@ -67,6 +67,15 @@ export function visibleProductViews(opts: {
    * function is exported and tested on its own, away from any rendered tree.
    */
   hasLedger?: boolean;
+  /**
+   * Whether the host is passing a Syllabus panel.
+   *
+   * Same rule as `hasLedger`, for the same reason: the tab is offered only
+   * when there is something behind it. A course passes one; a download never
+   * will, and a host on an older pin shows the seven tabs it shows today
+   * rather than an eighth that opens onto nothing.
+   */
+  hasSyllabus?: boolean;
 }): ProductViewKey[] {
   const ownerId = opts.product?.ownerId ?? opts.product?.owner?.id ?? null;
   const collaborators: any[] = opts.product?.collaborators ?? [];
@@ -127,6 +136,9 @@ export function visibleProductViews(opts: {
    */
   const base: ProductViewKey[] = [
     "overview", "details",
+    // Listed HERE as well as in SECTIONS — the nav renders the intersection,
+    // so a tab in one and not the other is silently dropped.
+    ...(opts.hasSyllabus ? (["syllabus"] as ProductViewKey[]) : []),
     ...(opts.hasLedger ? (["ledger"] as ProductViewKey[]) : []),
     "collaborators",
     // Listed HERE as well as in SECTIONS. The nav renders the intersection of
@@ -240,6 +252,20 @@ export interface ProductManagePageProps {
    * an older pin should show one tab fewer, not a blank one.
    */
   ledgerSlot?: React.ReactNode;
+  /**
+   * The Syllabus panel, for a product that has an ordered body of lessons.
+   *
+   * A slot rather than a component, because what goes in it is a course
+   * builder this package has no business knowing about: it writes through the
+   * learning endpoints, it drags lessons between modules, and it is the host's
+   * to own. This page's job is to give it a tab and get out of the way.
+   */
+  syllabusSlot?: React.ReactNode;
+  /**
+   * Where this product's PUBLIC page lives, e.g. "/learning/". Forwarded to
+   * the Details tab's copy-link. Defaults to the marketplace.
+   */
+  publicUrlBase?: string;
 }
 
 export function ProductManagePage({
@@ -274,6 +300,8 @@ export function ProductManagePage({
   overviewExtras,
   overviewSlot,
   ledgerSlot,
+  syllabusSlot,
+  publicUrlBase,
   // Defaults true: every consumer that has not been taught about this renders
   // exactly as before, and read-only is opt-in by the page that knows it is
   // showing someone else's product.
@@ -284,8 +312,8 @@ export function ProductManagePage({
   getProductManagementConfig();
 
   const allowed = React.useMemo(
-    () => visibleProductViews({ product, viewerUserId, forceModerator, hasLedger: !!ledgerSlot }),
-    [product, viewerUserId, forceModerator, ledgerSlot],
+    () => visibleProductViews({ product, viewerUserId, forceModerator, hasLedger: !!ledgerSlot, hasSyllabus: !!syllabusSlot }),
+    [product, viewerUserId, forceModerator, ledgerSlot, syllabusSlot],
   );
 
   // A `view` this viewer may not use falls back rather than rendering an
@@ -353,6 +381,7 @@ export function ProductManagePage({
     case "details":
       content = (
         <DetailsView
+          publicUrlBase={publicUrlBase}
           categories={categories}
           product={product}
           communityTag={communityTag}
@@ -395,6 +424,12 @@ export function ProductManagePage({
     case "ledger":
       /* A slot, like the Overview -- the host fetches it. */
       content = ledgerSlot ?? null;
+      break;
+
+    case "syllabus":
+      /* A slot too. What goes in it is a course builder this package has no
+         business knowing about -- see the prop. */
+      content = syllabusSlot ?? null;
       break;
 
     /*

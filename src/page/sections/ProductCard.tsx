@@ -21,9 +21,19 @@ interface Props {
   onEditTags?: () => void;
   /** Opens the category picker. Omit to hide the row. */
   onEditCategory?: () => void;
+  /**
+   * Where this product's PUBLIC page lives, e.g. "/learning/".
+   *
+   * Defaults to the marketplace, which is what every existing host means. A
+   * course's page is /learning/:id, and the marketplace route resolves by sku,
+   * so a course id under /marketplace/ does not resolve — the copied link
+   * simply 404'd.
+   */
+  publicUrlBase?: string;
 }
 
 export function ProductCard({
+  publicUrlBase = "/marketplace/",
   product, communityTag, listingId,
   onEditName, onEditPrice, onEditMedia, onEditCta, onEditTags, onEditCategory,
 }: Props) {
@@ -48,7 +58,15 @@ export function ProductCard({
    */
 
   async function copyProductLink() {
-    const url = `https://${communityTag}.cobuntu.com/marketplace/${product.id}`;
+    /*
+     * The PUBLIC path is the host's to name, not this package's to assume.
+     *
+     * It was hardcoded to /marketplace/, which is right for a download and
+     * wrong for a course: a course's page is /learning/:id, and the
+     * marketplace route resolves by sku through getProductBySku, so a course
+     * id pasted there does not resolve at all. The copied link simply 404'd.
+     */
+    const url = `https://${communityTag}.cobuntu.com${publicUrlBase}${product.id}`;
     try {
       await navigator.clipboard.writeText(url);
       setUrlCopied(true);
@@ -366,6 +384,8 @@ export function ProductCard({
 
 // Reusable clickable info row
 function InfoRow({ children, onClick, disabled, icon, customIcon }: {
+  /** Where this product's PUBLIC page lives, e.g. "/learning/". */
+  publicUrlBase?: string;
   children: React.ReactNode; onClick?: () => void; disabled?: boolean;
   icon?: React.ReactNode; customIcon?: React.ReactNode;
 }) {

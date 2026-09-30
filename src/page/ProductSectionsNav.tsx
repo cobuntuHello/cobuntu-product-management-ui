@@ -12,7 +12,7 @@ import * as React from "react";
  * of its own. This is view-state, like events, so tabs are cheap to add.
  */
 
-export type ProductViewKey = "overview" | "details" | "collaborators" | "buyers" | "listings" | "ledger" | "activity";
+export type ProductViewKey = "overview" | "details" | "syllabus" | "collaborators" | "buyers" | "listings" | "ledger" | "activity";
 
 /**
  * The tab strip, IN ORDER.
@@ -34,6 +34,25 @@ const SECTIONS: Array<{ key: ProductViewKey; label: string }> = [
    * here rather than the first.
    */
   { key: "details", label: "Details" },
+  /*
+   * SYLLABUS is a host-supplied tab, and it is the only one here that some
+   * products do not have at all.
+   *
+   * A course IS a products row - same table, same tiers, same listings - so it
+   * belongs on this page rather than on a page of its own. What it has that a
+   * download does not is an ordered body of lessons, and that is a third
+   * reason to open this page: not "how is it doing" and not "change the
+   * thing", but "arrange what is inside it".
+   *
+   * Straight after Details because it is the other half of describing the
+   * product, and before Ledger because arranging it is what an author does
+   * repeatedly while money is something they check.
+   *
+   * It appears only when the host passes `syllabusSlot` - see `hasSyllabus` in
+   * visibleProductViews. A product page on any pin, old or new, shows exactly
+   * the tabs it shows today.
+   */
+  { key: "syllabus", label: "Syllabus" },
   /*
    * LEDGER SITS AFTER DETAILS, always.
    *
