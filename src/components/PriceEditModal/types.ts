@@ -246,7 +246,17 @@ export const VARIANT_PARCELS: ReadonlyArray<[string, string, string]> = [
   ["STANDARD", "Standard parcel", "Up to 2 kg"],
   ["HEAVY", "Large or heavy", "2–20 kg"],
 ];
-/** "Other attributes" keys — buyers pick by these, from a defined set. */
+/**
+ * "Other attributes" keys — buyers pick by these, from a defined set.
+ *
+ * MUST match the server vocabulary in services/core/src/shared/listings/
+ * tierAttributes.ts (ATTRIBUTE_KEYS) verbatim — the API validates the key and
+ * 400s anything not in its list, so a key offered here but missing there is a
+ * dropdown option that fails on save. (Dimensions had drifted: the server
+ * accepted it while this list did not offer it.) The physical-spec keys are
+ * buyer-facing measurements, not shipping inputs — postage stays on the coarse
+ * parcel classes.
+ */
 export const VARIANT_ATTR_KEYS: ReadonlyArray<string> = [
   "Colour",
   "Size",
@@ -256,6 +266,10 @@ export const VARIANT_ATTR_KEYS: ReadonlyArray<string> = [
   "Format",
   "Flavour",
   "Scent",
+  "Dimensions",
+  "Weight",
+  "Capacity",
+  "Pack size",
 ];
 
 /** Sidecar donation config — saved separately from tiers via PUT
