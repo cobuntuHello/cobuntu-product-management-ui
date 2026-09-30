@@ -161,8 +161,16 @@ describe("the ledger tab", () => {
      * order anything.
      */
     it("is ordered after details in the nav, which is what decides", () => {
+        /*
+         * Stated as a RELATION, not an offset. This asserted `details + 1`
+         * until the optional Syllabus tab landed between the two, which broke
+         * a test about the ledger for a reason that had nothing to do with the
+         * ledger. Syllabus is the only key allowed to sit in the gap.
+         */
         const keys = SECTION_KEYS;
-        expect(keys.indexOf("ledger")).toBe(keys.indexOf("details") + 1);
+        expect(keys.indexOf("ledger")).toBeGreaterThan(keys.indexOf("details"));
+        expect(keys.slice(keys.indexOf("details") + 1, keys.indexOf("ledger")))
+            .toEqual(["syllabus"]);
     });
 
     /*

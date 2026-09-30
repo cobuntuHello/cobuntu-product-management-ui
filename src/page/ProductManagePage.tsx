@@ -185,8 +185,6 @@ export interface ProductManagePageProps {
 
   onUpdate: () => void | Promise<void>;
   onDelete: () => void | Promise<void>;
-  onPublish: () => void | Promise<void>;
-  onUnpublish: () => void | Promise<void>;
   showToast: (msg: string) => void;
 
   view: ProductViewKey;
@@ -275,8 +273,6 @@ export function ProductManagePage({
   product,
   onUpdate,
   onDelete,
-  onPublish,
-  onUnpublish,
   showToast,
   view,
   onViewChange,
@@ -388,8 +384,6 @@ export function ProductManagePage({
           productId={productId}
           isPublished={isPublished}
           listingId={listingId}
-          onPublish={onPublish}
-          onUnpublish={onUnpublish}
           onUpdate={onUpdate}
           onDelete={onDelete}
           showToast={showToast}

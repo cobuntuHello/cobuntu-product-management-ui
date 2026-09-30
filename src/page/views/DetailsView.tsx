@@ -4,7 +4,7 @@ import * as React from "react";
 import { ProductCard } from "../sections/ProductCard";
 import { OverviewActionCards } from "../sections/OverviewActionCards";
 import { AfterCheckoutCard } from "../sections/AfterCheckoutCard";
-import { ModalShell, API } from "../helpers";
+import { API } from "../helpers";
 import { useProductManagementConfig, useJsonHeaders } from "../../config";
 import { PriceEditModal } from "../../components/PriceEditModal";
 import { NameEditModal } from "../../components/NameEditModal";
@@ -46,7 +46,16 @@ import { useCanEdit } from "../../lib/manageAccess";
  * rather than being imported here — a slot, not a fork.
  */
 
-export type ProductModal = "name" | "price" | "share" | "distribution" | "delete" | "unpublish" | "cta" | "media" | null
+/*
+ * No "unpublish" key, and no onPublish/onUnpublish props: publishing is
+ * retired. Nothing in this package ever called `onPublish`, and nothing ever
+ * set the "unpublish" key, so its confirm modal was unreachable while both
+ * props stayed REQUIRED of every host. The endpoints behind them
+ * (POST .../products/:id/{publish,unpublish}) were already deleted from the
+ * backend, so the one path that could have reached them would have 404'd.
+ * A listing's visibility is managed in the Listings tab.
+ */
+export type ProductModal = "name" | "price" | "share" | "distribution" | "delete" | "cta" | "media" | null
   | "tags"
   | "category";
 
@@ -59,8 +68,6 @@ export interface DetailsViewProps {
   isPublished: boolean;
   listingId: string | null;
 
-  onPublish: () => void | Promise<void>;
-  onUnpublish: () => void | Promise<void>;
   onUpdate: () => void | Promise<void>;
   onDelete: () => void | Promise<void>;
   showToast: (msg: string) => void;
@@ -138,8 +145,6 @@ export function DetailsView({
   productId,
   isPublished,
   listingId,
-  onPublish,
-  onUnpublish,
   onUpdate,
   onDelete,
   showToast,
@@ -322,29 +327,6 @@ export function DetailsView({
           onDelete={async () => { await onDelete(); }}
           onClose={() => setModal(null)}
         />
-      )}
-
-      {modal === "unpublish" && (
-        <ModalShell onClose={() => setModal(null)}>
-          <h3 className="text-[15px] font-semibold text-zinc-900 mb-2">Unpublish product?</h3>
-          <p className="text-[13px] text-zinc-500 mb-5">
-            &ldquo;{product.name}&rdquo; will be hidden from the community marketplace. You can republish it anytime.
-          </p>
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => setModal(null)}
-              className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={async () => { await onUnpublish(); setModal(null); }}
-              className="px-4 py-2 text-[13px] font-medium bg-amber-500 text-white rounded-lg hover:bg-amber-600 cursor-pointer"
-            >
-              Unpublish
-            </button>
-          </div>
-        </ModalShell>
       )}
 
       {modal === "cta" && (

@@ -37,8 +37,6 @@ function renderOverview(over: Record<string, any> = {}) {
       productId="p1"
       isPublished={false}
       listingId={null}
-      onPublish={vi.fn()}
-      onUnpublish={vi.fn()}
       onUpdate={vi.fn()}
       onDelete={vi.fn()}
       showToast={vi.fn()}
@@ -134,17 +132,32 @@ describe("the branches exist at all", () => {
     const { resolve } = await import("node:path");
     const src = readFileSync(resolve(__dirname, "../page/views/DetailsView.tsx"), "utf8");
     /*
-     * "description" is absent BY DESIGN, not by omission: it was removed from
-     * the ProductModal union when the description moved to an inline section,
-     * so there is no key for a branch to read. Every key that still exists
-     * must still have one.
+     * "description" and "unpublish" are absent BY DESIGN, not by omission.
+     * "description" left the ProductModal union when the description moved to
+     * an inline section; "unpublish" left when publishing was retired (see
+     * below). Every key that still exists must still have a branch.
      */
     for (const key of [
-      "name", "price", "share", "distribution", "delete", "unpublish",
+      "name", "price", "share", "distribution", "delete",
       "cta", "media", "tags", "category",
     ]) {
       expect(src).toContain(`modal === "${key}"`);
     }
+
+    /*
+     * REVERSED: publishing is retired, so its branch must be ABSENT.
+     *
+     * Nothing ever called `onPublish` and nothing ever set the "unpublish"
+     * key, so the confirm modal was unreachable and the two props were dead
+     * weight the host had to satisfy. The endpoints they posted to
+     * (POST .../products/:id/{publish,unpublish}) were deleted from the
+     * backend first. A listing's visibility is managed in the Listings tab.
+     */
+    expect(src).not.toContain('modal === "unpublish"');
+    expect(src).not.toContain("await onUnpublish()");
+    // The props are gone from the interface, not merely unused by the body.
+    expect(src).not.toMatch(/^\s*onUnpublish[,:]/m);
+    expect(src).not.toMatch(/^\s*onPublish[,:]/m);
 
     /*
      * REVERSED: the drawer must now be ABSENT.
