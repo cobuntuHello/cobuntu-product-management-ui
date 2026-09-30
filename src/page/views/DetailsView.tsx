@@ -51,6 +51,8 @@ export type ProductModal = "name" | "price" | "share" | "distribution" | "delete
   | "category";
 
 export interface DetailsViewProps {
+  /** Where the product's PUBLIC page lives; forwarded to ProductCard. */
+  publicUrlBase?: string;
   product: any;
   communityTag: string;
   productId: string;
@@ -130,6 +132,7 @@ export interface DetailsViewProps {
 }
 
 export function DetailsView({
+  publicUrlBase,
   product,
   communityTag,
   productId,
@@ -222,6 +225,7 @@ export function DetailsView({
       />
 
       <ProductCard
+        publicUrlBase={publicUrlBase}
         product={product}
         communityTag={communityTag}
         listingId={listingId}
