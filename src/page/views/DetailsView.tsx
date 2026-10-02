@@ -4,7 +4,6 @@ import * as React from "react";
 import { ProductCard } from "../sections/ProductCard";
 import { OverviewActionCards } from "../sections/OverviewActionCards";
 import { AfterCheckoutCard } from "../sections/AfterCheckoutCard";
-import { API } from "../helpers";
 import { useProductManagementConfig, useJsonHeaders } from "../../config";
 import { PriceEditModal } from "../../components/PriceEditModal";
 import { NameEditModal } from "../../components/NameEditModal";
@@ -209,13 +208,45 @@ export function DetailsView({
    * community resource, and the community route gates on a leader permission
    * they do not hold.
    */
+  /*
+   * `apiBaseUrl` ALONE. Never `apiBaseUrl || API`.
+   *
+   * An EMPTY base is a deliberate value, not a missing one: the community app
+   * injects "" so these calls stay SAME-ORIGIN and the browser sends the
+   * httpOnly session cookie by itself (app platform S4.6 — see that app's
+   * ProductManagementProviderShim, whose authHeaders returns {} for exactly
+   * this reason). `""` is falsy, so `|| API` replaced it with the absolute
+   * api.cobuntu.com, which is cross-origin from a community's own domain. No
+   * cookie is sent on a cross-origin fetch without `credentials: "include"`,
+   * and no Authorization header exists to fall back on.
+   *
+   * So renaming answered 401 every single time, on every community, while the
+   * tags and description modals beside it kept working — they interpolate
+   * `apiBaseUrl` plainly, which is what every other call in this package does.
+   * Reported from live use: a seller pressed Save eleven times and the server
+   * logged eleven 401s.
+   */
   async function quickUpdate(body: Record<string, any>) {
-    const res = await fetch(`${apiBaseUrl || API}/api/users/me/products/${productId}`, {
+    const res = await fetch(`${apiBaseUrl}/api/users/me/products/${productId}`, {
       method: "PATCH",
       headers: jsonHeaders(),
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error("Failed to update");
+    if (!res.ok) {
+      /*
+       * The server's words, because the generic one hid the diagnosis. The
+       * modal swallows whatever is thrown so it can stay open, and nothing
+       * else surfaced a message, so a failing save looked identical to a save
+       * that had not been pressed. A 401 in particular is actionable and was
+       * the one thing the seller could not guess.
+       */
+      const message = await res
+        .json()
+        .then((d: any) => d?.error)
+        .catch(() => null);
+      showToast(message || (res.status === 401 ? "Your session expired. Sign in again." : "Failed to update"));
+      throw new Error(message || `Failed to update (${res.status})`);
+    }
     await onUpdate();
   }
 
