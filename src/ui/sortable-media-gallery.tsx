@@ -65,7 +65,29 @@ function FilledTile({
             <Video className="h-8 w-8 opacity-50 pointer-events-none" />
           </div>
         ) : (
-          <img src={item.preview || item.url} alt="" draggable={false} className="w-full h-full object-cover pointer-events-none" />
+          /*
+           * CONTAIN, not cover.
+           *
+           * The tile is square so the strip stays a tidy grid, and `cover`
+           * filled it by trimming whatever did not fit. On a photo that is
+           * harmless. On the slides and diagrams people put in a course it cut
+           * the title off the top and the edges off the sides, so the tiles
+           * showed fragments and the seller could not tell which slide was
+           * which, or which one was the cover.
+           *
+           * It also misreported the stored file. Nothing here crops on upload
+           * — the full image is what was saved and what the product page shows
+           * — so a trimmed tile said an edit had happened that had not. A
+           * seller reported her course images as "just cropped" on the
+           * strength of this preview alone.
+           *
+           * The muted ground is what makes the letterboxing read as the tile's
+           * shape rather than as a gap. Cropping is still one click away, which
+           * the tile's own title says.
+           */
+          <div className="w-full h-full flex items-center justify-center" style={{ background: "color-mix(in srgb, currentColor 6%, transparent)" }}>
+            <img src={item.preview || item.url} alt="" draggable={false} className="max-w-full max-h-full object-contain pointer-events-none" />
+          </div>
         )}
       </div>
 
