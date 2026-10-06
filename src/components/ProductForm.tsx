@@ -39,7 +39,7 @@ import {
 } from "@cobuntu/management-ui-shared";
 import {
   FileText, Tag as TagIcon,
-  Layers, MousePointerClick, ChevronRight,
+  Layers, MousePointerClick, ChevronRight, Pencil,
   Eye, EyeOff, UserCheck, Lock, ClipboardCheck, Repeat,
   Image as ImageIcon, Plus, Check, X,
 } from "lucide-react";
@@ -70,6 +70,37 @@ const SUPPORTED_CURRENCIES = [
 
 function getCurrencySymbol(code: string): string {
   return SUPPORTED_CURRENCIES.find(c => c.code === code)?.symbol || code;
+}
+
+/**
+ * The variant row's price line and fact strip (feat/variant-row-facts).
+ *
+ * Sellers were missing that capacity, files, a licence and stock are configured
+ * INSIDE a variant — the row only showed a name + price, so those felt absent.
+ * The card now surfaces whatever the variant has set, so the properties are
+ * visible and the row plainly reads "open me to edit". Facts render only when
+ * present, so a bare free variant stays a one-liner.
+ */
+function variantPriceLabel(t: DraftTier): string {
+  if (t.priceMode === "pwyw") return "Pay what you want";
+  const p = parseFloat(t.price);
+  if (!t.price || Number.isNaN(p) || p <= 0) return "Free";
+  const base = `${getCurrencySymbol(t.currency)}${t.price}`;
+  return t.isRecurring ? `${base}/${t.recurringInterval || "mo"}` : base;
+}
+function variantFacts(t: DraftTier): { k: string; v: string }[] {
+  const out: { k: string; v: string }[] = [];
+  const cap = parseInt(t.capacity, 10);
+  if (t.capacity && !Number.isNaN(cap) && cap > 0) out.push({ k: "Capacity", v: String(cap) });
+  const fileCount = (t.files?.length ?? 0) + (t.links?.length ?? 0);
+  if (fileCount > 0) out.push({ k: "Files", v: String(fileCount) });
+  if (t.licenseTerms && t.licenseTerms.trim()) out.push({ k: "Licence", v: "Set" });
+  const dl = parseInt(t.maxDownloads, 10);
+  if (t.maxDownloads && !Number.isNaN(dl) && dl > 0) out.push({ k: "Downloads", v: `${dl} max` });
+  if (t.condition && t.condition.trim()) out.push({ k: "Condition", v: t.condition });
+  if (t.parcelSize && t.parcelSize.trim()) out.push({ k: "Postage", v: t.parcelSize });
+  if (t.attrs && t.attrs.length > 0) out.push({ k: "Attributes", v: String(t.attrs.length) });
+  return out;
 }
 
 // ─── Types ─────────────────────────────────────────────────────
@@ -877,16 +908,37 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                            that used to sit here is gone — publishing a tier lives
                            inside that editor's Availability section, so a second
                            copy here was one control writing another's value. */
+                        /* Direction D: an expanded card. The whole card is the
+                           button (so the "Edit" pill is a visual cue, not a nested
+                           button); name + price on top, then a fact strip that
+                           surfaces capacity / files / licence / stock so sellers
+                           see what lives inside and that the row is editable. The
+                           strip wraps responsively and renders only set facts. */
                         <button key={i} type="button" onClick={() => openTierEditor(t.localId)}
-                          className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white hover:bg-zinc-100 transition-all duration-150 text-left cursor-pointer">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-zinc-200 text-zinc-600">
-                            <Layers className="h-3.5 w-3.5" />
+                          className="group w-full text-left rounded-xl bg-white border border-zinc-100 hover:bg-zinc-50 hover:border-zinc-200 transition-all duration-150 cursor-pointer overflow-hidden">
+                          <div className="flex items-center gap-3 px-4 py-3">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-zinc-200 text-zinc-600">
+                              <Layers className="h-3.5 w-3.5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[14px] font-semibold text-zinc-800 truncate">{t.name.trim() || "Unnamed variant"}</p>
+                              <p className="text-[12px] text-zinc-400 mt-0.5 truncate">{variantPriceLabel(t)}</p>
+                            </div>
+                            <span className="shrink-0 inline-flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-2.5 py-1.5 transition-colors"
+                              style={{ color: "var(--brand-color, #b8336a)", background: "color-mix(in srgb, var(--brand-color, #b8336a) 8%, transparent)" }}>
+                              <Pencil className="h-3 w-3" /> Edit
+                            </span>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-medium text-zinc-800 truncate">{t.name.trim() || "Unnamed variant"}</p>
-                            <p className="text-[11px] text-zinc-400">{t.price && parseFloat(t.price) > 0 ? `${getCurrencySymbol(t.currency)}${t.price}` : "Free"}</p>
-                          </div>
-                          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
+                          {variantFacts(t).length > 0 && (
+                            <div className="flex flex-wrap border-t border-zinc-100">
+                              {variantFacts(t).map((f) => (
+                                <div key={f.k} className="flex-1 min-w-[110px] px-4 py-2.5 border-r border-zinc-100 last:border-r-0">
+                                  <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{f.k}</p>
+                                  <p className="text-[13px] font-medium text-zinc-800 mt-0.5 tabular-nums">{f.v}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </button>
                       ))}
                     </div>
