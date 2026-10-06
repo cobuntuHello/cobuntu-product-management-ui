@@ -21,6 +21,7 @@ import { ProductManagementConfigProvider } from "../config";
 import { type DraftTier, type DonationDraft } from "./PriceEditModal/types";
 import { blankTier, blankDonation } from "./PriceEditModal/helpers";
 import { DonationsField } from "./PriceEditModal/DonationsField";
+import { RefundPolicyField, type RefundPolicyValue } from "./RefundPolicyField";
 import { CategoryPickerRow, type CategoryOption } from "./CategoryPickerRow";
 import {
   type ProductConditionValue, type ParcelClassValue,
@@ -171,6 +172,12 @@ export interface ProductFormData {
    * product anyone happens to open the form for.
    */
   allowRepeatPurchase?: boolean;
+  /**
+   * The seller's refund policy. null = Standard (platform default window);
+   * { mode:'default', customBuyerWindowDays:0 } = no self-service refunds. The
+   * create DTO + comprehensive update both accept it.
+   */
+  refundPolicy?: RefundPolicyValue;
   /**
    * The RESOLVED answer as the backend currently sees it, seeding the switch.
    * Read-only: the form never emits this. It exists so the switch can show the
@@ -378,6 +385,15 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   };
   const [accessibility, setAccessibility] = useState<"PUBLIC" | "MEMBERS_ONLY">(initialData?.accessibility || "PUBLIC");
   const [requiresApproval, setRequiresApproval] = useState(initialData?.requiresApproval || false);
+  /*
+   * Refund policy, seeded from initialData so an untouched form re-emits exactly
+   * what the product already had (no accidental reset on edit). null = Standard
+   * (platform default); { customBuyerWindowDays: 0 } = no self-service refunds.
+   * The create DTO + the comprehensive update both accept `refundPolicy`.
+   */
+  const [refundPolicy, setRefundPolicy] = useState<RefundPolicyValue>(
+    (initialData as { refundPolicy?: RefundPolicyValue } | undefined)?.refundPolicy ?? null,
+  );
   /*
    * undefined until the seller touches it, so an untouched switch emits
    * NOTHING and the column stays NULL. `??` and not `||`: an existing "no"
@@ -599,6 +615,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       viewTierIds: viewResolved.tierIds,
       buyTierIds: buyResolved.tierIds,
       requiresApproval,
+      // Seeded from initialData, so an untouched edit re-emits the same value and
+      // a create emits null (= platform default / Standard).
+      refundPolicy,
       // Spread, not a key: an untouched switch must not put the field in the
       // payload at all, or the backend records an answer nobody gave. A course
       // (hideRepeatPurchase) always stamps false — it is bought once, and the
@@ -643,7 +662,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       tiers: configured.length > 0 ? named.map(withoutDigitalDelivery) : [],
       donation,
     });
-  }, [name, description, tags, categoryId, subCategoryId, mediaItems, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, allowRepeatPurchase, hideRepeatPurchase, tiers, donation, condition, parcelClass, isPhysical]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [name, description, tags, categoryId, subCategoryId, mediaItems, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, refundPolicy, allowRepeatPurchase, hideRepeatPurchase, tiers, donation, condition, parcelClass, isPhysical]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Configured tiers drive the Pricing row summary + tier cards. A blank
   // seed tier ("Standard") counts once the user has named it.
@@ -948,6 +967,17 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 <Switch checked={repeatShown} onCheckedChange={setAllowRepeatPurchase} onClick={e => e.stopPropagation()} />
               </div>
             </div>
+          </div>
+          )}
+
+          {/* ─── Refunds ─── the seller's own policy (like approval), the SAME
+              control the manage page's refund modal uses (RefundPolicyField).
+              Standard = platform default window; None = buyers contact the seller.
+              Always on the settings page for every sellable artifact. */}
+          {showSettings && (
+          <div>
+            <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Refunds</p>
+            <RefundPolicyField value={refundPolicy} onChange={setRefundPolicy} />
           </div>
           )}
 

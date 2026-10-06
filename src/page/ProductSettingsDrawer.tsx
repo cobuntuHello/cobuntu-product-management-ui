@@ -469,12 +469,11 @@ function afterCheckoutSummary(product: any): string {
 }
 
 function refundPolicySummary(product: any): string {
-  const p = product?.refundPolicy;
-  const mode = p?.mode === "extended" ? "Extended" : "Standard";
-  const w = p?.customBuyerWindowDays;
-  if (w === 0) return `${mode} · buyer self-refunds off`;
-  if (typeof w === "number") return `${mode} · buyers ${w}d after purchase`;
-  return `${mode} · buyers refund during escrow`;
+  // Two presets now (standard vs none), matching the RefundPolicyField control.
+  // customBuyerWindowDays === 0 is the only lever that changes it.
+  return product?.refundPolicy?.customBuyerWindowDays === 0
+    ? "No self-service refunds"
+    : "Standard refunds";
 }
 
 function SettingsRow({
