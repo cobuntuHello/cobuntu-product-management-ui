@@ -88,17 +88,40 @@ function variantPriceLabel(t: DraftTier): string {
   const base = `${getCurrencySymbol(t.currency)}${t.price}`;
   return t.isRecurring ? `${base}/${t.recurringInterval || "mo"}` : base;
 }
-function variantFacts(t: DraftTier): { k: string; v: string }[] {
+/**
+ * The fact strip under each variant card.
+ *
+ * Curated-always, rest when-set: the core properties a buyer should learn ARE
+ * editable (so they discover them) show even when unset — "Capacity: Unlimited",
+ * "Sign-up form: Not set". The niche / type-specific ones only appear once set,
+ * so the strip teaches without turning into clutter.
+ *
+ * Type-aware: "Files" and "Licence" are digital-only, so on a PHYSICAL product
+ * they are dropped (showing "Files: None" on a boxed item would mislead, not
+ * teach). Condition/Postage are the physical-shape fields and stay when-set per
+ * the product decision.
+ */
+function variantFacts(t: DraftTier, isPhysical: boolean): { k: string; v: string }[] {
   const out: { k: string; v: string }[] = [];
+
+  // ── Curated — always shown, so buyers discover the knob even when it's unset.
   const cap = parseInt(t.capacity, 10);
-  if (t.capacity && !Number.isNaN(cap) && cap > 0) out.push({ k: "Capacity", v: String(cap) });
-  const fileCount = (t.files?.length ?? 0) + (t.links?.length ?? 0);
-  if (fileCount > 0) out.push({ k: "Files", v: String(fileCount) });
-  if (t.licenseTerms && t.licenseTerms.trim()) out.push({ k: "Licence", v: "Set" });
+  out.push({ k: "Capacity", v: (t.capacity && !Number.isNaN(cap) && cap > 0) ? String(cap) : "Unlimited" });
+
+  if (!isPhysical) {
+    const fileCount = (t.files?.length ?? 0) + (t.links?.length ?? 0);
+    out.push({ k: "Files", v: fileCount > 0 ? String(fileCount) : "None" });
+    out.push({ k: "Licence", v: (t.licenseTerms && t.licenseTerms.trim()) ? "Set" : "Not set" });
+  }
+
+  const formCount = t.draftForm?.fields?.length ?? t.formFieldCount ?? 0;
+  out.push({ k: "Sign-up form", v: formCount > 0 ? `${formCount} question${formCount === 1 ? "" : "s"}` : "Not set" });
+
+  // ── Niche / type-specific — only once set, to keep the strip from bloating.
   const dl = parseInt(t.maxDownloads, 10);
-  if (t.maxDownloads && !Number.isNaN(dl) && dl > 0) out.push({ k: "Downloads", v: `${dl} max` });
-  if (t.condition && t.condition.trim()) out.push({ k: "Condition", v: t.condition });
-  if (t.parcelSize && t.parcelSize.trim()) out.push({ k: "Postage", v: t.parcelSize });
+  if (!isPhysical && t.maxDownloads && !Number.isNaN(dl) && dl > 0) out.push({ k: "Downloads", v: `${dl} max` });
+  if (isPhysical && t.condition && t.condition.trim()) out.push({ k: "Condition", v: t.condition });
+  if (isPhysical && t.parcelSize && t.parcelSize.trim()) out.push({ k: "Postage", v: t.parcelSize });
   if (t.attrs && t.attrs.length > 0) out.push({ k: "Attributes", v: String(t.attrs.length) });
   return out;
 }
@@ -926,16 +949,14 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                             </div>
                             <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
                           </div>
-                          {variantFacts(t).length > 0 && (
-                            <div className="flex flex-wrap border-t border-zinc-100">
-                              {variantFacts(t).map((f) => (
-                                <div key={f.k} className="flex-1 min-w-[110px] px-4 py-2.5 border-r border-zinc-100 last:border-r-0">
-                                  <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{f.k}</p>
-                                  <p className="text-[13px] font-medium text-zinc-800 mt-0.5 tabular-nums">{f.v}</p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                          <div className="flex flex-wrap border-t border-zinc-100">
+                            {variantFacts(t, isPhysical).map((f) => (
+                              <div key={f.k} className="flex-1 min-w-[110px] px-4 py-2.5 border-r border-zinc-100 last:border-r-0">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{f.k}</p>
+                                <p className="text-[13px] font-medium text-zinc-800 mt-0.5 tabular-nums">{f.v}</p>
+                              </div>
+                            ))}
+                          </div>
                         </button>
                       ))}
                     </div>
