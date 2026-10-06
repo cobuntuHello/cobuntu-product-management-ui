@@ -4,15 +4,19 @@ import { renderWithConfig } from "./test-utils";
 import { ProductForm } from "../components/ProductForm";
 
 /**
- * `page` lets a wizard spread ONE mounted ProductForm across two steps without
+ * `page` lets a wizard spread ONE mounted ProductForm across steps without
  * splitting its state:
  *   - "listing"  → name, photos, description, tags, category, CTA
- *   - "commerce" → postage/condition, stock, variants (each carrying its own
- *                  files, links and licence), visibility, approval
+ *   - "commerce" → variants (each carrying its own files, links and licence),
+ *                  donations, community access
+ *   - "settings" → "Policies & access": requires-approval + repeat-purchase
  *   - "all"      → everything (the default; drawer + admin single-page form)
  *
- * Only VISIBLE blocks change — onChange still emits the whole payload on either
- * page, which is what makes a single instance safe to page across two steps.
+ * The approval + repeat toggles moved from commerce to settings so the commerce
+ * step is only variants/pricing/donations and its features stop hiding among
+ * unrelated toggles. Only VISIBLE blocks change — onChange still emits the whole
+ * payload on every page, which is what makes one instance safe to page across
+ * steps.
  */
 
 const base = { communityTag: "acme", showTiers: true, categories: [] as any[] };
@@ -33,21 +37,31 @@ describe("page split — listing vs commerce", () => {
     expect(screen.queryByText("Require approval")).not.toBeInTheDocument();
   });
 
-  it('page="commerce" shows commerce and hides the listing', () => {
+  it('page="commerce" shows variants and hides both the listing and the settings toggles', () => {
     renderWithConfig(<ProductForm {...base} onChange={vi.fn()} page="commerce" />);
     expect(screen.queryByPlaceholderText("Product Name")).not.toBeInTheDocument();
     expect(screen.queryByText("Add description")).not.toBeInTheDocument();
     expect(screen.queryByText("Call to Action Label")).not.toBeInTheDocument();
     expect(screen.getByText("Variants")).toBeInTheDocument();
-    expect(screen.getByText("Require approval")).toBeInTheDocument();
+    // Approval + repeat moved to the "Policies & access" (settings) step.
+    expect(screen.queryByText("Require approval")).not.toBeInTheDocument();
+    expect(screen.queryByText("Can be bought more than once")).not.toBeInTheDocument();
   });
 
-  it('default "all" shows both halves — the drawer/admin form is unaffected', () => {
+  it('page="settings" shows the policies toggles and hides variants', () => {
+    renderWithConfig(<ProductForm {...base} onChange={vi.fn()} page="settings" />);
+    expect(screen.queryByText("Variants")).not.toBeInTheDocument();
+    expect(screen.getByText("Require approval")).toBeInTheDocument();
+    expect(screen.getByText("Can be bought more than once")).toBeInTheDocument();
+  });
+
+  it('default "all" shows every half — the drawer/admin form is unaffected', () => {
     renderWithConfig(<ProductForm {...base} onChange={vi.fn()} />);
     expect(screen.getByPlaceholderText("Product Name")).toBeInTheDocument();
     expect(screen.getByText("Add description")).toBeInTheDocument();
     expect(screen.getByText("Variants")).toBeInTheDocument();
     expect(screen.getByText("Require approval")).toBeInTheDocument();
+    expect(screen.getByText("Can be bought more than once")).toBeInTheDocument();
   });
 
   it("the physical commerce page sends the item's own fields to the variant", () => {
