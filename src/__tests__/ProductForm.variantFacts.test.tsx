@@ -31,7 +31,6 @@ describe("ProductForm — variant row facts (direction D)", () => {
     expect(screen.getByText("Files")).toBeInTheDocument();
     expect(screen.getByText("Licence")).toBeInTheDocument();
     expect(screen.getByText("5 max")).toBeInTheDocument();
-    expect(screen.getByText("Edit")).toBeInTheDocument();
   });
 
   it("shows no fact strip for a bare variant (name + price only)", () => {

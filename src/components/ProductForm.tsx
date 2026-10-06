@@ -39,7 +39,7 @@ import {
 } from "@cobuntu/management-ui-shared";
 import {
   FileText, Tag as TagIcon,
-  Layers, MousePointerClick, ChevronRight, Pencil,
+  Layers, MousePointerClick, ChevronRight,
   Eye, EyeOff, UserCheck, Lock, ClipboardCheck, Repeat,
   Image as ImageIcon, Plus, Check, X,
 } from "lucide-react";
@@ -908,12 +908,12 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                            that used to sit here is gone — publishing a tier lives
                            inside that editor's Availability section, so a second
                            copy here was one control writing another's value. */
-                        /* Direction D: an expanded card. The whole card is the
-                           button (so the "Edit" pill is a visual cue, not a nested
-                           button); name + price on top, then a fact strip that
-                           surfaces capacity / files / licence / stock so sellers
-                           see what lives inside and that the row is editable. The
-                           strip wraps responsively and renders only set facts. */
+                        /* An expanded, clickable card: the whole row opens the tier
+                           editor, with a chevron as the drill-in cue. Name + price on
+                           top, then a fact strip that surfaces capacity / files /
+                           licence / stock so sellers see what lives inside and that
+                           the row is editable. The strip wraps responsively and
+                           renders only set facts. */
                         <button key={i} type="button" onClick={() => openTierEditor(t.localId)}
                           className="group w-full text-left rounded-xl bg-white border border-zinc-100 hover:bg-zinc-50 hover:border-zinc-200 transition-all duration-150 cursor-pointer overflow-hidden">
                           <div className="flex items-center gap-3 px-4 py-3">
@@ -924,10 +924,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                               <p className="text-[14px] font-semibold text-zinc-800 truncate">{t.name.trim() || "Unnamed variant"}</p>
                               <p className="text-[12px] text-zinc-400 mt-0.5 truncate">{variantPriceLabel(t)}</p>
                             </div>
-                            <span className="shrink-0 inline-flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-2.5 py-1.5 transition-colors"
-                              style={{ color: "var(--brand-color, #b8336a)", background: "color-mix(in srgb, var(--brand-color, #b8336a) 8%, transparent)" }}>
-                              <Pencil className="h-3 w-3" /> Edit
-                            </span>
+                            <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
                           </div>
                           {variantFacts(t).length > 0 && (
                             <div className="flex flex-wrap border-t border-zinc-100">
