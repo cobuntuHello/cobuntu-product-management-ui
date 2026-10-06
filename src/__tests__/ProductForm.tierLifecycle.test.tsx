@@ -79,9 +79,12 @@ const baseProps = (overrides: Record<string, unknown> = {}) => ({
 /** The Pricing card's tier rows — each row is a button that opens the tier. */
 function tierRowNames(): string[] {
   // Tier rows are the buttons inside the Pricing card that carry a tier name.
-  // "Set pricing" / "Add pricing tier" are the add affordance, not rows.
+  // "Set pricing" / "Add pricing tier" are the add affordance, not rows. Exclude
+  // toggle buttons (aria-pressed): the Refunds control's "Standard refunds"
+  // preset is a toggle and would otherwise match the /Standard/ name filter.
   return screen
     .queryAllByRole("button")
+    .filter((b) => !b.hasAttribute("aria-pressed"))
     .map((b) => b.textContent || "")
     .filter((t) => /Standard|Variant \d|Unnamed variant/.test(t))
     .map((t) => t.trim());
