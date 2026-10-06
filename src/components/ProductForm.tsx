@@ -257,6 +257,17 @@ interface ProductFormProps {
    */
   hideApproval?: boolean;
   /**
+   * When true, the "Can be bought more than once" (repeat-purchase) row is NOT
+   * rendered AND the form stamps `allowRepeatPurchase: false` in onChange.
+   *
+   * For COURSES: a course is always bought once — a second purchase grants a
+   * learner nothing new — so the toggle is a decision with one right answer.
+   * Hiding it removes the clutter and guarantees the correct value regardless of
+   * any stale draft/initialData. Default false keeps products (digital/physical)
+   * showing the toggle as before.
+   */
+  hideRepeatPurchase?: boolean;
+  /**
    * What is being sold. Drives the physical-only row, and nothing else.
    *
    * Defaults to DIGITAL so every existing caller is byte-identical: the row
@@ -285,7 +296,7 @@ interface ProductFormProps {
    * regardless of page, so opening a dialog on one page and switching pages
    * never loses its contents.
    */
-  page?: "listing" | "commerce" | "all";
+  page?: "listing" | "commerce" | "settings" | "all";
   /**
    * Surfaces community member (tier) pricing inside the draftMode tier wizard
    * so per-segment discount overrides can be configured at CREATE time (they
@@ -306,7 +317,7 @@ const AUTO_SEED_NAME = /^(Standard|Tier \d+)$/;
 
 // ─── Component ─────────────────────────────────────────────────
 
-export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false, labels }: ProductFormProps) {
+export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, hideRepeatPurchase, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false, labels }: ProductFormProps) {
   /* Merged once rather than at each use, so a partial override cannot leave
    * one string reading "course" beside another still reading "product". */
   const L = { ...DEFAULT_LABELS, ...(labels ?? {}) };
@@ -589,8 +600,14 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       buyTierIds: buyResolved.tierIds,
       requiresApproval,
       // Spread, not a key: an untouched switch must not put the field in the
-      // payload at all, or the backend records an answer nobody gave.
-      ...(allowRepeatPurchase === undefined ? {} : { allowRepeatPurchase }),
+      // payload at all, or the backend records an answer nobody gave. A course
+      // (hideRepeatPurchase) always stamps false — it is bought once, and the
+      // toggle is hidden, so the value must not depend on a stale draft.
+      ...(hideRepeatPurchase
+        ? { allowRepeatPurchase: false }
+        : allowRepeatPurchase === undefined
+          ? {}
+          : { allowRepeatPurchase }),
       /*
        * NULLED for anything that is not physical, and this is the guard, not a
        * tidy-up. normalisePhysicalFields THROWS a ValidationError when a
@@ -626,7 +643,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       tiers: configured.length > 0 ? named.map(withoutDigitalDelivery) : [],
       donation,
     });
-  }, [name, description, tags, categoryId, subCategoryId, mediaItems, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, allowRepeatPurchase, tiers, donation, condition, parcelClass, isPhysical]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [name, description, tags, categoryId, subCategoryId, mediaItems, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, allowRepeatPurchase, hideRepeatPurchase, tiers, donation, condition, parcelClass, isPhysical]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Configured tiers drive the Pricing row summary + tier cards. A blank
   // seed tier ("Standard") counts once the user has named it.
@@ -640,10 +657,15 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const nameLeft = LISTING_NAME_MAX - name.trim().length;
   const nameTooLong = listingNameTooLong(name);
 
-  // Which page's blocks to render. Default "all" → both true → byte-identical
-  // to before, so the drawer and admin single-page form are unaffected.
-  const showListing = page !== "commerce";
-  const showCommerce = page !== "listing";
+  // Which page's blocks to render. Default "all" → all true → byte-identical to
+  // before, so the drawer and admin single-page form are unaffected. The wizard
+  // splits the form across pages: "listing" (details), "commerce" (variants +
+  // pricing + donations) and "settings" ("Policies & access" — approval +
+  // repeat-purchase). Explicit membership rather than `!== x` so a new page can
+  // never silently fall into a block it does not own.
+  const showListing = page === "all" || page === "listing";
+  const showCommerce = page === "all" || page === "commerce";
+  const showSettings = page === "all" || page === "settings";
 
   return (
     <div className="space-y-6">
@@ -809,68 +831,74 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       {/* The "Product Options" eyebrow was removed 2026-08-09 — the rows say
           what they are, and the label was the only thing separating this card
           from the detail rows above it. */}
-      {showCommerce && (showTiers || !hideVisibility || !hideApproval) && (
+      {(showCommerce || showSettings) && (showTiers || !hideVisibility || !hideApproval || !hideRepeatPurchase) && (
         <div className="space-y-6">
-          {showTiers && (
-            <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
-            {/* Pricing — identical treatment to the event "Tickets" row:
-                summary + tier cards + a dashed button into the shared wizard. */}
-            {showTiers && (
-              <div className="px-5 py-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <Layers className="h-[18px] w-[18px] text-zinc-400" />
-                    <span className="text-sm font-medium text-zinc-800">Variants</span>
-                  </div>
-                  <span className="text-xs text-zinc-400">{configuredTiers.length === 0 ? "Free" : `${configuredTiers.length} variant${configuredTiers.length > 1 ? "s" : ""}`}{donation.enabled ? " · Donations" : ""}</span>
+          {/* ── Variants ── title OUTSIDE the card now, mirroring the Approval /
+              Purchases groups below; the card holds only the list + add button.
+              Its old in-card header (Layers icon + "Variants" + count) is gone so
+              it reads as one of the eyebrow-labelled groups rather than a
+              standalone panel. */}
+          {showCommerce && showTiers && (
+            <div>
+              <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Variants</p>
+              {/* A variant is what a buyer actually purchases: the product is a
+                  wrapper and each variant is one version of it, with its own
+                  price, files, licence and stock. Spelled out because sellers
+                  added a download expecting it at the product level and never
+                  opened a variant — where the deliverables actually live. */}
+              <p className="text-[12px] text-zinc-500 mb-2.5 max-w-[68ch] leading-relaxed">
+                Each variant is a version buyers can purchase, with its own price, files, licence and stock. Open one to add its downloadable content.
+              </p>
+              <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 overflow-hidden">
+                <div className="px-5 py-4">
+                  {configuredTiers.length > 0 && (
+                    <div className="space-y-2 mb-3">
+                      {configuredTiers.map((t, i) => (
+                        /* The whole row opens the tier editor. The publish switch
+                           that used to sit here is gone — publishing a tier lives
+                           inside that editor's Availability section, so a second
+                           copy here was one control writing another's value. */
+                        <button key={i} type="button" onClick={() => openTierEditor(t.localId)}
+                          className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white hover:bg-zinc-100 transition-all duration-150 text-left cursor-pointer">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-zinc-200 text-zinc-600">
+                            <Layers className="h-3.5 w-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-medium text-zinc-800 truncate">{t.name.trim() || "Unnamed variant"}</p>
+                            <p className="text-[11px] text-zinc-400">{t.price && parseFloat(t.price) > 0 ? `${getCurrencySymbol(t.currency)}${t.price}` : "Free"}</p>
+                          </div>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <button type="button" onClick={addAndEditTier}
+                    onMouseEnter={e => { const b = "var(--brand-color, #b8336a)"; e.currentTarget.style.color = b; e.currentTarget.style.borderColor = "color-mix(in srgb, var(--brand-color, #b8336a) 35%, transparent)"; e.currentTarget.style.background = "color-mix(in srgb, var(--brand-color, #b8336a) 6%, transparent)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = ""; e.currentTarget.style.borderColor = ""; e.currentTarget.style.background = ""; }}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[13px] font-medium text-zinc-500 border border-dashed border-zinc-200 rounded-xl cursor-pointer transition-all duration-150">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Add variant
+                  </button>
                 </div>
-                {configuredTiers.length > 0 && (
-                  <div className="space-y-2 mb-3">
-                    {configuredTiers.map((t, i) => (
-                      /* The whole row opens the tier editor. The publish switch
-                         that used to sit here is gone — publishing a tier lives
-                         inside that editor's Availability section, so a second
-                         copy here was one control writing another's value. */
-                      <button key={i} type="button" onClick={() => openTierEditor(t.localId)}
-                        className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white hover:bg-zinc-100 transition-all duration-150 text-left cursor-pointer">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-zinc-200 text-zinc-600">
-                          <Layers className="h-3.5 w-3.5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-zinc-800 truncate">{t.name.trim() || "Unnamed variant"}</p>
-                          <p className="text-[11px] text-zinc-400">{t.price && parseFloat(t.price) > 0 ? `${getCurrencySymbol(t.currency)}${t.price}` : "Free"}</p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <button type="button" onClick={addAndEditTier}
-                  onMouseEnter={e => { const b = "var(--brand-color, #b8336a)"; e.currentTarget.style.color = b; e.currentTarget.style.borderColor = "color-mix(in srgb, var(--brand-color, #b8336a) 35%, transparent)"; e.currentTarget.style.background = "color-mix(in srgb, var(--brand-color, #b8336a) 6%, transparent)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = ""; e.currentTarget.style.borderColor = ""; e.currentTarget.style.background = ""; }}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[13px] font-medium text-zinc-500 border border-dashed border-zinc-200 rounded-xl cursor-pointer transition-all duration-150">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  {configuredTiers.length === 0 ? "Add variant" : "Add variant"}
-                </button>
               </div>
-            )}
             </div>
           )}
 
-          {/* ─── Donations ─── listing-level; its own row that opens a modal
-              (desktop) / drawer (mobile). Outside the Variants card because a
-              donation applies to the whole listing, not a single variant. */}
-          <DonationsField
-            donation={donation}
-            onUpdate={(patch) => setDonation((d) => ({ ...d, ...patch }))}
-            defaultCurrency={currency}
-          />
+          {/* ─── Donations ─── listing-level; opens a modal (desktop) / drawer
+              (mobile). Commerce page, beside variants & pricing. */}
+          {showCommerce && (
+            <DonationsField
+              donation={donation}
+              onUpdate={(patch) => setDonation((d) => ({ ...d, ...patch }))}
+              defaultCurrency={currency}
+            />
+          )}
 
           {/* ─── Approval ───
               NOT community-scoped. requiresApproval is outside
               COMMUNITY_SCOPED_PRODUCT_FIELDS, so a member selling their own
               product may set it. Its own card, never the community one. */}
-          {!hideApproval && (
+          {showSettings && !hideApproval && (
             <div>
               <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Approval</p>
               <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
@@ -895,9 +923,10 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           {/* ─── Purchases ───
               Its own card rather than a second row under Approval: approval is
               about who may buy, this is about what an owner is shown after
-              they already have. Not gated on `hideApproval`, because the two
-              are unrelated rules and a consumer hiding one should not lose the
-              other. */}
+              they already have. Hidden for a course (`hideRepeatPurchase`),
+              which is always bought once; gated on `showSettings` so it rides
+              the "Policies & access" step with Approval, not commerce. */}
+          {showSettings && !hideRepeatPurchase && (
           <div>
             <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Purchases</p>
             <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
@@ -920,6 +949,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               </div>
             </div>
           </div>
+          )}
 
           {/* ─── Community access ───
               Visibility and Purchase exist ONLY because a community owns this
@@ -932,7 +962,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               deliberately on 2026-08-09 because it was the only thing
               separating the card from the detail rows. These two are new
               groups, and the label IS the explanation. */}
-          {!hideVisibility && (
+          {showCommerce && !hideVisibility && (
             <div>
               <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Community access</p>
               <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">

@@ -92,6 +92,24 @@ describe("the repeat-purchase switch", () => {
         expect(lastEmit(onChange).allowRepeatPurchase).toBe(false);
     });
 
+    it("is hidden for a course and stamps allowRepeatPurchase:false", () => {
+        // A course is always bought once, so the toggle is a decision with one
+        // right answer. hideRepeatPurchase removes the row AND forces the value
+        // false regardless of any stale draft/initialData.
+        const onChange = vi.fn();
+        renderWithConfig(
+            <ProductForm
+                {...base}
+                onChange={onChange}
+                hideRepeatPurchase
+                initialData={{ allowRepeatPurchase: true } as any}
+            />,
+        );
+        expect(screen.queryByText("Can be bought more than once")).not.toBeInTheDocument();
+        expect(screen.queryByText("Purchases")).not.toBeInTheDocument();
+        expect(lastEmit(onChange).allowRepeatPurchase).toBe(false);
+    });
+
     it("shows the seller's answer in preference to the resolved one", () => {
         const onChange = vi.fn();
         renderWithConfig(
