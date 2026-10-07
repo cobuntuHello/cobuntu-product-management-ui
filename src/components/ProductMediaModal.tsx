@@ -47,6 +47,11 @@ export function ProductMediaModal({
           url: m.url,
           type: (m.type === "video" ? "video" : "image") as "image" | "video",
           isExisting: true,
+          /* Null stays null: the card reads it as "centre", which is what it
+             did before anyone could set a point. */
+          focal: typeof m.focalX === "number" && typeof m.focalY === "number"
+            ? { x: m.focalX, y: m.focalY }
+            : null,
         })),
     [product?.media],
   );
@@ -65,6 +70,15 @@ export function ProductMediaModal({
 
       if (toDelete.length > 0) formData.append("mediaToDelete", JSON.stringify(toDelete));
       formData.append("mediaReordered", JSON.stringify(keptIds));
+      /*
+       * Only the images that HAVE a point, and only the ones the server knows
+       * about. A new upload has no id yet, and sending a centre for everything
+       * would overwrite points set elsewhere with a value nobody chose.
+       */
+      const focal = items
+        .filter((m) => m.isExisting && m.id && m.focal)
+        .map((m) => ({ id: m.id, x: m.focal!.x, y: m.focal!.y }));
+      if (focal.length > 0) formData.append("mediaFocal", JSON.stringify(focal));
       for (const item of items) {
         if (item.file && !item.isExisting) formData.append("media", item.file);
       }
