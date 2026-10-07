@@ -7,9 +7,10 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Upload, X, Video } from "lucide-react";
+import { Upload, X, Video, Crosshair } from "lucide-react";
 import { BannerCropModal, type BannerCropResult } from "./banner-crop-modal";
 import { dataUrlToFile } from "../lib/dataUrlToFile";
+import { FocalPointModal, type FocalPoint } from "./focal-point-modal";
 
 export interface MediaItem {
   id: string;
@@ -18,6 +19,12 @@ export interface MediaItem {
   type: "image" | "video";
   isExisting?: boolean;
   url?: string;
+  /**
+   * Where the subject of this image is, as percentages of its own width and
+   * height. Null means the middle, which is what every card crop assumed
+   * before a seller reported a photo losing its head to that assumption.
+   */
+  focal?: FocalPoint | null;
 }
 
 interface SortableMediaGalleryProps {
@@ -33,12 +40,13 @@ const TILE = "shrink-0 w-[128px] sm:w-auto aspect-square";
 /** A filled media tile — draggable, croppable, removable. The first tile
  *  carries a "Cover" badge (it's the card thumbnail). */
 function FilledTile({
-  item, isCover, onRemove, onFilledClick,
+  item, isCover, onRemove, onFilledClick, onSetFocus,
 }: {
   item: MediaItem;
   isCover: boolean;
   onRemove: () => void;
   onFilledClick: () => void;
+  onSetFocus: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const style: React.CSSProperties = {
@@ -86,7 +94,15 @@ function FilledTile({
            * the tile's own title says.
            */
           <div className="w-full h-full flex items-center justify-center" style={{ background: "color-mix(in srgb, currentColor 6%, transparent)" }}>
-            <img src={item.preview || item.url} alt="" draggable={false} className="max-w-full max-h-full object-contain pointer-events-none" />
+            <img
+              src={item.preview || item.url}
+              alt=""
+              draggable={false}
+              className="max-w-full max-h-full object-contain pointer-events-none"
+              /* Contained here, so the point changes nothing on this tile —
+                 the tile's job is to show the whole file. The point is for the
+                 CARD, previewed inside the focus dialog. */
+            />
           </div>
         )}
       </div>
@@ -95,6 +111,24 @@ function FilledTile({
         <div className="absolute top-1.5 left-1.5 bg-black/70 text-white text-[10px] font-semibold px-2 py-0.5 rounded-md pointer-events-none">
           Cover
         </div>
+      )}
+
+      {/*
+        * Setting the focus is its own control, not another meaning for the
+        * tile. The tile already opens the square crop; a press that did two
+        * different things depending on where it landed is how the crop tool
+        * and this one would get confused for each other.
+        */}
+      {item.type === "image" && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onSetFocus(); }}
+          aria-label="Choose what the card shows"
+          title="Choose what the card shows"
+          className="absolute bottom-1.5 left-1.5 grid h-7 w-7 place-items-center rounded-full border-none bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 cursor-pointer hover:bg-black/75"
+        >
+          <Crosshair className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
       )}
 
       <button
@@ -131,6 +165,8 @@ function AddTile({ count, max, onClick }: { count: number; max: number; onClick:
 export function SortableMediaGallery({ items, onChange, maxItems = 5 }: SortableMediaGalleryProps) {
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [cropOpen, setCropOpen] = React.useState(false);
+  /** Which image is having its card focus set, if any. */
+  const [focusIndex, setFocusIndex] = React.useState<number | null>(null);
   const [cropIndex, setCropIndex] = React.useState<number | null>(null);
 
   const sensors = useSensors(
@@ -215,6 +251,7 @@ export function SortableMediaGallery({ items, onChange, maxItems = 5 }: Sortable
                 isCover={i === 0}
                 onRemove={() => handleRemove(i)}
                 onFilledClick={() => handleFilledClick(i)}
+                onSetFocus={() => setFocusIndex(i)}
               />
             ))}
           </SortableContext>
@@ -231,6 +268,20 @@ export function SortableMediaGallery({ items, onChange, maxItems = 5 }: Sortable
           ? `${filledCount}/${maxItems} · First photo is the cover · drag to reorder`
           : `Add up to ${maxItems} photos · the first is the cover`}
       </p>
+
+      {/* The focus dialog, which previews the CARD rather than the file. */}
+      {focusIndex !== null && items[focusIndex] && (
+        <FocalPointModal
+          src={items[focusIndex].preview || items[focusIndex].url || ""}
+          value={items[focusIndex].focal ?? null}
+          onClose={() => setFocusIndex(null)}
+          onSave={(focal) => {
+            const updated = [...items];
+            updated[focusIndex] = { ...updated[focusIndex], focal };
+            onChange(updated);
+          }}
+        />
+      )}
 
       <BannerCropModal
         open={cropOpen}
