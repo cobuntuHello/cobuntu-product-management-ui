@@ -155,16 +155,15 @@ export function ProductActivityTab({ product, communityTag, pageSize = 25 }: Pro
         </p>
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
-        {entries.length === 0 && !loading && !error ? (
-          <EmptyState />
-        ) : (
+      {entries.length === 0 && !loading && !error ? (
+        <EmptyState />
+      ) : (
+        <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
           <ul className="divide-y divide-zinc-100">
             {entries.map((entry) => (
               <ActivityRow key={entry.id} entry={entry} now={now} UserAvatar={UserAvatar} />
             ))}
           </ul>
-        )}
 
         {loading && <LoadingRow />}
 
@@ -186,7 +185,8 @@ export function ProductActivityTab({ product, communityTag, pageSize = 25 }: Pro
         {exhausted && entries.length > 0 && (
           <p className="px-6 py-4 text-center text-[11px] text-zinc-400">End of activity.</p>
         )}
-      </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -256,7 +256,6 @@ function LoadingRow() {
 function EmptyState() {
   return (
     <SharedEmptyState
-      bordered={false}
       icon={
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
              stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">

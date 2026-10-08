@@ -214,41 +214,43 @@ export function CollaboratorsView({
         )}
       </div>
 
-      <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
-        {rows === null ? (
-          <p className="px-6 py-12 text-center text-[12px] text-zinc-400">Loading co-sellers…</p>
-        ) : rows.length === 0 ? (
-          <EmptyState
-            bordered={false}
-            icon={
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
-                   stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-              </svg>
-            }
-            title="No co-sellers yet"
-            body="Search for a member to add. They appear on the listing beside you."
-          />
-       
-        ) : (
-          <ul className="divide-y divide-zinc-100">
-            {rows.map((c) => (
-              <li key={c.id}>
-                <CollaboratorRow
-                  collaborator={c}
-                  isImmutableOwner={c.userId === ownerId || c.role === "OWNER"}
-                  canManage={canEdit}
-                  UserAvatar={UserAvatar}
-                  onRequestRemove={() => setConfirmRemove(c)}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {rows !== null && rows.length === 0 ? (
+        /* Dotted empty state stands alone — no wrapper card, so the border
+           doesn't nest in a box (uniform with the other tabs). */
+        <EmptyState
+          icon={
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          }
+          title="No co-sellers yet"
+          body="Search for a member to add. They appear on the listing beside you."
+        />
+      ) : (
+        <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
+          {rows === null ? (
+            <p className="px-6 py-12 text-center text-[12px] text-zinc-400">Loading co-sellers…</p>
+          ) : (
+            <ul className="divide-y divide-zinc-100">
+              {rows.map((c) => (
+                <li key={c.id}>
+                  <CollaboratorRow
+                    collaborator={c}
+                    isImmutableOwner={c.userId === ownerId || c.role === "OWNER"}
+                    canManage={canEdit}
+                    UserAvatar={UserAvatar}
+                    onRequestRemove={() => setConfirmRemove(c)}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {error && <p className="mt-3 text-[12px] text-red-600">{error}</p>}
 

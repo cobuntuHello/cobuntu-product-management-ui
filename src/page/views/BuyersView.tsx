@@ -269,15 +269,15 @@ export function BuyersView({
 
             <Section title="Has access" subtitle="Given the product for free. Not a sale.">
                 {grants === null ? (
-                    <p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p>
+                    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
                 ) : grants.length === 0 ? (
                     <EmptyState
-                        bordered={false}
                         icon={<PeopleIcon />}
                         title="Nobody has been given this yet"
                         body="Give access to hand somebody the product without charging them."
                     />
                 ) : (
+                    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
                     <ul className="divide-y divide-zinc-100">
                         {grants.map((g) => (
                             <li key={g.id} className="flex items-center gap-3 px-5 py-3">
@@ -299,21 +299,22 @@ export function BuyersView({
                             </li>
                         ))}
                     </ul>
+                    </div>
                 )}
             </Section>
 
             <div className="mt-5">
                 <Section title="Invited" subtitle="Asked to buy it. They still pay.">
                     {invites === null ? (
-                        <p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p>
+                        <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
                     ) : invites.length === 0 ? (
                         <EmptyState
-                            bordered={false}
                             icon={<PeopleIcon />}
                             title="No invitations sent"
                             body="Invite somebody to buy this and they get an email with your note."
                         />
                     ) : (
+                        <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
                         <ul className="divide-y divide-zinc-100">
                             {invites.map((i) => (
                                 <li key={i.id} className="flex items-center gap-3 px-5 py-3">
@@ -332,6 +333,7 @@ export function BuyersView({
                                 </li>
                             ))}
                         </ul>
+                        </div>
                     )}
                 </Section>
             </div>
@@ -492,13 +494,16 @@ const BASE_COPY = {
 };
 
 function Section({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+    /* The card wrapper lives with the LIST now, not here: a dotted empty state
+       renders on its own (no box-in-box), while a populated list still gets its
+       card. The caller decides which, so Section is just the titled container. */
     return (
         <div>
             <div className="mb-2">
                 <h3 className="text-[13px] font-semibold text-zinc-900">{title}</h3>
                 <p className="text-[11.5px] text-zinc-400">{subtitle}</p>
             </div>
-            <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">{children}</div>
+            {children}
         </div>
     );
 }
