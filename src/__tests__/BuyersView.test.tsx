@@ -83,12 +83,13 @@ beforeEach(() => vi.clearAllMocks());
  * plainly, alongside a paid customer so the two read as the same kind of row.
  */
 describe("customers", () => {
-    function renderWithCustomers(customers: unknown[], product: any = PRODUCT) {
+    function renderWithCustomers(customers: unknown[], product: any = PRODUCT, extraRoutes: any[] = []) {
         const fetchMock = mockFetch([
             { method: "GET", url: /\/access-grants$/, body: [] },
             { method: "GET", url: /\/invitations$/, body: [] },
             { method: "GET", url: /\/customers$/, body: customers },
             ROSTER,
+            ...extraRoutes,
         ]);
         renderWithConfig(
             <BuyersView
@@ -152,6 +153,95 @@ describe("customers", () => {
         // "Ana Neto" still appears once, in the Customers list behind the
         // modal — but not a SECOND time in the picker roster.
         expect(screen.getAllByText("Ana Neto")).toHaveLength(1);
+    });
+
+    /**
+     * How many downloads from how many possible, and the licence if the tier
+     * carries one — fetched only once a row is expanded, and only then.
+     */
+    describe("expanding for download/licence detail", () => {
+        const ONE = [
+            { id: "s1", grossAmount: 0, currency: "EUR", createdAt: "2026-01-01T00:00:00Z", guestEmail: null,
+              user: { id: "u-ana", name: "Ana Neto", usertag: "ana-neto", profileImage: null } },
+        ];
+
+        it("shows usage against the cap", async () => {
+            const user = userEvent.setup();
+            renderWithCustomers(ONE, PRODUCT, [
+                { method: "GET", url: /\/customers\/s1$/,
+                  body: { licenseTerms: null, downloads: [{ name: "Guide.pdf", used: 2, max: 5 }], linkOpens: [] } },
+            ]);
+
+            await user.click(await screen.findByText("Ana Neto"));
+
+            expect(await screen.findByText("Guide.pdf")).toBeInTheDocument();
+            expect(await screen.findByText("2 of 5 downloads")).toBeInTheDocument();
+        });
+
+        it("reads no cap as unlimited, not as zero", async () => {
+            const user = userEvent.setup();
+            renderWithCustomers(ONE, PRODUCT, [
+                { method: "GET", url: /\/customers\/s1$/,
+                  body: { licenseTerms: null, downloads: [{ name: "Guide.pdf", used: 4, max: null }], linkOpens: [] } },
+            ]);
+
+            await user.click(await screen.findByText("Ana Neto"));
+
+            expect(await screen.findByText("4 downloads")).toBeInTheDocument();
+            expect(screen.queryByText(/of null|of unlimited/)).not.toBeInTheDocument();
+        });
+
+        it("shows the licence text when the tier carries one", async () => {
+            const user = userEvent.setup();
+            renderWithCustomers(ONE, PRODUCT, [
+                { method: "GET", url: /\/customers\/s1$/,
+                  body: { licenseTerms: "Personal use only.", downloads: [], linkOpens: [] } },
+            ]);
+
+            await user.click(await screen.findByText("Ana Neto"));
+
+            expect(await screen.findByText(/Personal use only\./)).toBeInTheDocument();
+        });
+
+        it("says so when there is nothing downloadable on the sale", async () => {
+            const user = userEvent.setup();
+            renderWithCustomers(ONE, PRODUCT, [
+                { method: "GET", url: /\/customers\/s1$/, body: { licenseTerms: null, downloads: [], linkOpens: [] } },
+            ]);
+
+            await user.click(await screen.findByText("Ana Neto"));
+
+            expect(await screen.findByText("No downloadable content on this sale.")).toBeInTheDocument();
+        });
+
+        it("fetches once and collapses on a second click, without re-fetching", async () => {
+            const user = userEvent.setup();
+            const fetchMock = renderWithCustomers(ONE, PRODUCT, [
+                { method: "GET", url: /\/customers\/s1$/,
+                  body: { licenseTerms: null, downloads: [{ name: "Guide.pdf", used: 1, max: 5 }], linkOpens: [] } },
+            ]);
+
+            await user.click(await screen.findByText("Ana Neto"));
+            await screen.findByText("Guide.pdf");
+            await user.click(screen.getByText("Ana Neto"));
+            expect(screen.queryByText("Guide.pdf")).not.toBeInTheDocument();
+            await user.click(screen.getByText("Ana Neto"));
+            await screen.findByText("Guide.pdf");
+
+            const detailCalls = fetchMock.mock.calls.filter(([url]: any) => /\/customers\/s1$/.test(String(url)));
+            expect(detailCalls).toHaveLength(1);
+        });
+
+        it("says so when the detail fails to load", async () => {
+            const user = userEvent.setup();
+            renderWithCustomers(ONE, PRODUCT, [
+                { method: "GET", url: /\/customers\/s1$/, status: 500, body: { error: "nope" } },
+            ]);
+
+            await user.click(await screen.findByText("Ana Neto"));
+
+            expect(await screen.findByText("Could not load this customer's download detail.")).toBeInTheDocument();
+        });
     });
 });
 
