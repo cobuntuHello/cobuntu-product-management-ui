@@ -59,6 +59,35 @@ interface Invitation {
     users?: { id: string; name?: string | null; usertag?: string | null; profileImage?: string | null } | null;
 }
 
+/**
+ * Someone who actually ACQUIRED this product themselves — free or paid.
+ *
+ * Neither a grant (the seller gave it away) nor an invitation (asked to pay,
+ * still pending): this is a real checkout, which is why it needs its own
+ * section. A free one is the bug this closes — it used to appear nowhere but
+ * a €0.00 line on the Ledger tab.
+ */
+interface Customer {
+    id: string;
+    grossAmount: number;
+    currency: string;
+    createdAt: string;
+    guestEmail: string | null;
+    user: { id: string; name?: string | null; usertag?: string | null; profileImage?: string | null } | null;
+}
+
+/**
+ * One customer's download usage vs. cap, and the licence if the tier carries
+ * one — fetched lazily, per row, when a seller expands it. "How many
+ * downloads from how many possible" was the exact ask; a cap of `null` means
+ * unlimited (a stray 0/negative value on the tier reads the same way).
+ */
+interface CustomerDetail {
+    licenseTerms: string | null;
+    downloads: { name: string; used: number; max: number | null }[];
+    linkOpens: { name: string; opens: number }[];
+}
+
 export function BuyersView({
     product,
     onUpdate,
@@ -80,6 +109,12 @@ export function BuyersView({
 
     const [grants, setGrants] = React.useState<Grant[] | null>(null);
     const [invites, setInvites] = React.useState<Invitation[] | null>(null);
+    const [customers, setCustomers] = React.useState<Customer[] | null>(null);
+    const [expandedCustomerId, setExpandedCustomerId] = React.useState<string | null>(null);
+    /* Keyed by sale id. "loading"/"error" are states, not data — kept in the
+       same map rather than a parallel one so there is one source of truth per
+       row and no risk of the two falling out of sync. */
+    const [customerDetails, setCustomerDetails] = React.useState<Record<string, CustomerDetail | "loading" | "error">>({});
     const [mode, setMode] = React.useState<null | "grant" | "invite">(null);
     const [confirmRevoke, setConfirmRevoke] = React.useState<Grant | null>(null);
     const [busy, setBusy] = React.useState(false);
@@ -95,24 +130,49 @@ export function BuyersView({
 
     const load = React.useCallback(async () => {
         const headers = authHeaders();
-        const [g, i] = await Promise.all([
+        const [g, i, c] = await Promise.all([
             fetch(`${apiBaseUrl}/api/products/${product.id}/access-grants`, { headers })
                 .then((r) => (r.ok ? r.json() : [])).catch(() => []),
             fetch(`${apiBaseUrl}/api/products/${product.id}/invitations`, { headers })
                 .then((r) => (r.ok ? r.json() : [])).catch(() => []),
+            fetch(`${apiBaseUrl}/api/products/${product.id}/customers`, { headers })
+                .then((r) => (r.ok ? r.json() : [])).catch(() => []),
         ]);
         setGrants(Array.isArray(g) ? g : []);
         setInvites(Array.isArray(i) ? i : []);
+        setCustomers(Array.isArray(c) ? c : []);
     }, [apiBaseUrl, authHeaders, product.id]);
 
     React.useEffect(() => { load(); }, [load]);
+
+    /**
+     * Expand a customer row to its download/licence detail, fetched once and
+     * cached in `customerDetails` — re-opening the same row does not re-fetch.
+     * Collapsing is just closing the one open row; there is at most one at a
+     * time, which keeps "which row is this detail under" unambiguous.
+     */
+    const toggleCustomer = React.useCallback(async (saleId: string) => {
+        if (expandedCustomerId === saleId) { setExpandedCustomerId(null); return; }
+        setExpandedCustomerId(saleId);
+        if (customerDetails[saleId] !== undefined) return;
+        setCustomerDetails((d) => ({ ...d, [saleId]: "loading" }));
+        try {
+            const res = await fetch(`${apiBaseUrl}/api/products/${product.id}/customers/${saleId}`, { headers: authHeaders() });
+            if (!res.ok) throw new Error(String(res.status));
+            const body = await res.json();
+            setCustomerDetails((d) => ({ ...d, [saleId]: body }));
+        } catch {
+            setCustomerDetails((d) => ({ ...d, [saleId]: "error" }));
+        }
+    }, [apiBaseUrl, authHeaders, product.id, expandedCustomerId, customerDetails]);
 
     /** Everyone who already has it or has been asked — never offered again. */
     const excludeUserIds = React.useMemo(() => [
         ...(grants ?? []).map((g) => g.userId),
         ...(invites ?? []).map((i) => i.users?.id).filter((x): x is string => !!x),
+        ...(customers ?? []).map((c) => c.user?.id).filter((x): x is string => !!x),
         ...(product?.ownerId ? [product.ownerId] : []),
-    ], [grants, invites, product?.ownerId]);
+    ], [grants, invites, customers, product?.ownerId]);
 
     /*
      * Which variant is being given away.
@@ -267,6 +327,63 @@ export function BuyersView({
                 )}
             </div>
 
+            <Section title="Customers" subtitle="Bought it themselves — free or paid.">
+                {customers === null ? (
+                    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
+                ) : customers.length === 0 ? (
+                    <EmptyState
+                        icon={<PeopleIcon />}
+                        title="Nobody has bought this yet"
+                        body="Once somebody checks out — free or paid — they show up here."
+                    />
+                ) : (
+                    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
+                    <ul className="divide-y divide-zinc-100">
+                        {customers.map((c) => {
+                            const expanded = expandedCustomerId === c.id;
+                            const detail = customerDetails[c.id];
+                            return (
+                            <li key={c.id}>
+                                <button
+                                    type="button"
+                                    onClick={() => void toggleCustomer(c.id)}
+                                    aria-expanded={expanded}
+                                    className="flex w-full items-center gap-3 px-5 py-3 text-left cursor-pointer hover:bg-zinc-50"
+                                >
+                                    <UserAvatar user={c.user ?? { id: c.guestEmail ?? c.id }} className="w-8 h-8 shrink-0" />
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[13px] text-zinc-900 truncate">{c.user?.name || c.guestEmail || "Unknown"}</p>
+                                        {c.user?.usertag ? (
+                                            <p className="text-[11px] text-zinc-400 truncate">@{c.user.usertag}</p>
+                                        ) : c.user?.name && c.guestEmail ? (
+                                            <p className="text-[11px] text-zinc-400 truncate">{c.guestEmail}</p>
+                                        ) : null}
+                                    </div>
+                                    <span className="text-[12px] font-medium text-zinc-500 shrink-0">
+                                        {formatCustomerAmount(c.grossAmount, c.currency)}
+                                    </span>
+                                    <ChevronIcon className={`shrink-0 text-zinc-300 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                                </button>
+                                {expanded && (
+                                    <div className="px-5 pb-4 pl-[52px]">
+                                        {detail === "loading" || detail === undefined ? (
+                                            <p className="text-[12px] text-zinc-400">Loading…</p>
+                                        ) : detail === "error" ? (
+                                            <p className="text-[12px] text-red-600">Could not load this customer's download detail.</p>
+                                        ) : (
+                                            <CustomerDownloadDetailPanel detail={detail} />
+                                        )}
+                                    </div>
+                                )}
+                            </li>
+                            );
+                        })}
+                    </ul>
+                    </div>
+                )}
+            </Section>
+
+            <div className="mt-5">
             <Section title="Has access" subtitle="Given the product for free. Not a sale.">
                 {grants === null ? (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
@@ -302,6 +419,7 @@ export function BuyersView({
                     </div>
                 )}
             </Section>
+            </div>
 
             <div className="mt-5">
                 <Section title="Invited" subtitle="Asked to buy it. They still pay.">
@@ -509,6 +627,21 @@ function Section({ title, subtitle, children }: { title: string; subtitle: strin
 }
 
 /**
+ * The customer row's amount — "Free" for a genuine $0 acquisition (the bug
+ * this section exists to fix), the real price otherwise. Cents, like
+ * everywhere else on the platform.
+ */
+function formatCustomerAmount(grossAmount: number, currency: string): string {
+    if (!grossAmount) return "Free";
+    try {
+        return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 2 })
+            .format(grossAmount / 100);
+    } catch {
+        return `${(grossAmount / 100).toFixed(2)} ${currency}`;
+    }
+}
+
+/**
  * What the invitee will receive.
  *
  * The PRICE is here deliberately — an invitation is not a gift, and a preview
@@ -557,5 +690,50 @@ function PeopleIcon() {
             <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
             <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
+    );
+}
+
+function ChevronIcon({ className = "" }: { className?: string }) {
+    return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+            <path d="m6 9 6 6 6-6" />
+        </svg>
+    );
+}
+
+/**
+ * A customer's download usage vs. cap, and the tier's licence text if it
+ * carries one. "How many downloads from how many possible, and the licence
+ * if applicable" was the exact ask — this is where that renders.
+ */
+function CustomerDownloadDetailPanel({ detail }: { detail: CustomerDetail }) {
+    const nothing = detail.downloads.length === 0 && detail.linkOpens.length === 0 && !detail.licenseTerms;
+    if (nothing) {
+        return <p className="text-[12px] text-zinc-400">No downloadable content on this sale.</p>;
+    }
+    return (
+        <div className="space-y-2.5">
+            {detail.downloads.map((d, i) => (
+                <div key={`dl-${i}`} className="flex items-baseline justify-between gap-3 text-[12.5px]">
+                    <span className="text-zinc-600 truncate">{d.name}</span>
+                    <span className="shrink-0 font-medium text-zinc-900 tabular-nums">
+                        {d.max != null ? `${d.used} of ${d.max} downloads` : `${d.used} ${d.used === 1 ? "download" : "downloads"}`}
+                    </span>
+                </div>
+            ))}
+            {detail.linkOpens.map((l, i) => (
+                <div key={`lo-${i}`} className="flex items-baseline justify-between gap-3 text-[12.5px]">
+                    <span className="text-zinc-600 truncate">{l.name}</span>
+                    <span className="shrink-0 font-medium text-zinc-900 tabular-nums">
+                        opened {l.opens} {l.opens === 1 ? "time" : "times"}
+                    </span>
+                </div>
+            ))}
+            {detail.licenseTerms && (
+                <p className="mt-1 rounded-lg bg-zinc-50 px-3 py-2 text-[11.5px] leading-relaxed text-zinc-500">
+                    <span className="font-medium text-zinc-600">Licence: </span>{detail.licenseTerms}
+                </p>
+            )}
+        </div>
     );
 }

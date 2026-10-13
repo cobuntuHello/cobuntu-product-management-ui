@@ -40,11 +40,12 @@ const ROSTER = {
         ],
     },
 };
-/* The tab loads both lists on mount. Empty keeps the fixtures about the act,
-   not about what is already there. */
+/* The tab loads all three lists on mount. Empty keeps the fixtures about the
+   act, not about what is already there. */
 const LISTS = [
     { method: "GET", url: /\/access-grants$/, body: [] },
     { method: "GET", url: /\/invitations$/, body: [] },
+    { method: "GET", url: /\/customers$/, body: [] },
 ];
 
 function renderView(routes: any[] = [], product: any = PRODUCT) {
@@ -70,6 +71,179 @@ function posted(fetchMock: ReturnType<typeof vi.fn>, match: RegExp) {
 }
 
 beforeEach(() => vi.clearAllMocks());
+
+/**
+ * The third way somebody ends up with a product: they bought it, through
+ * checkout, themselves — free or paid. Neither a grant nor an invitation.
+ *
+ * This is the bug fix: a FREE acquisition used to appear nowhere on this tab
+ * (it is not a grant — nobody gave it away — and not an invitation — nobody
+ * is still waiting to pay). It showed up only as a stray €0.00 line on the
+ * separate Ledger tab. These tests pin that it now renders here, labelled
+ * plainly, alongside a paid customer so the two read as the same kind of row.
+ */
+describe("customers", () => {
+    function renderWithCustomers(customers: unknown[], product: any = PRODUCT, extraRoutes: any[] = []) {
+        const fetchMock = mockFetch([
+            { method: "GET", url: /\/access-grants$/, body: [] },
+            { method: "GET", url: /\/invitations$/, body: [] },
+            { method: "GET", url: /\/customers$/, body: customers },
+            ROSTER,
+            ...extraRoutes,
+        ]);
+        renderWithConfig(
+            <BuyersView
+                product={product}
+                onUpdate={vi.fn()}
+                showToast={vi.fn()}
+                communityTag="c"
+                currentUserId="u-own"
+            />,
+        );
+        return fetchMock;
+    }
+
+    it("shows a FREE acquisition — the reported bug", async () => {
+        renderWithCustomers([
+            { id: "s1", grossAmount: 0, currency: "EUR", createdAt: "2026-01-01T00:00:00Z", guestEmail: null,
+              user: { id: "u-ana", name: "Ana Neto", usertag: "ana-neto", profileImage: null } },
+        ]);
+
+        expect(await screen.findByText("Ana Neto")).toBeInTheDocument();
+        expect(await screen.findByText("Free")).toBeInTheDocument();
+    });
+
+    it("shows a PAID acquisition with the amount — this tab had neither before", async () => {
+        renderWithCustomers([
+            { id: "s2", grossAmount: 2400, currency: "EUR", createdAt: "2026-01-01T00:00:00Z", guestEmail: null,
+              user: { id: "u-bo", name: "Bo Silva", usertag: "bo-silva", profileImage: null } },
+        ]);
+
+        expect(await screen.findByText("Bo Silva")).toBeInTheDocument();
+        // 2400 cents. Loose on the currency symbol, same as the EmailPreview
+        // price assertion below — only the amount is this test's business.
+        expect(await screen.findByText(/24\.00/)).toBeInTheDocument();
+    });
+
+    it("shows a guest buyer by email when there is no account", async () => {
+        renderWithCustomers([
+            { id: "s3", grossAmount: 0, currency: "EUR", createdAt: "2026-01-01T00:00:00Z",
+              guestEmail: "guest@example.com", user: null },
+        ]);
+
+        expect(await screen.findByText("guest@example.com")).toBeInTheDocument();
+        expect(await screen.findByText("Free")).toBeInTheDocument();
+    });
+
+    it("says so when nobody has bought it yet", async () => {
+        renderWithCustomers([]);
+        expect(await screen.findByText("Nobody has bought this yet")).toBeInTheDocument();
+    });
+
+    it("does not re-offer somebody who already bought it", async () => {
+        // Already a customer — give-access and invite-to-buy are both moot.
+        const user = userEvent.setup();
+        renderWithCustomers([
+            { id: "s1", grossAmount: 0, currency: "EUR", createdAt: "2026-01-01T00:00:00Z", guestEmail: null,
+              user: { id: "u-ana", name: "Ana Neto", usertag: "ana-neto", profileImage: null } },
+        ]);
+
+        await user.click(await screen.findByText("Give access"));
+        await screen.findByText("Bo Silva");
+        // "Ana Neto" still appears once, in the Customers list behind the
+        // modal — but not a SECOND time in the picker roster.
+        expect(screen.getAllByText("Ana Neto")).toHaveLength(1);
+    });
+
+    /**
+     * How many downloads from how many possible, and the licence if the tier
+     * carries one — fetched only once a row is expanded, and only then.
+     */
+    describe("expanding for download/licence detail", () => {
+        const ONE = [
+            { id: "s1", grossAmount: 0, currency: "EUR", createdAt: "2026-01-01T00:00:00Z", guestEmail: null,
+              user: { id: "u-ana", name: "Ana Neto", usertag: "ana-neto", profileImage: null } },
+        ];
+
+        it("shows usage against the cap", async () => {
+            const user = userEvent.setup();
+            renderWithCustomers(ONE, PRODUCT, [
+                { method: "GET", url: /\/customers\/s1$/,
+                  body: { licenseTerms: null, downloads: [{ name: "Guide.pdf", used: 2, max: 5 }], linkOpens: [] } },
+            ]);
+
+            await user.click(await screen.findByText("Ana Neto"));
+
+            expect(await screen.findByText("Guide.pdf")).toBeInTheDocument();
+            expect(await screen.findByText("2 of 5 downloads")).toBeInTheDocument();
+        });
+
+        it("reads no cap as unlimited, not as zero", async () => {
+            const user = userEvent.setup();
+            renderWithCustomers(ONE, PRODUCT, [
+                { method: "GET", url: /\/customers\/s1$/,
+                  body: { licenseTerms: null, downloads: [{ name: "Guide.pdf", used: 4, max: null }], linkOpens: [] } },
+            ]);
+
+            await user.click(await screen.findByText("Ana Neto"));
+
+            expect(await screen.findByText("4 downloads")).toBeInTheDocument();
+            expect(screen.queryByText(/of null|of unlimited/)).not.toBeInTheDocument();
+        });
+
+        it("shows the licence text when the tier carries one", async () => {
+            const user = userEvent.setup();
+            renderWithCustomers(ONE, PRODUCT, [
+                { method: "GET", url: /\/customers\/s1$/,
+                  body: { licenseTerms: "Personal use only.", downloads: [], linkOpens: [] } },
+            ]);
+
+            await user.click(await screen.findByText("Ana Neto"));
+
+            expect(await screen.findByText(/Personal use only\./)).toBeInTheDocument();
+        });
+
+        it("says so when there is nothing downloadable on the sale", async () => {
+            const user = userEvent.setup();
+            renderWithCustomers(ONE, PRODUCT, [
+                { method: "GET", url: /\/customers\/s1$/, body: { licenseTerms: null, downloads: [], linkOpens: [] } },
+            ]);
+
+            await user.click(await screen.findByText("Ana Neto"));
+
+            expect(await screen.findByText("No downloadable content on this sale.")).toBeInTheDocument();
+        });
+
+        it("fetches once and collapses on a second click, without re-fetching", async () => {
+            const user = userEvent.setup();
+            const fetchMock = renderWithCustomers(ONE, PRODUCT, [
+                { method: "GET", url: /\/customers\/s1$/,
+                  body: { licenseTerms: null, downloads: [{ name: "Guide.pdf", used: 1, max: 5 }], linkOpens: [] } },
+            ]);
+
+            await user.click(await screen.findByText("Ana Neto"));
+            await screen.findByText("Guide.pdf");
+            await user.click(screen.getByText("Ana Neto"));
+            expect(screen.queryByText("Guide.pdf")).not.toBeInTheDocument();
+            await user.click(screen.getByText("Ana Neto"));
+            await screen.findByText("Guide.pdf");
+
+            const detailCalls = fetchMock.mock.calls.filter(([url]: any) => /\/customers\/s1$/.test(String(url)));
+            expect(detailCalls).toHaveLength(1);
+        });
+
+        it("says so when the detail fails to load", async () => {
+            const user = userEvent.setup();
+            renderWithCustomers(ONE, PRODUCT, [
+                { method: "GET", url: /\/customers\/s1$/, status: 500, body: { error: "nope" } },
+            ]);
+
+            await user.click(await screen.findByText("Ana Neto"));
+
+            expect(await screen.findByText("Could not load this customer's download detail.")).toBeInTheDocument();
+        });
+    });
+});
 
 describe("giving access", () => {
     it("posts user ids, because a grant is written against an account", async () => {
