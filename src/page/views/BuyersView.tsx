@@ -59,6 +59,23 @@ interface Invitation {
     users?: { id: string; name?: string | null; usertag?: string | null; profileImage?: string | null } | null;
 }
 
+/**
+ * Someone who actually ACQUIRED this product themselves — free or paid.
+ *
+ * Neither a grant (the seller gave it away) nor an invitation (asked to pay,
+ * still pending): this is a real checkout, which is why it needs its own
+ * section. A free one is the bug this closes — it used to appear nowhere but
+ * a €0.00 line on the Ledger tab.
+ */
+interface Customer {
+    id: string;
+    grossAmount: number;
+    currency: string;
+    createdAt: string;
+    guestEmail: string | null;
+    user: { id: string; name?: string | null; usertag?: string | null; profileImage?: string | null } | null;
+}
+
 export function BuyersView({
     product,
     onUpdate,
@@ -80,6 +97,7 @@ export function BuyersView({
 
     const [grants, setGrants] = React.useState<Grant[] | null>(null);
     const [invites, setInvites] = React.useState<Invitation[] | null>(null);
+    const [customers, setCustomers] = React.useState<Customer[] | null>(null);
     const [mode, setMode] = React.useState<null | "grant" | "invite">(null);
     const [confirmRevoke, setConfirmRevoke] = React.useState<Grant | null>(null);
     const [busy, setBusy] = React.useState(false);
@@ -95,14 +113,17 @@ export function BuyersView({
 
     const load = React.useCallback(async () => {
         const headers = authHeaders();
-        const [g, i] = await Promise.all([
+        const [g, i, c] = await Promise.all([
             fetch(`${apiBaseUrl}/api/products/${product.id}/access-grants`, { headers })
                 .then((r) => (r.ok ? r.json() : [])).catch(() => []),
             fetch(`${apiBaseUrl}/api/products/${product.id}/invitations`, { headers })
                 .then((r) => (r.ok ? r.json() : [])).catch(() => []),
+            fetch(`${apiBaseUrl}/api/products/${product.id}/customers`, { headers })
+                .then((r) => (r.ok ? r.json() : [])).catch(() => []),
         ]);
         setGrants(Array.isArray(g) ? g : []);
         setInvites(Array.isArray(i) ? i : []);
+        setCustomers(Array.isArray(c) ? c : []);
     }, [apiBaseUrl, authHeaders, product.id]);
 
     React.useEffect(() => { load(); }, [load]);
@@ -111,8 +132,9 @@ export function BuyersView({
     const excludeUserIds = React.useMemo(() => [
         ...(grants ?? []).map((g) => g.userId),
         ...(invites ?? []).map((i) => i.users?.id).filter((x): x is string => !!x),
+        ...(customers ?? []).map((c) => c.user?.id).filter((x): x is string => !!x),
         ...(product?.ownerId ? [product.ownerId] : []),
-    ], [grants, invites, product?.ownerId]);
+    ], [grants, invites, customers, product?.ownerId]);
 
     /*
      * Which variant is being given away.
@@ -267,6 +289,40 @@ export function BuyersView({
                 )}
             </div>
 
+            <Section title="Customers" subtitle="Bought it themselves — free or paid.">
+                {customers === null ? (
+                    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
+                ) : customers.length === 0 ? (
+                    <EmptyState
+                        icon={<PeopleIcon />}
+                        title="Nobody has bought this yet"
+                        body="Once somebody checks out — free or paid — they show up here."
+                    />
+                ) : (
+                    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
+                    <ul className="divide-y divide-zinc-100">
+                        {customers.map((c) => (
+                            <li key={c.id} className="flex items-center gap-3 px-5 py-3">
+                                <UserAvatar user={c.user ?? { id: c.guestEmail ?? c.id }} className="w-8 h-8 shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[13px] text-zinc-900 truncate">{c.user?.name || c.guestEmail || "Unknown"}</p>
+                                    {c.user?.usertag ? (
+                                        <p className="text-[11px] text-zinc-400 truncate">@{c.user.usertag}</p>
+                                    ) : c.user?.name && c.guestEmail ? (
+                                        <p className="text-[11px] text-zinc-400 truncate">{c.guestEmail}</p>
+                                    ) : null}
+                                </div>
+                                <span className="text-[12px] font-medium text-zinc-500 shrink-0">
+                                    {formatCustomerAmount(c.grossAmount, c.currency)}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                    </div>
+                )}
+            </Section>
+
+            <div className="mt-5">
             <Section title="Has access" subtitle="Given the product for free. Not a sale.">
                 {grants === null ? (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
@@ -302,6 +358,7 @@ export function BuyersView({
                     </div>
                 )}
             </Section>
+            </div>
 
             <div className="mt-5">
                 <Section title="Invited" subtitle="Asked to buy it. They still pay.">
@@ -506,6 +563,21 @@ function Section({ title, subtitle, children }: { title: string; subtitle: strin
             {children}
         </div>
     );
+}
+
+/**
+ * The customer row's amount — "Free" for a genuine $0 acquisition (the bug
+ * this section exists to fix), the real price otherwise. Cents, like
+ * everywhere else on the platform.
+ */
+function formatCustomerAmount(grossAmount: number, currency: string): string {
+    if (!grossAmount) return "Free";
+    try {
+        return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 2 })
+            .format(grossAmount / 100);
+    } catch {
+        return `${(grossAmount / 100).toFixed(2)} ${currency}`;
+    }
 }
 
 /**
