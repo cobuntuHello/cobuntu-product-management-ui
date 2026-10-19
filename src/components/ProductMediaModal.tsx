@@ -4,6 +4,7 @@ import * as React from "react";
 import { ModalShell } from "../page/helpers";
 import { SortableMediaGallery, type MediaItem } from "../ui/sortable-media-gallery";
 import { useProductManagementConfig } from "../config";
+import { uploadNewGalleryItems } from "../lib/productMediaUpload";
 
 /**
  * Manage a product's images in one place: reorder, add, remove.
@@ -19,10 +20,20 @@ import { useProductManagementConfig } from "../config";
  * rather than having a separate "make this the banner" action. One concept,
  * one gesture.
  *
- * Saves through the SAME multipart contract the edit drawer uses
- * (`mediaReordered`, `mediaToDelete`, `media` files) because that is what the
- * backend implements; sending only the media fields leaves every other field
+ * Saves through the SAME contract the edit drawer uses (`mediaReordered`,
+ * `mediaToDelete`, `mediaFocal`) because that is what `/comprehensive`
+ * implements; sending only the media fields leaves every other field
  * untouched, since the update only writes what it receives.
+ *
+ * NEW files no longer ride along as raw multipart bytes on that same PUT —
+ * `/comprehensive` sits behind Cloud Run's hard, non-configurable 32 MiB
+ * request-body ceiling, which silently 413s once a seller has more than one
+ * or two ordinary phone photos (or any short video clip) staged in the same
+ * save. Reproduced live and fixed with the same move courses already made for
+ * lesson video: the browser uploads each new file straight to Cloud Storage
+ * (uploadNewGalleryItems, ../lib/productMediaUpload.ts) and only a path round-
+ * trips through our API, so `/comprehensive` only ever carries ids.
+ * docs/features/product-media-direct-upload.md (cobuntu-backend-monorepo)
  */
 export function ProductMediaModal({
   product,
@@ -62,26 +73,32 @@ export function ProductMediaModal({
   async function save() {
     setSaving(true);
     try {
+      /*
+       * Every NEW photo/clip goes straight to Cloud Storage first (bypassing
+       * the comprehensive PUT's 32 MiB body ceiling entirely — see
+       * lib/resumable-upload.ts). What comes back carries real server ids in
+       * place of the new items, so the save below only ever tells the backend
+       * about media it already knows exists.
+       */
+      const resolved = await uploadNewGalleryItems(apiBaseUrl, authHeaders, product.id, items);
+
       const formData = new FormData();
 
-      const keptIds = items.filter((m) => m.isExisting).map((m) => m.id);
+      const keptIds = resolved.filter((m) => m.isExisting).map((m) => m.id);
       const originalIds = (product?.media || []).map((m: any) => m.id);
       const toDelete = originalIds.filter((id: string) => !keptIds.includes(id));
 
       if (toDelete.length > 0) formData.append("mediaToDelete", JSON.stringify(toDelete));
       formData.append("mediaReordered", JSON.stringify(keptIds));
       /*
-       * Only the images that HAVE a point, and only the ones the server knows
-       * about. A new upload has no id yet, and sending a centre for everything
-       * would overwrite points set elsewhere with a value nobody chose.
+       * Only the images that HAVE a point. A newly-uploaded item now carries
+       * its real id too (set above), so its focal point is no longer silently
+       * dropped the way it would have been when only existing items had ids.
        */
-      const focal = items
-        .filter((m) => m.isExisting && m.id && m.focal)
+      const focal = resolved
+        .filter((m) => m.id && m.focal)
         .map((m) => ({ id: m.id, x: m.focal!.x, y: m.focal!.y }));
       if (focal.length > 0) formData.append("mediaFocal", JSON.stringify(focal));
-      for (const item of items) {
-        if (item.file && !item.isExisting) formData.append("media", item.file);
-      }
 
       const res = await fetch(`${apiBaseUrl}/api/users/me/products/${product.id}/comprehensive`, {
         method: "PUT",
