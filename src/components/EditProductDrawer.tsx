@@ -7,6 +7,7 @@ import { type CategoryOption } from "./CategoryPickerRow";
 import { ProductForm, type ProductFormData } from "./ProductForm";
 import type { MediaItem } from "../ui/sortable-media-gallery";
 import type { UploadedFile } from "../ui/file-upload-zone";
+import { uploadNewGalleryItems } from "../lib/productMediaUpload";
 
 interface Props {
   /**
@@ -215,15 +216,20 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       formData.append("categoryId", data.categoryId ?? "");
       formData.append("subCategoryId", data.subCategoryId ?? "");
 
-      const existingMediaIds = data.mediaItems.filter(m => m.isExisting).map(m => m.id);
+      /*
+       * Every NEW photo/clip goes straight to Cloud Storage first, the same
+       * fix ProductMediaModal uses and for the same reason: `/comprehensive`
+       * sits behind Cloud Run's hard 32 MiB request-body ceiling, which
+       * silently 413s this PUT once a seller has staged more than a photo or
+       * two (or any short clip) here. See ../lib/productMediaUpload.ts.
+       */
+      const resolvedMedia = await uploadNewGalleryItems(apiBaseUrl, authHeaders, product.id, data.mediaItems);
+
+      const existingMediaIds = resolvedMedia.filter(m => m.isExisting).map(m => m.id);
       const originalMediaIds = (product.media || []).map((m: any) => m.id);
       const mediaToDelete = originalMediaIds.filter((id: string) => !existingMediaIds.includes(id));
       if (mediaToDelete.length > 0) formData.append("mediaToDelete", JSON.stringify(mediaToDelete));
       formData.append("mediaReordered", JSON.stringify(existingMediaIds));
-
-      for (const item of data.mediaItems) {
-        if (item.file && !item.isExisting) formData.append("media", item.file);
-      }
 
       /*
        * DELETE ONLY WHAT THE USER ACTUALLY REMOVED.
