@@ -4,8 +4,6 @@ import userEvent from "@testing-library/user-event";
 import { renderWithConfig } from "./test-utils";
 import { ProductForm } from "../components/ProductForm";
 
-vi.mock("react-quill-new", () => ({ default: () => null }));
-
 /**
  * Deliverables belong to a VARIANT (T-163).
  *

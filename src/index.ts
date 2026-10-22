@@ -113,7 +113,7 @@ export {
   DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription,
 } from "./ui/dialog";
 export { EventTags } from "./ui/event-tags";
-export { RichTextEditor } from "./ui/rich-text-editor";
+export { MarkdownEditor, type MarkdownEditorProps } from "./ui/markdown-editor";
 export { FileUploadZone, type UploadedFile } from "./ui/file-upload-zone";
 export { StockPhotoPicker } from "./ui/stock-photo-picker";
 export { BannerCropModal, type BannerCropResult } from "./ui/banner-crop-modal";

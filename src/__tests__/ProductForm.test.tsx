@@ -4,11 +4,6 @@ import userEvent from "@testing-library/user-event";
 import { ProductForm, type ProductFormData } from "../components/ProductForm";
 import { renderWithConfig } from "./test-utils";
 
-// react-quill-new touches `document` on import and isn't worth rendering for a
-// smoke test of the form itself — the description editor lives in a Dialog
-// that we never open here.
-vi.mock("react-quill-new", () => ({ default: () => null }));
-
 const baseProps = (overrides: Record<string, unknown> = {}) => ({
   communityTag: "orbis",
   initialData: {

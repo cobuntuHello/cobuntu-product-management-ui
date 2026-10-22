@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ModalShell } from "../page/helpers";
-import { RichTextEditor } from "../ui/rich-text-editor";
+import { MarkdownEditor } from "../ui/markdown-editor";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
 
 /**
@@ -62,8 +62,8 @@ export function ProductDescriptionEditModal({
     <ModalShell onClose={onClose} width="w-full sm:w-[640px]">
       <h3 className="text-[15px] font-semibold text-zinc-900 mb-4">Edit description</h3>
       <div className="mb-4 max-h-[60vh] overflow-y-auto">
-        <RichTextEditor
-          content={content}
+        <MarkdownEditor
+          value={content}
           onChange={setContent}
           placeholder="Describe your product..."
         />

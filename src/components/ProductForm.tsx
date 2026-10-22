@@ -8,10 +8,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "../ui/dialog";
 import { EventTags } from "../ui/event-tags";
-import { htmlToPlainText } from "../lib/htmlToPlainText";
+import { descriptionToPlainText } from "../lib/htmlToPlainText";
 import { LISTING_NAME_MAX, NAME_COUNTER_FROM, listingNameTooLong } from "../lib/listingNameLimit";
 import { dataUrlToFile } from "../lib/dataUrlToFile";
-import { RichTextEditor } from "../ui/rich-text-editor";
+import { MarkdownEditor } from "../ui/markdown-editor";
 import { type MediaItem } from "../ui/sortable-media-gallery";
 import { BannerCropModal, type BannerCropResult } from "../ui/banner-crop-modal";
 import { type UploadedFile } from "../ui/file-upload-zone";
@@ -389,7 +389,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   // text editor emits &nbsp; for runs of spaces, and stripping tags alone left
   // those entities rendering literally as "Test&nbsp;product" in the row under
   // the field the seller had just filled in (reported 2026-08-08).
-  const descriptionPreview = htmlToPlainText(description);
+  const descriptionPreview = descriptionToPlainText(description);
   const [tags, setTags] = useState<Tag[]>(initialData?.tags || []);
   const [mediaItems, setMediaItems] = useState<MediaItem[]>(initialData?.mediaItems || []);
   // Deliverables (files / external links / licence) now live INSIDE each
@@ -1135,7 +1135,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             <DialogDescription>{L.descriptionHint}</DialogDescription>
           </DialogHeader>
           <div className="flex-1 min-h-0 overflow-y-auto">
-            <RichTextEditor content={description} onChange={setDescription} placeholder={L.descriptionPlaceholder} />
+            <MarkdownEditor value={description} onChange={setDescription} placeholder={L.descriptionPlaceholder} />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDescriptionOpen(false)}>Cancel</Button>
