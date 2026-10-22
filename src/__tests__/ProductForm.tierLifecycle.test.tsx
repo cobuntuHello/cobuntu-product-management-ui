@@ -4,8 +4,6 @@ import userEvent from "@testing-library/user-event";
 import { ProductForm } from "../components/ProductForm";
 import { renderWithConfig } from "./test-utils";
 
-vi.mock("react-quill-new", () => ({ default: () => null }));
-
 /**
  * Adding a pricing tier — the create/cancel lifecycle.
  *

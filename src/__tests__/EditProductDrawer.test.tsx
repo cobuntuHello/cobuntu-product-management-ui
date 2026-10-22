@@ -4,8 +4,6 @@ import userEvent from "@testing-library/user-event";
 import { EditProductDrawer } from "../components/EditProductDrawer";
 import { renderWithConfig, mockFetch } from "./test-utils";
 
-vi.mock("react-quill-new", () => ({ default: () => null }));
-
 const product = {
   id: "p-1",
   name: "Cool product",

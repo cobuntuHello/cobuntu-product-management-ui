@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { RichTextEditor } from "../../ui/rich-text-editor";
+import { MarkdownEditor } from "../../ui/markdown-editor";
 import { useProductManagementConfig, useJsonHeaders } from "../../config";
 import { useCanEdit } from "../../lib/manageAccess";
 
@@ -94,7 +94,7 @@ export function DescriptionSection({ product, productId, onSaved, showToast }: P
     }
 
     return (
-        <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 p-5">
+        <div>
             <div className="flex items-center justify-between gap-4 mb-3">
                 <div className="min-w-0">
                     <h2 className="text-[15px] font-semibold text-zinc-900">Description</h2>
@@ -116,20 +116,15 @@ export function DescriptionSection({ product, productId, onSaved, showToast }: P
 
             {/*
               * Read-only is expressed by making the editor inert, not by
-              * re-rendering the stored HTML ourselves.
-              *
-              * Injecting it with dangerouslySetInnerHTML would mean parsing
-              * someone's stored markup on a page it was never rendered on
-              * before, for no gain — the editor already displays exactly this
-              * content through its own pipeline. `inert` blocks interaction and
-              * takes it out of the tab order in one attribute.
+              * re-rendering the stored markdown ourselves. `inert` blocks
+              * interaction and takes it out of the tab order in one attribute.
               */}
             <div
                 {...(canEdit ? {} : { inert: "" as any, "aria-readonly": true })}
                 style={canEdit ? undefined : { opacity: 0.75 }}
             >
-                <RichTextEditor
-                    content={content}
+                <MarkdownEditor
+                    value={content}
                     onChange={setContent}
                     placeholder={canEdit ? "Describe your product..." : ""}
                 />

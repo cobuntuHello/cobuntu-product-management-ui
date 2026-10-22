@@ -3,8 +3,6 @@ import { ProductForm } from "../components/ProductForm";
 import { renderWithConfig } from "./test-utils";
 import { blankTier } from "../components/PriceEditModal/helpers";
 
-vi.mock("react-quill-new", () => ({ default: () => null }));
-
 /**
  * A free tier's configuration has to survive submit.
  *

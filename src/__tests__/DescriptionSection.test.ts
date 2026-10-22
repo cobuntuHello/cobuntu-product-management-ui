@@ -25,7 +25,7 @@ describe("the description has its own section", () => {
     });
 
     it("edits inline rather than opening a modal", () => {
-        expect(section).toContain("<RichTextEditor");
+        expect(section).toContain("<MarkdownEditor");
         expect(details).not.toContain('modal === "description"');
     });
 
@@ -73,9 +73,9 @@ describe("permissions and read-only", () => {
         expect(section).toContain("{canEdit && (");
     });
 
-    it("does not re-render stored HTML itself", () => {
-        // The USAGE, not the word — the comment above it explains why we do
-        // not do this.
+    it("does not render anything unsafely itself", () => {
+        // The USAGE, not the word — the editor component owns its own
+        // read-only live-preview overlay internally.
         expect(section).not.toMatch(/dangerouslySetInnerHTML=\{/);
         expect(section).toContain("inert");
     });

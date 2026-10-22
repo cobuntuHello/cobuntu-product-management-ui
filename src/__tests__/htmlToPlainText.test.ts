@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { htmlToPlainText } from "../lib/htmlToPlainText";
+import { htmlToPlainText, descriptionToPlainText } from "../lib/htmlToPlainText";
 
 describe("htmlToPlainText", () => {
   it("decodes &nbsp; to spaces (the reported bug)", () => {
@@ -49,5 +49,29 @@ describe("ProductForm description preview (reported 2026-08-08)", () => {
     expect(preview).toBe("Test product Test product");
     expect(preview).not.toContain("&nbsp;");
     expect(preview).not.toContain("&");
+  });
+});
+
+describe("descriptionToPlainText (handles both stored formats during the migration window)", () => {
+  it("strips markdown inline syntax", () => {
+    expect(descriptionToPlainText("This is **bold** and *italic* and ~~gone~~ and `code`.")).toBe(
+      "This is bold and italic and gone and code.",
+    );
+  });
+
+  it("strips markdown block markers", () => {
+    expect(descriptionToPlainText("# Heading\n- item one\n- item two\n> a quote")).toBe(
+      "Heading item one item two a quote",
+    );
+  });
+
+  it("still strips legacy HTML and decodes entities", () => {
+    expect(descriptionToPlainText("<p>Two&nbsp;communities.</p>")).toBe("Two communities.");
+  });
+
+  it("handles empty / null / undefined", () => {
+    expect(descriptionToPlainText("")).toBe("");
+    expect(descriptionToPlainText(null)).toBe("");
+    expect(descriptionToPlainText(undefined)).toBe("");
   });
 });
