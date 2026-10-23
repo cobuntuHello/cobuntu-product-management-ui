@@ -21,7 +21,6 @@ import { ProductManagementConfigProvider } from "../config";
 import { type DraftTier, type DonationDraft } from "./PriceEditModal/types";
 import { blankTier, blankDonation } from "./PriceEditModal/helpers";
 import { DonationsField } from "./PriceEditModal/DonationsField";
-import { RefundPolicyField, type RefundPolicyValue } from "./RefundPolicyField";
 import { CategoryPickerRow, type CategoryOption } from "./CategoryPickerRow";
 import {
   type ProductConditionValue, type ParcelClassValue,
@@ -39,6 +38,8 @@ import {
   PolicyIcon,
   AudienceMeter,
   tierAccessLevel,
+  RefundPolicyField,
+  type RefundPolicyValue,
 } from "@cobuntu/management-ui-shared";
 import {
   FileText, Tag as TagIcon,
@@ -1003,7 +1004,21 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                   <ClipboardCheck className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
                   <div className="min-w-0">
                     <span className="text-sm font-medium text-zinc-800">Require approval</span>
-                    <p className="text-[11px] text-zinc-400 mt-0.5">Buyers apply and you approve before they get access. Their payment is held until you decide.</p>
+                    {/*
+                      * What is true RIGHT NOW, not what the feature is.
+                      *
+                      * This described the switch in both positions, which the
+                      * switch's own label already does -- so reading it told
+                      * you nothing about which way it was set. The held
+                      * payment is the part worth keeping, and it only applies
+                      * when approval is ON, so it is said there and nowhere
+                      * else.
+                      */}
+                    <p className="text-[11px] text-zinc-400 mt-0.5">
+                      {requiresApproval
+                        ? "Buyers apply and you approve. Their payment is held until you decide."
+                        : "Anyone can buy straight away"}
+                    </p>
                   </div>
                 </div>
                 <Switch checked={requiresApproval} onCheckedChange={setRequiresApproval} onClick={e => e.stopPropagation()} />
@@ -1029,12 +1044,26 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                   <Repeat className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
                   <div className="min-w-0">
                     <span className="text-sm font-medium text-zinc-800">Can be bought more than once</span>
-                    {/* Capped rather than left to fill the row: `justify-between`
-                        runs this paragraph right up to the Switch, so the last
-                        line of each wrap sits a few pixels from the toggle and
-                        the row reads as one cramped block. A measure cap wraps
-                        it earlier and leaves the gutter the gap alone could not. */}
-                    <p className="text-[11px] text-zinc-400 mt-0.5 max-w-[62ch]">On for anything delivered per purchase, like a session or a consultation. Off for a download or a course, where a second purchase gives the buyer nothing new and their page points at what they already own instead.</p>
+                    {/*
+                      * The longest line on the step, replaced by the outcome.
+                      *
+                      * It ran to two wrapped lines and spent them teaching the
+                      * setting from both sides at once -- "On for anything
+                      * delivered per purchase ... Off for a download or a
+                      * course ...". A reader who has already set the switch is
+                      * being told about the position they did not pick, and
+                      * the cap that stopped it crowding the toggle was there
+                      * because the text was too long for the row at all.
+                      *
+                      * Each position now says what happens in it, which is
+                      * also short enough that the measure cap is no longer
+                      * doing anything.
+                      */}
+                    <p className="text-[11px] text-zinc-400 mt-0.5">
+                      {repeatShown
+                        ? "Buyers can buy it again, like a session or a consultation."
+                        : "Owners are sent to what they already bought."}
+                    </p>
                   </div>
                 </div>
                 <Switch checked={repeatShown} onCheckedChange={setAllowRepeatPurchase} onClick={e => e.stopPropagation()} />

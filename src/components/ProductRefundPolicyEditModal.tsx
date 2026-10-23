@@ -1,7 +1,7 @@
 import * as React from "react";
 import { ModalShell } from "../page/helpers";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
-import { RefundPolicyField, type RefundPolicyValue } from "./RefundPolicyField";
+import { RefundPolicyField, type RefundPolicyValue } from "@cobuntu/management-ui-shared";
 
 /**
  * Seller-facing editor for a product's refund policy, on the manage page. Shares
