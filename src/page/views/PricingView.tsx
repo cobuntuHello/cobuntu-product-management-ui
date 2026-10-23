@@ -3,7 +3,15 @@
 import { useState } from "react";
 import { ChevronRight, Layers } from "lucide-react";
 import { PriceEditModal } from "../../components/PriceEditModal";
-import { getSymbol, toDisplay } from "../../components/PriceEditModal/helpers";
+import {
+  getSymbol,
+  toDisplay,
+  loadDonationFromProduct,
+  buildDonationBody,
+} from "../../components/PriceEditModal/helpers";
+import { DonationsSection } from "../../components/PriceEditModal/DonationsSection";
+import type { DonationDraft } from "../../components/PriceEditModal/types";
+import { useProductManagementConfig, useJsonHeaders } from "../../config";
 import { useCanEdit } from "../../lib/manageAccess";
 
 /**
@@ -124,6 +132,61 @@ export function PricingView({
     setEditingTier(key);
   };
 
+  /*
+   * DONATIONS — the "whole listing" sidecar, as the wizard shows it.
+   *
+   * The wizard's pricing step is variants AND donations: DonationsField sits
+   * directly under the variant list. This tab shipped with the variant half
+   * only, which made it a near-copy of that step rather than the same one.
+   *
+   * On the manage page the editor already existed, but inside
+   * PriceEditModal's Level 1 list -- the surface these cards deliberately
+   * skip. So it stayed reachable (Details -> the small price control) and was
+   * missing from the tab that is now its natural home.
+   *
+   * Independent of variants, and saved independently through its own
+   * PUT /donations, which is what the modal does. `donationDirty` keeps an
+   * untouched visit from issuing a write -- and from sending a cleared config
+   * for a seller who only came to look.
+   */
+  const { apiBaseUrl } = useProductManagementConfig();
+  const jsonHeaders = useJsonHeaders();
+  const [donation, setDonation] = useState<DonationDraft>(() => loadDonationFromProduct(product));
+  const [donationDirty, setDonationDirty] = useState(false);
+  const [savingDonation, setSavingDonation] = useState(false);
+
+  const updateDonation = (patch: Partial<DonationDraft>) => {
+    if (!canEdit) return;
+    setDonationDirty(true);
+    setDonation((d) => ({ ...d, ...patch }));
+  };
+
+  const saveDonation = async () => {
+    if (!canEdit || !donationDirty || savingDonation) return;
+    setSavingDonation(true);
+    try {
+      const res = await fetch(
+        `${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/donations`,
+        {
+          method: "PUT",
+          headers: jsonHeaders(),
+          body: JSON.stringify(buildDonationBody(donation, tiers[0]?.products?.currency || "EUR")),
+        },
+      );
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || "Failed to save donation settings");
+      }
+      setDonationDirty(false);
+      showToast("Donations updated");
+      onUpdate();
+    } catch (e: any) {
+      showToast(e?.message || "Failed to save donation settings");
+    } finally {
+      setSavingDonation(false);
+    }
+  };
+
   const tiers: any[] = Array.isArray(product?.tiers) ? product.tiers : [];
   const productType: string = product?.productType || "DIGITAL";
   const isPhysical = productType === "PHYSICAL";
@@ -225,6 +288,41 @@ export function PricingView({
             </svg>
             Add variant
           </button>
+        )}
+      </div>
+
+      {/* "Whole listing" — the same separator the modal uses before this
+          sidecar, so a seller reads donations as listing-level rather than as
+          another variant. */}
+      <div className="flex items-center gap-2">
+        <div className="h-px flex-1 bg-zinc-100" />
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Whole listing</span>
+        <div className="h-px flex-1 bg-zinc-100" />
+      </div>
+
+      <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-4">
+        {/* DonationsSection is bare (the wizard renders it inside a modal via
+            DonationsField), so it is card-wrapped here -- the same thing the
+            modal does for its own inline list. */}
+        <DonationsSection
+          donation={donation}
+          onUpdate={updateDonation}
+          defaultCurrency={tiers[0]?.products?.currency || "EUR"}
+        />
+        {/* Its own Save: donations persist through their own endpoint, not
+            with the variants. Shown only once something changed, so a host who
+            came to look cannot write a cleared config. */}
+        {canEdit && donationDirty && (
+          <div className="flex justify-end pt-3">
+            <button
+              type="button"
+              onClick={saveDonation}
+              disabled={savingDonation}
+              className="px-4 py-2 text-[13px] font-medium rounded-lg bg-zinc-900 text-white cursor-pointer disabled:opacity-40"
+            >
+              {savingDonation ? "Saving..." : "Save donations"}
+            </button>
+          </div>
         )}
       </div>
 

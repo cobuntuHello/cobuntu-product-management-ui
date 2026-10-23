@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, fireEvent, render } from "@testing-library/react";
+import { screen, fireEvent } from "@testing-library/react";
+import { renderWithConfig } from "./test-utils";
 import { ManageAccessProvider } from "../lib/manageAccess";
 import { PricingView } from "../page/views/PricingView";
 
@@ -21,6 +22,17 @@ import { PricingView } from "../page/views/PricingView";
  *     else's product must not reprice it. The sibling guard only proves this
  *     file CALLS useCanEdit; it cannot prove the call changes anything.
  */
+
+vi.mock("../components/PriceEditModal/DonationsSection", () => ({
+  DonationsSection: ({ onUpdate, defaultCurrency }: any) => (
+    <div data-testid="donations">
+      <span data-testid="donations-currency">{defaultCurrency}</span>
+      <button type="button" onClick={() => onUpdate({ enabled: true })}>
+        toggle-donations
+      </button>
+    </div>
+  ),
+}));
 
 vi.mock("../components/PriceEditModal", () => ({
   PriceEditModal: (props: any) => (
@@ -64,7 +76,9 @@ function renderView(
 ) {
   const onUpdate = vi.fn();
   const showToast = vi.fn();
-  render(
+  // Wrapped in the config provider: PricingView reads apiBaseUrl and the JSON
+  // headers to persist donations, so a bare render throws.
+  renderWithConfig(
     <ManageAccessProvider canEdit={canEdit}>
       <PricingView
         product={product}
@@ -192,5 +206,55 @@ describe("PricingView", () => {
   it("tolerates a product with no variants", () => {
     renderView({ product: makeProduct({ tiers: undefined }) });
     expect(screen.getByText("Add variant")).toBeTruthy();
+  });
+});
+
+/**
+ * DONATIONS — the other half of the wizard's pricing step.
+ *
+ * Shipped missing at first: the tab had the variant list and not the donations
+ * sidecar. These pin the wiring, and above all that an untouched visit writes
+ * NOTHING -- a PUT carrying a cleared config from someone who only came to
+ * look is the expensive mistake here.
+ */
+describe("PricingView donations", () => {
+  it("renders the donations sidecar", () => {
+    renderView();
+    expect(screen.getByTestId("donations")).toBeTruthy();
+  });
+
+  it("seeds the currency from the first variant", () => {
+    renderView();
+    expect(screen.getByTestId("donations-currency").textContent).toBe("EUR");
+  });
+
+  it("offers no Save until something actually changed", () => {
+    renderView();
+    expect(screen.queryByText("Save donations")).toBeNull();
+  });
+
+  it("offers Save once a change is made", () => {
+    renderView();
+    fireEvent.click(screen.getByText("toggle-donations"));
+    expect(screen.getByText("Save donations")).toBeTruthy();
+  });
+
+  it("PUTs to the product donations endpoint on save", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+    vi.stubGlobal("fetch", fetchMock);
+    renderView();
+    fireEvent.click(screen.getByText("toggle-donations"));
+    fireEvent.click(screen.getByText("Save donations"));
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/products/p-1/donations");
+    expect(init.method).toBe("PUT");
+    vi.unstubAllGlobals();
+  });
+
+  it("a read-only viewer cannot change them, so no Save ever appears", () => {
+    renderView({ canEdit: false });
+    fireEvent.click(screen.getByText("toggle-donations"));
+    expect(screen.queryByText("Save donations")).toBeNull();
   });
 });
