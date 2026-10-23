@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ProductSectionsNav, type ProductViewKey } from "./ProductSectionsNav";
 import { DetailsView, type ProductModal } from "./views/DetailsView";
+import { PricingView } from "./views/PricingView";
 import { CollaboratorsView } from "./views/CollaboratorsView";
 import { BuyersView } from "./views/BuyersView";
 import { ListingsSection } from "./sections/ListingsSection";
@@ -135,7 +136,11 @@ export function visibleProductViews(opts: {
    * existing ?view=listings link keeps working rather than falling through.
    */
   const base: ProductViewKey[] = [
-    "overview", "details",
+    // "pricing" rides with "details": same audience, same permission, and a
+    // carrier's leader gets the read-only version of both. Listed HERE as well
+    // as in SECTIONS -- the nav renders the intersection, so a key in one and
+    // not the other is silently dropped.
+    "overview", "details", "pricing",
     // Listed HERE as well as in SECTIONS — the nav renders the intersection,
     // so a tab in one and not the other is silently dropped.
     ...(opts.hasSyllabus ? (["syllabus"] as ProductViewKey[]) : []),
@@ -411,6 +416,19 @@ export function ProductManagePage({
           onSaveApproval={onSaveApproval}
           approvalCopy={approvalCopy}
           extras={overviewExtras}
+        />
+      );
+      break;
+
+    case "pricing":
+      content = (
+        <PricingView
+          product={product}
+          productId={productId}
+          communityTag={communityTag}
+          onUpdate={onUpdate}
+          showToast={showToast}
+          showMemberPricing={showMemberPricing}
         />
       );
       break;

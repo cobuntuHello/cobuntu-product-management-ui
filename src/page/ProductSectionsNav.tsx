@@ -12,7 +12,7 @@ import * as React from "react";
  * of its own. This is view-state, like events, so tabs are cheap to add.
  */
 
-export type ProductViewKey = "overview" | "details" | "syllabus" | "collaborators" | "buyers" | "listings" | "ledger" | "activity";
+export type ProductViewKey = "overview" | "details" | "pricing" | "syllabus" | "collaborators" | "buyers" | "listings" | "ledger" | "activity";
 
 /**
  * The tab strip, IN ORDER.
@@ -34,6 +34,21 @@ const SECTIONS: Array<{ key: ProductViewKey; label: string }> = [
    * here rather than the first.
    */
   { key: "details", label: "Details" },
+  /*
+   * PRICING SITS IMMEDIATELY AFTER DETAILS.
+   *
+   * Variants used to be reachable only through a small control on the Details
+   * card, which opened the editor on its own compact list. What a product
+   * costs and how many can be sold is a first-class part of it, and the create
+   * wizard already gives it its own step -- so it gets its own tab here, with
+   * the same card-per-variant list the wizard shows.
+   *
+   * Adding it HERE is only half: this array decides ORDER, while the page's
+   * visibleViews() decides WHETHER a tab shows, and the nav renders the
+   * intersection. A key in one and not the other is silently dropped -- which
+   * is exactly how Details became unreachable in production once before.
+   */
+  { key: "pricing", label: "Pricing" },
   /*
    * SYLLABUS is a host-supplied tab, and it is the only one here that some
    * products do not have at all.
