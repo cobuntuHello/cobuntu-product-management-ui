@@ -36,6 +36,9 @@ import {
   tierAccessConsequence,
   type TierAccessValue,
   type MembershipTier,
+  PolicyIcon,
+  AudienceMeter,
+  tierAccessLevel,
 } from "@cobuntu/management-ui-shared";
 import {
   FileText, Tag as TagIcon,
@@ -1073,12 +1076,27 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                     included, unlike the card-level rule where a capability you
                     cannot have is not rendered at all. */}
                 <div className="px-5 py-4">
+                  {/* Same signals as the event form's policy rows: the glyph
+                      says what the control governs, a lock appears on it once
+                      the thing stops being public, and the meter says how much
+                      of the audience is included.
+
+                      The glyph no longer flips between Eye and EyeOff. That
+                      pair is binary, so it said "public or not" and nothing
+                      about how far from public -- and it left the row with no
+                      stable symbol of its own, which is what made this header
+                      and the "Who can buy it" one below it hard to tell apart
+                      at a glance. */}
                   <div className="flex items-center gap-3 mb-3 min-w-0">
-                    {viewResolved.visibility === "PUBLIC" ? <Eye className="h-[18px] w-[18px] text-zinc-400 shrink-0" /> : <EyeOff className="h-[18px] w-[18px] text-zinc-400 shrink-0" />}
-                    <div className="min-w-0">
+                    <PolicyIcon
+                      icon={<Eye className="h-[18px] w-[18px] text-zinc-400 shrink-0" />}
+                      level={tierAccessLevel(viewAccess)}
+                    />
+                    <div className="min-w-0 flex-1">
                       <span className="text-sm font-medium text-zinc-800">Who can see it</span>
                       <p className="text-[11px] text-zinc-400 mt-0.5">{tierAccessSummary(viewAccess, membershipTiers)}</p>
                     </div>
+                    <AudienceMeter level={tierAccessLevel(viewAccess)} />
                   </div>
                   <MembershipTierPicker
                     value={viewAccess}
@@ -1093,11 +1111,15 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                     feature exists for. */}
                 <div className="px-5 py-4">
                   <div className="flex items-center gap-3 mb-3 min-w-0">
-                    {buyResolved.visibility === "PUBLIC" ? <UserCheck className="h-[18px] w-[18px] text-zinc-400 shrink-0" /> : <Lock className="h-[18px] w-[18px] text-zinc-400 shrink-0" />}
-                    <div className="min-w-0">
+                    <PolicyIcon
+                      icon={<UserCheck className="h-[18px] w-[18px] text-zinc-400 shrink-0" />}
+                      level={tierAccessLevel(buyAccess)}
+                    />
+                    <div className="min-w-0 flex-1">
                       <span className="text-sm font-medium text-zinc-800">Who can buy it</span>
                       <p className="text-[11px] text-zinc-400 mt-0.5">{tierAccessSummary(buyAccess, membershipTiers)}</p>
                     </div>
+                    <AudienceMeter level={tierAccessLevel(buyAccess)} />
                   </div>
                   <MembershipTierPicker
                     value={buyAccess}
