@@ -21,8 +21,8 @@ import { SECTION_KEYS } from "../page/ProductSectionsNav";
  * with more per listing than that tab ever showed. The KEY still resolves so an
  * existing ?view=listings link keeps working; it is simply not a tab.
  */
-const SELLER_SET = ["overview", "details", "collaborators", "buyers", "activity"];
-const MODERATOR_SET = ["overview", "details", "collaborators", "buyers", "activity"];
+const SELLER_SET = ["overview", "details", "pricing", "collaborators", "buyers", "activity"];
+const MODERATOR_SET = ["overview", "details", "pricing", "collaborators", "buyers", "activity"];
 
 describe("visibleProductViews", () => {
   it("gives the owner every tab", () => {
@@ -116,7 +116,7 @@ describe("the syllabus tab", () => {
             product: owner, viewerUserId: "u1", hasSyllabus: true, hasLedger: true,
         });
         expect(views).toEqual([
-            "overview", "details", "syllabus", "ledger", "collaborators", "buyers", "activity",
+            "overview", "details", "pricing", "syllabus", "ledger", "collaborators", "buyers", "activity",
         ]);
     });
 
@@ -150,7 +150,7 @@ describe("the ledger tab", () => {
 
     it("appears after details when it does", () => {
         const views = visibleProductViews({ product: owner, viewerUserId: "u1", hasLedger: true });
-        expect(views).toEqual(["overview", "details", "ledger", "collaborators", "buyers", "activity"]);
+        expect(views).toEqual(["overview", "details", "pricing", "ledger", "collaborators", "buyers", "activity"]);
     });
 
     /*
@@ -169,8 +169,15 @@ describe("the ledger tab", () => {
          */
         const keys = SECTION_KEYS;
         expect(keys.indexOf("ledger")).toBeGreaterThan(keys.indexOf("details"));
+        /*
+         * Pricing joined the strip between Details and Ledger, so this slice
+         * is ["pricing", "syllabus"] now. The rule it defends is unchanged:
+         * the ledger sits after the editing surfaces, and the syllabus sits
+         * between them -- it is the exact membership that moved, not the
+         * ordering rule.
+         */
         expect(keys.slice(keys.indexOf("details") + 1, keys.indexOf("ledger")))
-            .toEqual(["syllabus"]);
+            .toEqual(["pricing", "syllabus"]);
     });
 
     /*
@@ -184,12 +191,12 @@ describe("the ledger tab", () => {
      */
     it("is offered to a moderator, alongside the other read-only tabs", () => {
         const views = visibleProductViews({ product: owner, forceModerator: true, hasLedger: true });
-        expect(views).toEqual(["overview", "details", "ledger", "collaborators", "buyers", "activity"]);
+        expect(views).toEqual(["overview", "details", "pricing", "ledger", "collaborators", "buyers", "activity"]);
     });
 
     it("is still absent for a moderator when no panel is passed", () => {
         expect(visibleProductViews({ product: owner, forceModerator: true }))
-            .toEqual(["overview", "details", "collaborators", "buyers", "activity"]);
+            .toEqual(["overview", "details", "pricing", "collaborators", "buyers", "activity"]);
     });
 });
 
@@ -224,5 +231,37 @@ describe("everyone who may look gets the same tabs", () => {
         const mod = visibleProductViews({ product: owner, forceModerator: true, hasLedger: true });
         const seller = visibleProductViews({ product: owner, viewerUserId: "u1", hasLedger: true });
         expect(mod).toEqual(seller);
+    });
+});
+
+/**
+ * The trap this file exists for, applied to Pricing.
+ *
+ * A key in the nav's SECTIONS but not in the allowed list renders nothing; a
+ * key in the allowed list but not SECTIONS is unreachable. Either way the tab
+ * silently does not exist -- which is how Details became unreachable in
+ * production once before.
+ */
+describe("the pricing tab", () => {
+    // Its own fixture: the sibling describes each declare a local `owner`, so
+    // reaching for theirs would depend on block scope that is not shared.
+    const owner = { ownerId: "u1", collaborators: [] };
+
+    it("is in the allowed set for the owner", () => {
+        expect(visibleProductViews({ product: owner, viewerUserId: "u1" })).toContain("pricing");
+    });
+
+    it("is in the nav's own list too, so the intersection keeps it", () => {
+        expect(SECTION_KEYS).toContain("pricing");
+    });
+
+    it("sits immediately after details, which is where it was asked for", () => {
+        expect(SECTION_KEYS.indexOf("pricing")).toBe(SECTION_KEYS.indexOf("details") + 1);
+    });
+
+    it("is offered to a carrying community's leader, read-only", () => {
+        // Visible, like Details: what a product costs is not a secret from the
+        // leader listing it. PricingView's own gate blocks the editors.
+        expect(visibleProductViews({ product: owner, forceModerator: true })).toContain("pricing");
     });
 });

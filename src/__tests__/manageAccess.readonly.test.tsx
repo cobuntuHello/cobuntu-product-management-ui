@@ -95,8 +95,22 @@ function stripComments(src: string): string {
 function writesToServer(src: string): boolean {
   return /method:\s*["'](POST|PATCH|PUT|DELETE)["']/.test(src);
 }
+/**
+ * Signals that a file opens an editing surface of its own.
+ *
+ * The named list is kept, and a generic `setEditing*` is matched too. The
+ * list-only version had a hole: PricingView arrived holding its open editor in
+ * `setEditingTier`, which is none of these names, so the guard would have
+ * called a view that opens the variant editor read-only and passed it.
+ * Enumerating setter names means every new view has to happen to pick one
+ * that is already on the list. The event package's twin was widened the same
+ * way for the same reason.
+ */
 function opensAnEditor(src: string): boolean {
-  return /set(Modal|ShowEditDrawer|SettingsOpen|AddOpen|ConfirmRemove)\b/.test(src);
+  return (
+    /set(Modal|ShowEditDrawer|SettingsOpen|AddOpen|ConfirmRemove)\b/.test(src)
+    || /\bsetEditing\w*\s*\(/.test(src)
+  );
 }
 
 describe("read-only coverage across the manage views", () => {
