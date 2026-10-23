@@ -199,7 +199,11 @@ export function PricingView({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+      {/* No card around these sections.
+          The variant cards are the objects on this page; wrapping them in
+          another bordered surface nested a card inside a card and made the
+          real ones read as list rows rather than as the things you open. */}
+      <div>
         <h2 className="text-[15px] font-semibold text-zinc-900">Variants</h2>
         <p className="text-[12px] text-zinc-500 mt-1 mb-4 max-w-[68ch] leading-relaxed">
           Each variant is a version buyers can purchase, with its own price, capacity and
@@ -291,19 +295,7 @@ export function PricingView({
         )}
       </div>
 
-      {/* "Whole listing" — the same separator the modal uses before this
-          sidecar, so a seller reads donations as listing-level rather than as
-          another variant. */}
-      <div className="flex items-center gap-2">
-        <div className="h-px flex-1 bg-zinc-100" />
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Whole listing</span>
-        <div className="h-px flex-1 bg-zinc-100" />
-      </div>
-
-      <div className="rounded-2xl border border-zinc-200 bg-white px-4 py-4">
-        {/* DonationsSection is bare (the wizard renders it inside a modal via
-            DonationsField), so it is card-wrapped here -- the same thing the
-            modal does for its own inline list. */}
+      <div>
         <DonationsSection
           donation={donation}
           onUpdate={updateDonation}

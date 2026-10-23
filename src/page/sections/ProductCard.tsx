@@ -11,7 +11,6 @@ interface Props {
   communityTag: string;
   listingId: string | null;
   onEditName: () => void;
-  onEditPrice: () => void;
   /** Opens the media manager — banner and gallery are one surface. */
   onEditMedia: () => void;
   /** Opens the CTA-text editor. Omit to hide the row. */
@@ -35,7 +34,7 @@ interface Props {
 export function ProductCard({
   publicUrlBase = "/marketplace/",
   product, communityTag, listingId,
-  onEditName, onEditPrice, onEditMedia, onEditCta, onEditTags, onEditCategory,
+  onEditName, onEditMedia, onEditCta, onEditTags, onEditCategory,
 }: Props) {
   // Injected by the host app; the package ships its own fallback so no host
   // is forced to supply one.
@@ -260,13 +259,12 @@ export function ProductCard({
               <p className="text-sm font-medium text-zinc-900 truncate">{product.name || "Untitled Product"}</p>
             </InfoRow>
 
-            {/* Price */}
-            <InfoRow onClick={onEditPrice}
-              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg>}>
-              <p className="text-sm font-medium text-zinc-900">
-                {isPaid ? `${currency} ${(Number(product.price) / 100).toFixed(2)}` : "Free"}
-              </p>
-            </InfoRow>
+            {/* No price row.
+                Pricing has its own tab now, carrying the variant list and the
+                donations sidecar. A row here showed ONE number for a product
+                that can carry several variants, and opened the same editor by
+                a second route -- two entry points to one thing, one of which
+                could only ever tell half the story. */}
 
             {/*
               Description — the product manage page had NO way to edit one.
