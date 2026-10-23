@@ -21,7 +21,6 @@ import { ProductCard } from "../page/sections/ProductCard";
 
 const handlers = () => ({
   onEditName: vi.fn(),
-  onEditPrice: vi.fn(),
   onEditMedia: vi.fn(),
   onEditCta: vi.fn(),
   onEditDescription: vi.fn(),
@@ -162,8 +161,8 @@ describe("the edit rows", () => {
     const { h } = renderCard();
     await userEvent.click(screen.getByText("Community Builder Pack"));
     expect(h.onEditName).toHaveBeenCalled();
-    await userEvent.click(screen.getByText(/19\.99/));
-    expect(h.onEditPrice).toHaveBeenCalled();
+    // No price assertion: the price row is gone from this card. Pricing has
+    // its own tab, which renders the variant cards and the editor behind them.
   });
 
   it("has no buttons on the card", () => {
@@ -421,7 +420,6 @@ describe("tags and category as rows", () => {
         communityTag="avepark"
         listingId={null}
         onEditName={vi.fn()}
-        onEditPrice={vi.fn()}
         onEditMedia={vi.fn()}
       />,
     );

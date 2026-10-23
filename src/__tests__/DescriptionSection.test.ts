@@ -40,10 +40,20 @@ describe("the description has its own section", () => {
         expect(details).not.toMatch(/ProductModal = [^;]*"description"/);
     });
 
+    /*
+     * "onEditPrice" has left this list: the price row was removed from the
+     * card when pricing got its own tab. The point of the test is unchanged --
+     * a SHORT field belongs in a row, and only the long-form description was
+     * promoted out of one.
+     */
     it("leaves the SHORT fields as rows", () => {
-        for (const row of ["onEditName", "onEditPrice", "onEditCta", "onEditTags"]) {
+        for (const row of ["onEditName", "onEditCta", "onEditTags"]) {
             expect(card).toContain(row);
         }
+    });
+
+    it("no longer carries a price row, now that Pricing is a tab", () => {
+        expect(card).not.toContain("onEditPrice");
     });
 });
 

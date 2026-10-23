@@ -73,11 +73,9 @@ describe("every Overview row opens its editor", () => {
     await expectSomethingOpened();
   });
 
-  it("price", async () => {
-    renderOverview();
-    await userEvent.click(screen.getByText("Free"));
-    await expectSomethingOpened();
-  });
+  // No "price" case: the row is gone from Details and so is the modal branch
+  // behind it. Pricing has its own tab, which opens the same editor from the
+  // variant cards.
 
   it("description — no longer a modal, and no longer a row", async () => {
     /*
@@ -138,7 +136,7 @@ describe("the branches exist at all", () => {
      * below). Every key that still exists must still have a branch.
      */
     for (const key of [
-      "name", "price", "share", "distribution", "delete",
+      "name", "share", "distribution", "delete",
       "cta", "media", "tags", "category",
     ]) {
       expect(src).toContain(`modal === "${key}"`);

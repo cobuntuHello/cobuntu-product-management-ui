@@ -54,7 +54,7 @@ import { useCanEdit } from "../../lib/manageAccess";
  * backend, so the one path that could have reached them would have 404'd.
  * A listing's visibility is managed in the Listings tab.
  */
-export type ProductModal = "name" | "price" | "share" | "distribution" | "delete" | "cta" | "media" | null
+export type ProductModal = "name" | "share" | "distribution" | "delete" | "cta" | "media" | null
   | "tags"
   | "category";
 
@@ -266,7 +266,6 @@ export function DetailsView({
         communityTag={communityTag}
         listingId={listingId}
         onEditName={() => setModal("name")}
-        onEditPrice={() => setModal("price")}
         onEditMedia={() => setModal("media")}
         onEditCta={() => setModal("cta")}
         onEditTags={() => setModal("tags")}
@@ -319,18 +318,11 @@ export function DetailsView({
         />
       )}
 
-      {modal === "price" && (
-        <PriceEditModal
-          product={product}
-          communityTag={communityTag}
-          productId={productId}
-          onClose={() => setModal(null)}
-          onSaved={() => { setModal(null); void onUpdate(); }}
-          showToast={showToast}
-          showMemberPricing={showMemberPricing}
-          productType={product.productType}
-        />
-      )}
+      {/* No price modal here.
+          The Details price row that opened it is gone -- pricing has its own
+          tab, which renders this same editor from the variant cards. Nothing
+          on this view reaches it any more, so keeping the branch would be a
+          second, unreachable copy of a surface that already has a home. */}
 
       {modal === "share" && (
         <ShareModal
