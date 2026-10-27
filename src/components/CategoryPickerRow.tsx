@@ -160,21 +160,21 @@ export function CategoryPickerRow({
             iconId={selected.iconId}
             iconColor={selected.iconColor}
             imageUrl={selected.imageUrl}
-            size={22}
+            size={30}
           />
         ) : summary ? (
           <span
-            className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0"
+            className="flex items-center justify-center w-[30px] h-[30px] rounded-full text-white shrink-0"
             style={{ background: "var(--brand-color, #18181b)" }}
           >
-            <Check className="h-3 w-3" strokeWidth={3.5} />
+            <Check className="h-4 w-4" strokeWidth={3.5} />
           </span>
         ) : (
           // Colored badge, matching the other basics-step rows
           // (description=amber, tags=purple, CTA=blue) — teal keeps this
           // row visually distinct from the other three.
-          <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full bg-teal-100 text-teal-600 shrink-0">
-            <FolderTree className="h-3 w-3" />
+          <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full bg-teal-100 text-teal-600 shrink-0">
+            <FolderTree className="h-4 w-4" />
           </span>
         )}
         <span className="flex-1 min-w-0">

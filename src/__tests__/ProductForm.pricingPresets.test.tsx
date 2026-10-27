@@ -161,6 +161,6 @@ describe("the Paid preset respects the Stripe-connected gate", () => {
     // connect-Stripe redirect — the rich description (not the connect hint)
     // stays on screen.
     fireEvent.click(paidButton);
-    expect(screen.getByText(/The price lives on the variant below/)).toBeInTheDocument();
+    expect(screen.getByText(/Buyers pay to get access/)).toBeInTheDocument();
   });
 });
