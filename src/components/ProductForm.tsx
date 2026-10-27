@@ -288,8 +288,26 @@ export interface ProductFormData {
   // (viewability + accessibility declared above — both default PUBLIC.)
 }
 
-interface ProductFormProps {
+export interface ProductFormProps {
   communityTag: string;
+  /**
+   * Caller-supplied Stripe-connected status that overrides this form's own
+   * internal `useStripeStatus(communityTag)` check for the "Paid" preset
+   * card gating.
+   *
+   * Why this exists: `useStripeStatus` hits the COMMUNITY-scoped, admin-gated
+   * `GET /api/communities/:communityTag/stripe/connected` endpoint. A seller
+   * who has genuinely connected Stripe but is not a community admin gets a
+   * 403 there, which collapses to `connected: false` — the "Paid" card then
+   * shows locked even though Stripe is really connected. Host apps that
+   * already know the real, USER-scoped answer (e.g. via
+   * `GET /api/users/me/stripe/status`) pass it here instead of letting this
+   * form re-derive a wrong one.
+   *
+   * Omitted → byte-identical to before: the form still calls
+   * `useStripeStatus` itself and uses its result unchanged.
+   */
+  stripeStatusOverride?: { connected: boolean; connectUrl?: string | null };
   /**
    * Override the words this form uses for the thing being sold.
    *
@@ -402,7 +420,7 @@ const AUTO_SEED_NAME = /^(Standard|Tier \d+)$/;
 
 // ─── Component ─────────────────────────────────────────────────
 
-export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, hideRepeatPurchase, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false, labels }: ProductFormProps) {
+export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, hideRepeatPurchase, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false, labels, stripeStatusOverride }: ProductFormProps) {
   /* Merged once rather than at each use, so a partial override cannot leave
    * one string reading "course" beside another still reading "product". */
   const L = { ...DEFAULT_LABELS, ...(labels ?? {}) };
@@ -582,8 +600,33 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   }
 
   /* Stripe-connected gate for the "Paid" card — see ../lib/useStripeStatus
-   * for why this is a local hook rather than a cross-package dependency. */
-  const stripeStatus = useStripeStatus(communityTag);
+   * for why this is a local hook rather than a cross-package dependency.
+   *
+   * Called UNCONDITIONALLY (even when `stripeStatusOverride` is supplied) so
+   * hook-call order never depends on a prop — React requires the same hooks
+   * in the same order on every render, and gating this behind a prop check
+   * would violate that. When an override is passed, its result is simply not
+   * used below; `stripeStatus` is computed from the override instead.
+   *
+   * Why an override exists at all: this hook hits the COMMUNITY-scoped,
+   * admin-gated `/api/communities/:communityTag/stripe/connected` endpoint.
+   * A seller with Stripe genuinely connected, but who is not a community
+   * admin, gets a 403 there, which this hook correctly collapses to
+   * `connected: false` for safety — but that is the WRONG answer for the
+   * "Paid" preset gate, which cares whether *this seller* can charge, not
+   * whether they admin the community. A host app that already computed the
+   * correct user-scoped answer (e.g. via `GET /api/users/me/stripe/status`)
+   * passes it as `stripeStatusOverride` instead of letting this mismatched
+   * check override it. */
+  const internalStripeStatus = useStripeStatus(communityTag);
+  const stripeStatus = stripeStatusOverride
+    ? {
+        connected: stripeStatusOverride.connected,
+        loading: false,
+        known: true,
+        connectUrl: stripeStatusOverride.connectUrl ?? internalStripeStatus.connectUrl,
+      }
+    : internalStripeStatus;
 
   // Dismissible "Good to know" tip at the foot of the pricing step. Local
   // state only — see wizard-banners.tsx's DismissibleTipBanner doc comment
