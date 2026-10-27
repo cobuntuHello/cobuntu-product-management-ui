@@ -155,6 +155,24 @@ describe("the Paid preset respects the Stripe-connected gate", () => {
     expect(paidButton).toHaveAttribute("aria-pressed", "false");
   });
 
+  it("confirms before leaving for Stripe Connect, rather than redirecting immediately", () => {
+    const hrefSpy = vi.fn();
+    Object.defineProperty(window, "location", {
+      value: { ...window.location, set href(v: string) { hrefSpy(v); } },
+      writable: true,
+    });
+    renderWithConfig(
+      <ProductForm {...base} stripeStatusOverride={{ connected: false, connectUrl: "https://connect.stripe.com/x" }} />,
+    );
+    const paidButton = screen.getByRole("button", { name: /^Paid/ });
+    fireEvent.click(paidButton);
+    // No immediate navigation — a confirm dialog interrupts first.
+    expect(hrefSpy).not.toHaveBeenCalled();
+    expect(screen.getByText(/Connect Stripe to accept payments/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Continue to Stripe/ }));
+    expect(hrefSpy).toHaveBeenCalledWith("https://connect.stripe.com/x");
+  });
+
   it("drops the Stripe-connect hint once useStripeStatus resolves connected: true, and clicking applies the preset path (not a navigation)", async () => {
     connectStripe();
     renderWithConfig(<ProductForm {...base} />);
