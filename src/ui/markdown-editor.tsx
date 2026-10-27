@@ -106,33 +106,36 @@ export function MarkdownEditor({
   const html = value.length ? value.split("\n").map(formatLine).join("\n") : "";
 
   return (
-    <div
-      className={`group relative rounded-2xl transition-all duration-150 ${
-        disabled
-          ? "bg-zinc-50 opacity-60"
-          : focused
-          ? "bg-white shadow-[0_1px_2px_rgba(16,24,32,0.04),0_0_0_4px_rgba(24,24,27,0.05)] ring-1 ring-zinc-200"
-          : "bg-zinc-50 ring-1 ring-transparent hover:ring-zinc-100"
-      }`}
-    >
+    <div>
       <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-4 py-3.5 text-[14.5px] leading-relaxed text-zinc-800"
-        dangerouslySetInnerHTML={{ __html: html || "&nbsp;" }}
-      />
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        placeholder={placeholder}
-        disabled={disabled}
-        autoFocus={autoFocus}
-        rows={minRows}
-        spellCheck
-        className="relative w-full resize-none overflow-hidden whitespace-pre-wrap break-words border-0 bg-transparent px-4 py-3.5 text-[14.5px] leading-relaxed text-transparent caret-zinc-900 outline-none placeholder:text-zinc-300"
-      />
+        className={`group relative overflow-hidden rounded-2xl transition-all duration-150 ${
+          disabled
+            ? "bg-zinc-50 opacity-60"
+            : focused
+            ? "bg-white shadow-[0_1px_2px_rgba(16,24,32,0.04),0_0_0_4px_rgba(24,24,27,0.05)] ring-1 ring-zinc-200"
+            : "bg-zinc-50 ring-1 ring-transparent hover:ring-zinc-100"
+        }`}
+      >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-4 py-3.5 text-[14.5px] leading-relaxed text-zinc-800"
+          dangerouslySetInnerHTML={{ __html: html || "&nbsp;" }}
+        />
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder={placeholder}
+          disabled={disabled}
+          autoFocus={autoFocus}
+          rows={minRows}
+          spellCheck
+          className="relative w-full resize-none overflow-hidden whitespace-pre-wrap break-words border-0 bg-transparent px-4 py-3.5 text-[14.5px] leading-relaxed text-transparent caret-zinc-900 outline-none placeholder:text-zinc-300"
+        />
+      </div>
+      <p className="mt-1.5 px-1 text-[11.5px] text-zinc-400">Markdown supported: use **bold**, *italic*, and - for lists.</p>
     </div>
   );
 }

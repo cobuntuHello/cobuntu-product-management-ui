@@ -980,12 +980,12 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         <button type="button" onClick={() => setIsDescriptionOpen(true)}
           className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
           {descriptionPreview ? (
-            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
+            <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-4 w-4" strokeWidth={3.5} /></span>
           ) : (
             // Colored badge, not a flat icon — distinct accent per row type
             // so the list reads as several kinds of thing, not one repeated
             // glyph (feat/wizard-presets-and-banners).
-            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full bg-amber-100 text-amber-600 shrink-0"><FileText className="h-3 w-3" /></span>
+            <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full bg-amber-100 text-amber-600 shrink-0"><FileText className="h-4 w-4" /></span>
           )}
           <span className="flex-1 min-w-0">
             <span className={`block text-sm truncate ${descriptionPreview ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{descriptionPreview ? "Description" : "Add description"}</span>
@@ -1001,9 +1001,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         <button type="button" onClick={() => setIsTagsOpen(true)}
           className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
           {tags.length > 0 ? (
-            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
+            <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-4 w-4" strokeWidth={3.5} /></span>
           ) : (
-            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full bg-purple-100 text-purple-600 shrink-0"><TagIcon className="h-3 w-3" /></span>
+            <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full bg-purple-100 text-purple-600 shrink-0"><TagIcon className="h-4 w-4" /></span>
           )}
           <span className="flex-1 min-w-0">
             <span className={`block text-sm truncate ${tags.length > 0 ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{tags.length > 0 ? "Tags" : "Add tags"}</span>
@@ -1028,9 +1028,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         <button type="button" onClick={() => setIsCtaOpen(true)}
           className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
           {ctaText.trim() ? (
-            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
+            <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-4 w-4" strokeWidth={3.5} /></span>
           ) : (
-            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full bg-blue-100 text-blue-600 shrink-0"><MousePointerClick className="h-3 w-3" /></span>
+            <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full bg-blue-100 text-blue-600 shrink-0"><MousePointerClick className="h-4 w-4" /></span>
           )}
           <span className="flex-1 min-w-0">
             <span className={`block text-sm truncate ${ctaText.trim() ? "font-medium text-zinc-800" : "text-zinc-500"}`}>Call to Action Label<span className="font-normal text-zinc-400 text-[12.5px]">{ctaText.trim() ? "" : " · optional"}</span></span>
@@ -1095,23 +1095,23 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 subtitle={pricingBannerSubtitle}
               />
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-stretch">
                 {([
                   {
                     kind: "free" as const, label: "Free", icon: Gift,
-                    desc: `Anyone can get it with no payment. The variant underneath stays at $0 — switch to Paid any time without losing its other settings.`,
+                    desc: `No payment required to get it.`,
                     cardSelected: "cursor-pointer border-emerald-300 bg-emerald-50",
                     badgeSelected: "bg-emerald-100 text-emerald-600",
                   },
                   {
                     kind: "paid" as const, label: "Paid", icon: Wallet,
-                    desc: `Buyers pay before they get access. The price lives on the variant below, so you set the exact amount there once Stripe is connected.`,
+                    desc: `Buyers pay to get access.`,
                     cardSelected: "cursor-pointer border-blue-300 bg-blue-50",
                     badgeSelected: "bg-blue-100 text-blue-600",
                   },
                   {
                     kind: "donations" as const, label: "Free with donations", icon: CreditCard,
-                    desc: `Access stays free, but buyers are offered a voluntary tip at checkout. Nobody is blocked from getting it for not paying.`,
+                    desc: `Free, with an optional tip at checkout.`,
                     cardSelected: "cursor-pointer border-violet-300 bg-violet-50",
                     badgeSelected: "bg-violet-100 text-violet-600",
                   },
@@ -1142,7 +1142,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                       }}
                       aria-pressed={selected}
                       className={cn(
-                        "group text-left rounded-xl border px-3.5 py-3 transition-all duration-150 cursor-pointer",
+                        "group h-full flex flex-col items-start text-left rounded-xl border px-3.5 py-3 transition-all duration-150 cursor-pointer",
                         needsStripe
                           ? "border-zinc-100 bg-zinc-50 hover:border-zinc-200"
                           : selected
@@ -1151,16 +1151,18 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                       )}
                     >
                       {/* Bigger icon + badge — a real visual anchor for the
-                          card, not a tiny decoration. */}
+                          card, not a tiny decoration. Same fixed size and top
+                          position on every card so the three stay aligned
+                          regardless of label/description length. */}
                       <span className={cn(
-                        "flex items-center justify-center w-10 h-10 rounded-full mb-2",
+                        "flex items-center justify-center w-10 h-10 rounded-full mb-2 shrink-0",
                         needsStripe ? "bg-zinc-200 text-zinc-400" : selected ? badgeSelected : "bg-zinc-100 text-zinc-500",
                       )}>
                         <PresetIcon className="h-5 w-5" />
                       </span>
                       <p className={cn("text-[13px] font-semibold", needsStripe ? "text-zinc-500" : "text-zinc-800")}>{label}</p>
                       <p className={cn("text-[11.5px] mt-0.5 leading-snug", needsStripe ? "text-zinc-400" : "text-zinc-500")}>
-                        {needsStripe ? "Connect Stripe to sell for a price — tap to connect now." : desc}
+                        {needsStripe ? "Connect Stripe to sell for a price." : desc}
                       </p>
                     </button>
                   );
