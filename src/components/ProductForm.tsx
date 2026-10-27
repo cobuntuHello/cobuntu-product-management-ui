@@ -43,6 +43,7 @@ import {
   RefundPolicyField,
   type RefundPolicyValue,
   DiscardPrompt,
+  ConfirmLeaveModal,
 } from "@cobuntu/management-ui-shared";
 import {
   FileText, Tag as TagIcon,
@@ -548,6 +549,10 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const [pricingDirty, setPricingDirty] = useState(false);
   /* The preset awaiting a discard-confirm, or null when none is pending. */
   const [pendingPreset, setPendingPreset] = useState<PricingPreset | null>(null);
+  /* Confirm before leaving the wizard for Stripe Connect onboarding — a
+     seller tapping "Paid" with no warning and landing on another site was a
+     jarring pattern interrupt (feedback). */
+  const [confirmingStripeLeave, setConfirmingStripeLeave] = useState(false);
 
   /*
    * Derived fresh on every render from the actual tier/donation state —
@@ -1178,7 +1183,10 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                       aria-label={label}
                       onClick={() => {
                         if (needsStripe) {
-                          if (stripeStatus.connectUrl) window.location.href = stripeStatus.connectUrl;
+                          // Redirecting straight to Stripe with no warning is
+                          // a jarring pattern interrupt (feedback) — confirm
+                          // first instead of leaving immediately.
+                          if (stripeStatus.connectUrl) setConfirmingStripeLeave(true);
                           return;
                         }
                         tapPricingPreset(kind);
@@ -1629,6 +1637,19 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         message="Switching to this preset will overwrite the price and donation settings you configured manually."
         confirmLabel="Use preset"
         cancelLabel="Keep my setup"
+      />
+
+      <ConfirmLeaveModal
+        open={confirmingStripeLeave}
+        onCancel={() => setConfirmingStripeLeave(false)}
+        onConfirm={() => {
+          setConfirmingStripeLeave(false);
+          if (stripeStatus.connectUrl) window.location.href = stripeStatus.connectUrl;
+        }}
+        title="Connect Stripe to accept payments"
+        message="You'll be taken to Stripe to connect your account. You can come back and finish this listing afterward."
+        confirmLabel="Continue to Stripe"
+        cancelLabel="Not now"
       />
     </div>
   );
