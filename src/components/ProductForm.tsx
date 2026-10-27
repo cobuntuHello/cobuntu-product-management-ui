@@ -47,7 +47,7 @@ import {
 import {
   FileText, Tag as TagIcon,
   Layers, MousePointerClick, ChevronRight,
-  Eye, EyeOff, UserCheck, Lock, ClipboardCheck, Repeat,
+  Eye, EyeOff, UserCheck, Shield, ShieldCheck, Repeat,
   Image as ImageIcon, Plus, Check, X,
   PenLine, Wallet, Gift, CreditCard, AlertCircle,
 } from "lucide-react";
@@ -1246,12 +1246,12 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
 
           {/* ─── Policies & access banner ─── purely decorative lead-in,
               same pattern as the basics/pricing banners, sitting above this
-              step's first row. Lock glyph for "policies & access" — distinct
+              step's first row. Shield glyph for "policies & access" — distinct
               from PenLine (basics) and Wallet (pricing), so each banner's
               icon reflects its OWN step rather than a shared decoration. */}
           {showSettings && (
             <WizardStepBanner
-              icon={<Lock className="h-[18px] w-[18px]" />}
+              icon={<Shield className="h-[18px] w-[18px]" />}
               title={settingsBannerTitle}
               subtitle={settingsBannerSubtitle}
             />
@@ -1266,12 +1266,26 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Approval</p>
               <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
 
-              {/* Buyer applies, seller approves; the payment is held meanwhile. */}
+              {/* Buyer applies, seller approves; the payment is held meanwhile.
+                  Icon badge + title/subtitle + "Recommended for…" pill mirrors
+                  the visual treatment this wizard's other banners/cards already
+                  use (WizardStepBanner's tinted icon circle, the pricing preset
+                  cards' badges) — this was the one toggle row still a bare
+                  label+switch with no visual anchor. ShieldCheck (not the
+                  Shield used by the step banner above) so the row reads as
+                  "approval granted/verified" rather than reusing the step's own
+                  glyph. The pill is static copy, not conditional on current
+                  state — it's a recommendation about WHEN to turn this on, not
+                  a description of the current setting (that's the subtitle's
+                  job), so it shows regardless of whether approval is currently
+                  required. */}
               <div
                 onClick={() => setRequiresApproval(!requiresApproval)}
                 className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-100/60 transition-colors">
                 <div className="flex items-center gap-3 min-w-0">
-                  <ClipboardCheck className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
+                  <span className="flex items-center justify-center w-9 h-9 rounded-full bg-zinc-100 text-zinc-500 shrink-0">
+                    <ShieldCheck className="h-[18px] w-[18px]" />
+                  </span>
                   <div className="min-w-0">
                     <span className="text-sm font-medium text-zinc-800">Require approval</span>
                     {/*
@@ -1289,6 +1303,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                         ? "Buyers apply and you approve. Their payment is held until you decide."
                         : "Anyone can buy straight away"}
                     </p>
+                    <span className="inline-flex items-center mt-1.5 px-2 py-0.5 rounded-full bg-zinc-100 text-[10px] font-medium text-zinc-500">
+                      Recommended for private {noun}s
+                    </span>
                   </div>
                 </div>
                 <Switch checked={requiresApproval} onCheckedChange={setRequiresApproval} onClick={e => e.stopPropagation()} />
