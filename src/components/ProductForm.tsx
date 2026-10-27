@@ -179,6 +179,9 @@ export interface ProductFormLabels {
   /** The banner above the pricing-step preset cards. Same reasoning as above. */
   pricingBannerTitle?: string;
   pricingBannerSubtitle?: string;
+  /** The banner above the Policies & access (settings) step. Same reasoning as above. */
+  settingsBannerTitle?: string;
+  settingsBannerSubtitle?: string;
 }
 
 const DEFAULT_LABELS: Required<Pick<ProductFormLabels,
@@ -419,6 +422,8 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const basicsBannerSubtitle = labels?.basicsBannerSubtitle ?? `Give your ${noun} a name people will recognize`;
   const pricingBannerTitle = labels?.pricingBannerTitle ?? `Configure your ${noun}'s business model`;
   const pricingBannerSubtitle = labels?.pricingBannerSubtitle ?? "Choose how people can get access. You can change these later.";
+  const settingsBannerTitle = labels?.settingsBannerTitle ?? `Set your ${noun}'s policies`;
+  const settingsBannerSubtitle = labels?.settingsBannerSubtitle ?? "Choose how buyers interact with it. You can change these later.";
   // Form state
   const [name, setName] = useState(initialData?.name || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -1234,6 +1239,19 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             <DismissibleTipBanner
               body="You can always add more variants, upload files, set a licence or track stock for each one later."
               onDismiss={() => setPricingTipDismissed(true)}
+            />
+          )}
+
+          {/* ─── Policies & access banner ─── purely decorative lead-in,
+              same pattern as the basics/pricing banners, sitting above this
+              step's first row. Lock glyph for "policies & access" — distinct
+              from PenLine (basics) and Wallet (pricing), so each banner's
+              icon reflects its OWN step rather than a shared decoration. */}
+          {showSettings && (
+            <WizardStepBanner
+              icon={<Lock className="h-[18px] w-[18px]" />}
+              title={settingsBannerTitle}
+              subtitle={settingsBannerSubtitle}
             />
           )}
 
