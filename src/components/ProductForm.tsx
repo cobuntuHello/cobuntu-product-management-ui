@@ -578,11 +578,20 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       // Never fabricate a price. A tier that already has one keeps it;
       // an unpriced/free one is cleared to "" so the seller's own number is
       // the first thing that lands there, not an invented default.
+      const firstTierHadNoPrice = !(parseFloat(tiers[0]?.price || "0") > 0);
       setTiers((ts) => ts.map((t) => ({
         ...t,
         price: parseFloat(t.price || "0") > 0 ? t.price : "",
       })));
       setDonation((d) => ({ ...d, enabled: false }));
+      /*
+       * Clearing the price leaves the card un-highlighted (the derived
+       * "selected" state only flips once a price > 0 exists) and nothing
+       * else on screen changes -- tapping "Paid" looked like it did nothing
+       * (feedback). Opening the price editor right away gives the seller
+       * somewhere to actually type the amount, instead of a silent no-op.
+       */
+      if (firstTierHadNoPrice && tiers[0]) openTierEditor(tiers[0].localId);
     } else {
       setTiers((ts) => ts.map((t) => ({ ...t, price: "0" })));
       setDonation((d) => ({ ...d, enabled: preset === "donations" }));
@@ -1334,7 +1343,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 onClick={() => setRequiresApproval(!requiresApproval)}
                 className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-100/60 transition-colors">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="flex items-center justify-center w-9 h-9 rounded-full bg-zinc-100 text-zinc-500 shrink-0">
+                  <span className="flex items-center justify-center w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 shrink-0">
                     <ShieldCheck className="h-[18px] w-[18px]" />
                   </span>
                   <div className="min-w-0">
@@ -1379,7 +1388,11 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 onClick={() => setAllowRepeatPurchase(!repeatShown)}
                 className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-zinc-100/60 transition-colors">
                 <div className="flex items-center gap-3 min-w-0">
-                  <Repeat className="h-[18px] w-[18px] text-zinc-400 shrink-0" />
+                  {/* Was a bare icon, no badge at all — the one row on this
+                      step with no colored anchor, matching feedback. */}
+                  <span className="flex items-center justify-center w-9 h-9 rounded-full bg-cyan-100 text-cyan-600 shrink-0">
+                    <Repeat className="h-[18px] w-[18px]" />
+                  </span>
                   <div className="min-w-0">
                     <span className="text-sm font-medium text-zinc-800">Can be bought more than once</span>
                     {/*
