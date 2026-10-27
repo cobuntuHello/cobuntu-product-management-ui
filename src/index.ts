@@ -67,6 +67,41 @@ export {
 } from "./lib/productCreatePayload";
 export { EditProductDrawer } from "./components/EditProductDrawer";
 
+/*
+ * The create wizard — a reusable ProductCreateWizard, mirroring
+ * @cobuntu/event-management-ui's EventCreateWizard. See src/create-wizard/
+ * for the transport/navigation/copy contract it takes from its host.
+ */
+export { ProductCreateWizard } from "./create-wizard";
+export type {
+  ProductCreateWizardProps,
+  ProductCreateWizardTransport,
+  ProductCreateWizardNavigation,
+  ProductCreateWizardHrefs,
+  ProductCreateWizardResult,
+  ProductCreateWizardExtraStep,
+  ProductCreateWizardTheme,
+  ProductCreateWizardCommunity,
+  ProductDraftSummary,
+  ProductDraftRow,
+  ProductDraftSnapshot,
+  ProductFeePackage,
+  MemberStripeStatus,
+  ProductWizardPermissions,
+  ProductWizardTier,
+  SaveDraftResult,
+  CreateProductResult,
+  ProductCreateWizardCopy,
+  WizardTranslate,
+  WizardTranslateRich,
+  ProductWizardMessages,
+} from "./create-wizard";
+export {
+  createWizardTranslator as createProductWizardTranslator,
+  formatMessage as formatProductWizardMessage,
+  PRODUCT_WIZARD_MESSAGES_EN,
+} from "./create-wizard";
+
 // UI primitives — duplicated from @cobuntu/event-management-ui by design
 // (see README). Re-exported here so consumers have a single import point
 // for the package's surface.
