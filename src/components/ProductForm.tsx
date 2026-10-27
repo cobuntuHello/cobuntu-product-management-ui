@@ -22,6 +22,8 @@ import { type DraftTier, type DonationDraft } from "./PriceEditModal/types";
 import { blankTier, blankDonation } from "./PriceEditModal/helpers";
 import { DonationsField } from "./PriceEditModal/DonationsField";
 import { CategoryPickerRow, type CategoryOption } from "./CategoryPickerRow";
+import { WizardStepBanner, DismissibleTipBanner } from "./wizard-banners";
+import { useStripeStatus } from "../lib/useStripeStatus";
 import {
   type ProductConditionValue, type ParcelClassValue,
 } from "./PhysicalDetailsFields";
@@ -40,12 +42,14 @@ import {
   tierAccessLevel,
   RefundPolicyField,
   type RefundPolicyValue,
+  DiscardPrompt,
 } from "@cobuntu/management-ui-shared";
 import {
   FileText, Tag as TagIcon,
   Layers, MousePointerClick, ChevronRight,
   Eye, EyeOff, UserCheck, Lock, ClipboardCheck, Repeat,
   Image as ImageIcon, Plus, Check, X,
+  Sparkles, Wallet, Gift, CreditCard,
 } from "lucide-react";
 
 // draftMode makes ZERO API calls (mount fetch, member-pricing fetch, and
@@ -163,9 +167,22 @@ export interface ProductFormLabels {
   tagsTitle?: string;
   tagsHint?: string;
   ctaHint?: string;
+  /**
+   * The decorative lead-in banner above the name field (feat/wizard-presets-
+   * and-banners). Not part of DEFAULT_LABELS below: its default text is
+   * derived from `productType` (product vs course), not a single fixed
+   * string, so it is computed inline where `productType` is in scope rather
+   * than baked into this static map.
+   */
+  basicsBannerTitle?: string;
+  basicsBannerSubtitle?: string;
+  /** The banner above the pricing-step preset cards. Same reasoning as above. */
+  pricingBannerTitle?: string;
+  pricingBannerSubtitle?: string;
 }
 
-const DEFAULT_LABELS: Required<ProductFormLabels> = {
+const DEFAULT_LABELS: Required<Pick<ProductFormLabels,
+  "namePlaceholder" | "descriptionTitle" | "descriptionHint" | "descriptionPlaceholder" | "tagsTitle" | "tagsHint" | "ctaHint">> = {
   namePlaceholder: "Product Name",
   descriptionTitle: "Product Description",
   descriptionHint: "Describe your product. What will customers get?",
@@ -386,6 +403,22 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   /* Merged once rather than at each use, so a partial override cannot leave
    * one string reading "course" beside another still reading "product". */
   const L = { ...DEFAULT_LABELS, ...(labels ?? {}) };
+  /*
+   * The product/course copy-swap mechanism, reused rather than reinvented.
+   *
+   * `productType === "COURSE"` is the SAME flag `hideRepeatPurchase` already
+   * keys off of above (the course wizard passes it for the identical reason:
+   * one form, two nouns). The two new wizard banners below interpolate this
+   * noun into their default copy instead of hardcoding "product", while
+   * still going through `labels` first so a consumer can override the exact
+   * wording (e.g. a non-English-shaped sentence) without this component
+   * needing to know every caller's phrasing.
+   */
+  const noun = productType === "COURSE" ? "course" : "product";
+  const basicsBannerTitle = labels?.basicsBannerTitle ?? "Let's start with the basics";
+  const basicsBannerSubtitle = labels?.basicsBannerSubtitle ?? `Give your ${noun} a name people will recognize`;
+  const pricingBannerTitle = labels?.pricingBannerTitle ?? `Configure your ${noun}'s business model`;
+  const pricingBannerSubtitle = labels?.pricingBannerSubtitle ?? "Choose how people can get access. You can change these later.";
   // Form state
   const [name, setName] = useState(initialData?.name || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -470,6 +503,87 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const [multiTier, setMultiTier] = useState(initialData?.tiers && initialData.tiers.length > 0);
   const [tiers, setTiers] = useState<DraftTier[]>(initialData?.tiers && initialData.tiers.length > 0 ? initialData.tiers : [blankTier({ currency })]);
   const [donation, setDonation] = useState<DonationDraft>(initialData?.donation || blankDonation(currency));
+
+  /*
+   * ── Pricing presets ("Free" / "Paid" / "Free with donations") ──────────
+   *
+   * A three-card quick-setup row above the variant list, so a seller who
+   * just wants "free" or "paid" never has to open the tier editor to get
+   * there. It writes the SAME state the tier editor and the donations field
+   * write (tiers[].price, donation.enabled) — there is no separate preset
+   * state to drift from the real config.
+   */
+  type PricingPreset = "free" | "paid" | "donations";
+
+  /*
+   * Dirty = the seller has touched tier/donation config manually (via the
+   * tier editor or the donations field) since the last preset applied.
+   * Pristine (false) is also true on first render, before anything has been
+   * configured at all — a fresh "Standard" / price "0" tier has nothing to
+   * lose, so the very first preset tap should never need a confirm.
+   */
+  const [pricingDirty, setPricingDirty] = useState(false);
+  /* The preset awaiting a discard-confirm, or null when none is pending. */
+  const [pendingPreset, setPendingPreset] = useState<PricingPreset | null>(null);
+
+  /*
+   * Derived fresh on every render from the actual tier/donation state —
+   * never written to directly — so the card highlight cannot disagree with
+   * what the tier editor or the donations field just changed underneath it.
+   * Checked against the FIRST tier only: presets are a single-price quick
+   * path, and a seller who has gone multi-tier with divergent prices has
+   * moved past what three cards can represent (their variants keep working;
+   * the cards just stop claiming to summarize them precisely).
+   */
+  function pricingPresetFor(ts: DraftTier[], d: DonationDraft): PricingPreset {
+    const p = parseFloat(ts[0]?.price ?? "0");
+    const hasPrice = !Number.isNaN(p) && p > 0;
+    // Paid wins even with donations also enabled — spelled out in the spec
+    // this implements: a paid tier plus donations is closest to "Paid".
+    if (hasPrice) return "paid";
+    return d.enabled ? "donations" : "free";
+  }
+  const activePricingPreset = pricingPresetFor(tiers, donation);
+
+  function applyPricingPreset(preset: PricingPreset) {
+    if (preset === "paid") {
+      // Never fabricate a price. A tier that already has one keeps it;
+      // an unpriced/free one is cleared to "" so the seller's own number is
+      // the first thing that lands there, not an invented default.
+      setTiers((ts) => ts.map((t) => ({
+        ...t,
+        price: parseFloat(t.price || "0") > 0 ? t.price : "",
+      })));
+      setDonation((d) => ({ ...d, enabled: false }));
+    } else {
+      setTiers((ts) => ts.map((t) => ({ ...t, price: "0" })));
+      setDonation((d) => ({ ...d, enabled: preset === "donations" }));
+    }
+    setPricingDirty(false);
+  }
+
+  /*
+   * The tap handler every preset card calls. Applies immediately when there
+   * is nothing to lose (pristine, or the tapped preset is already the active
+   * one) and only interrupts with DiscardPrompt when the seller manually
+   * configured something that preset would overwrite.
+   */
+  function tapPricingPreset(preset: PricingPreset) {
+    if (!pricingDirty || activePricingPreset === preset) {
+      applyPricingPreset(preset);
+      return;
+    }
+    setPendingPreset(preset);
+  }
+
+  /* Stripe-connected gate for the "Paid" card — see ../lib/useStripeStatus
+   * for why this is a local hook rather than a cross-package dependency. */
+  const stripeStatus = useStripeStatus(communityTag);
+
+  // Dismissible "Good to know" tip at the foot of the pricing step. Local
+  // state only — see wizard-banners.tsx's DismissibleTipBanner doc comment
+  // for why this does not persist across remounts.
+  const [pricingTipDismissed, setPricingTipDismissed] = useState(false);
 
   // UI state
   const [isDescriptionOpen, setIsDescriptionOpen] = useState(false);
@@ -747,6 +861,16 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   return (
     <div className="space-y-6">
       {showListing && (<>
+      {/* ─── Basics banner ─── purely decorative lead-in, no input of its
+           own; sits above the name field it introduces. Copy swaps
+           product/course via the same `productType` flag the rest of this
+           form already keys off of (see `noun` above). */}
+      <WizardStepBanner
+        icon={<Sparkles className="h-[18px] w-[18px]" />}
+        title={basicsBannerTitle}
+        subtitle={basicsBannerSubtitle}
+      />
+
       {/* ─── Product name — big inline title (borderless, matches event) ─── */}
       <div>
         <input value={name} onChange={e => setName(e.target.value)} placeholder={L.namePlaceholder}
@@ -844,7 +968,12 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
           {descriptionPreview ? (
             <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
-          ) : <FileText className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
+          ) : (
+            // Colored badge, not a flat icon — distinct accent per row type
+            // so the list reads as several kinds of thing, not one repeated
+            // glyph (feat/wizard-presets-and-banners).
+            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full bg-amber-100 text-amber-600 shrink-0"><FileText className="h-3 w-3" /></span>
+          )}
           <span className="flex-1 min-w-0">
             <span className={`block text-sm truncate ${descriptionPreview ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{descriptionPreview ? "Description" : "Add description"}</span>
             {descriptionPreview && <span className="block text-[12.5px] text-zinc-500 truncate">{descriptionPreview}</span>}
@@ -856,7 +985,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
           {tags.length > 0 ? (
             <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
-          ) : <TagIcon className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
+          ) : (
+            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full bg-purple-100 text-purple-600 shrink-0"><TagIcon className="h-3 w-3" /></span>
+          )}
           <span className="flex-1 min-w-0">
             <span className={`block text-sm truncate ${tags.length > 0 ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{tags.length > 0 ? "Tags" : "Add tags"}</span>
             {tags.length > 0 && <span className="block text-[12.5px] text-zinc-500 truncate">{tags.map(t => t.name).join(" · ")}</span>}
@@ -879,7 +1010,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
           {ctaText.trim() ? (
             <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-3 w-3" strokeWidth={3.5} /></span>
-          ) : <MousePointerClick className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />}
+          ) : (
+            <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full bg-blue-100 text-blue-600 shrink-0"><MousePointerClick className="h-3 w-3" /></span>
+          )}
           <span className="flex-1 min-w-0">
             <span className={`block text-sm truncate ${ctaText.trim() ? "font-medium text-zinc-800" : "text-zinc-500"}`}>Call to Action Label<span className="font-normal text-zinc-400 text-[12.5px]">{ctaText.trim() ? "" : " · optional"}</span></span>
             {ctaText.trim() && <span className="block text-[12.5px] text-zinc-500 truncate">&ldquo;{ctaText}&rdquo;</span>}
@@ -910,70 +1043,154 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           from the detail rows above it. */}
       {(showCommerce || showSettings) && (showTiers || !hideVisibility || !hideApproval || !hideRepeatPurchase) && (
         <div className="space-y-6">
-          {/* ── Variants ── title OUTSIDE the card now, mirroring the Approval /
-              Purchases groups below; the card holds only the list + add button.
-              Its old in-card header (Layers icon + "Variants" + count) is gone so
-              it reads as one of the eyebrow-labelled groups rather than a
-              standalone panel. */}
+          {/*
+            * ── Variants ──
+            *
+            * The old in-card "Variants" title + subtext and the enclosing
+            * wrapper card are GONE (feat/wizard-presets-and-banners). The
+            * step this renders inside already carries its own title/subtitle
+            * above the stepper (per the product spec), so a second "Variants"
+            * header here was a redundant restatement, not new information.
+            * The wrapper card is gone too — each tier keeps only its OWN
+            * card, so a one-variant product (the common case) no longer
+            * shows a card inside a card. "Add variant" moves to sit directly
+            * below the last tier card, unwrapped, losing its dashed-border
+            * treatment (that border read as "the edge of the variants panel",
+            * which no longer exists) but keeping the dashed OUTLINE on the
+            * button itself so it still reads as "add", not as a fourth tier.
+            */}
           {showCommerce && showTiers && (
-            <div>
-              <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Variants</p>
-              {/* A variant is what a buyer actually purchases: the product is a
-                  wrapper and each variant is one version of it, with its own
-                  price, files, licence and stock. Spelled out because sellers
-                  added a download expecting it at the product level and never
-                  opened a variant — where the deliverables actually live. */}
-              <p className="text-[12px] text-zinc-500 mb-2.5 max-w-[68ch] leading-relaxed">
-                Each variant is a version buyers can purchase, with its own price, files, licence and stock. Open one to add its downloadable content.
-              </p>
-              <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 overflow-hidden">
-                <div className="px-5 py-4">
-                  {configuredTiers.length > 0 && (
-                    <div className="space-y-2 mb-3">
-                      {configuredTiers.map((t, i) => (
-                        /* The whole row opens the tier editor. The publish switch
-                           that used to sit here is gone — publishing a tier lives
-                           inside that editor's Availability section, so a second
-                           copy here was one control writing another's value. */
-                        /* An expanded, clickable card: the whole row opens the tier
-                           editor, with a chevron as the drill-in cue. Name + price on
-                           top, then a fact strip that surfaces capacity / files /
-                           licence / stock so sellers see what lives inside and that
-                           the row is editable. The strip wraps responsively and
-                           renders only set facts. */
-                        <button key={i} type="button" onClick={() => openTierEditor(t.localId)}
-                          className="group w-full text-left rounded-xl bg-white border border-zinc-100 hover:bg-zinc-50 hover:border-zinc-200 transition-all duration-150 cursor-pointer overflow-hidden">
-                          <div className="flex items-center gap-3 px-4 py-3">
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-zinc-200 text-zinc-600">
-                              <Layers className="h-3.5 w-3.5" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[14px] font-semibold text-zinc-800 truncate">{t.name.trim() || "Unnamed variant"}</p>
-                              <p className="text-[12px] text-zinc-400 mt-0.5 truncate">{variantPriceLabel(t)}</p>
-                            </div>
-                            <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
-                          </div>
-                          <div className="flex flex-wrap border-t border-zinc-100">
-                            {variantFacts(t, isPhysical).map((f) => (
-                              <div key={f.k} className="flex-1 min-w-[110px] px-4 py-2.5 border-r border-zinc-100 last:border-r-0">
-                                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{f.k}</p>
-                                <p className="text-[13px] font-medium text-zinc-800 mt-0.5 tabular-nums">{f.v}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <button type="button" onClick={addAndEditTier}
-                    onMouseEnter={e => { const b = "var(--brand-color, #b8336a)"; e.currentTarget.style.color = b; e.currentTarget.style.borderColor = "color-mix(in srgb, var(--brand-color, #b8336a) 35%, transparent)"; e.currentTarget.style.background = "color-mix(in srgb, var(--brand-color, #b8336a) 6%, transparent)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.color = ""; e.currentTarget.style.borderColor = ""; e.currentTarget.style.background = ""; }}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[13px] font-medium text-zinc-500 border border-dashed border-zinc-200 rounded-xl cursor-pointer transition-all duration-150">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    Add variant
-                  </button>
-                </div>
+            <div className="space-y-3">
+              {/* ── Pricing banner + quick-setup presets ──
+                  Sits below the step's own title and above the tier cards.
+                  The three cards write the SAME state the tier editor and
+                  the donations field do (see the preset helpers above) —
+                  there is no separate "preset" value stored anywhere. */}
+              <WizardStepBanner
+                icon={<Sparkles className="h-[18px] w-[18px]" />}
+                title={pricingBannerTitle}
+                subtitle={pricingBannerSubtitle}
+              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {([
+                  {
+                    kind: "free" as const, label: "Free", icon: Gift,
+                    cardSelected: "cursor-pointer border-emerald-300 bg-emerald-50",
+                    badgeSelected: "bg-emerald-100 text-emerald-600",
+                  },
+                  {
+                    kind: "paid" as const, label: "Paid", icon: Wallet,
+                    cardSelected: "cursor-pointer border-blue-300 bg-blue-50",
+                    badgeSelected: "bg-blue-100 text-blue-600",
+                  },
+                  {
+                    kind: "donations" as const, label: "Free with donations", icon: CreditCard,
+                    cardSelected: "cursor-pointer border-violet-300 bg-violet-50",
+                    badgeSelected: "bg-violet-100 text-violet-600",
+                  },
+                  // Explicit per-card classnames, not an interpolated
+                  // `border-${accent}-300` string: Tailwind only generates
+                  // the classes it can see literally in source, so a
+                  // template-built class name would be silently absent from
+                  // the built CSS.
+                ]).map(({ kind, label, icon: PresetIcon, cardSelected, badgeSelected }) => {
+                  const selected = activePricingPreset === kind;
+                  // "Paid" needs a Stripe-connected community. Grayed out +
+                  // explained rather than hidden, so a seller discovers the
+                  // requirement here instead of at a save-time 400 — the
+                  // same reasoning event-management-ui's StripePayoutNotice
+                  // documents.
+                  const disabled = kind === "paid" && !stripeStatus.connected;
+                  return (
+                    <button
+                      key={kind}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => !disabled && tapPricingPreset(kind)}
+                      aria-pressed={selected}
+                      className={cn(
+                        "group text-left rounded-xl border px-3.5 py-3 transition-all duration-150",
+                        disabled
+                          ? "opacity-50 cursor-not-allowed border-zinc-100 bg-zinc-50"
+                          : selected
+                            ? cardSelected
+                            : "cursor-pointer border-zinc-100 bg-white hover:border-zinc-200 hover:bg-zinc-50",
+                      )}
+                    >
+                      <span className={cn(
+                        "flex items-center justify-center w-7 h-7 rounded-full mb-2",
+                        selected && !disabled ? badgeSelected : "bg-zinc-100 text-zinc-500",
+                      )}>
+                        <PresetIcon className="h-3.5 w-3.5" />
+                      </span>
+                      <p className="text-[13px] font-semibold text-zinc-800">{label}</p>
+                      {disabled && (
+                        <p className="text-[11px] text-zinc-400 mt-0.5 leading-snug">
+                          Connect Stripe first to sell for a price.
+                        </p>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
+
+              {configuredTiers.length > 0 && (
+                <div className="space-y-2">
+                  {configuredTiers.map((t, i) => (
+                    /* The whole row opens the tier editor. The publish switch
+                       that used to sit here is gone — publishing a tier lives
+                       inside that editor's Availability section, so a second
+                       copy here was one control writing another's value. */
+                    /* An expanded, clickable card: the whole row opens the tier
+                       editor, with a chevron as the drill-in cue. Name + price on
+                       top, then a fact strip that surfaces capacity / files /
+                       licence / stock so sellers see what lives inside and that
+                       the row is editable. The strip wraps responsively and
+                       renders only set facts. */
+                    <button key={i} type="button" onClick={() => openTierEditor(t.localId)}
+                      className="group w-full text-left rounded-xl bg-white border border-zinc-100 hover:bg-zinc-50 hover:border-zinc-200 transition-all duration-150 cursor-pointer overflow-hidden">
+                      <div className="flex items-center gap-3 px-4 py-3">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-zinc-200 text-zinc-600">
+                          <Layers className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[14px] font-semibold text-zinc-800 truncate">{t.name.trim() || "Unnamed variant"}</p>
+                          <p className="text-[12px] text-zinc-400 mt-0.5 truncate">{variantPriceLabel(t)}</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
+                      </div>
+                      <div className="flex flex-wrap border-t border-zinc-100">
+                        {variantFacts(t, isPhysical).map((f) => (
+                          <div key={f.k} className="flex-1 min-w-[110px] px-4 py-2.5 border-r border-zinc-100 last:border-r-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">{f.k}</p>
+                            <p className="text-[13px] font-medium text-zinc-800 mt-0.5 tabular-nums">{f.v}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button type="button" onClick={addAndEditTier}
+                onMouseEnter={e => { const b = "var(--brand-color, #b8336a)"; e.currentTarget.style.color = b; e.currentTarget.style.borderColor = "color-mix(in srgb, var(--brand-color, #b8336a) 35%, transparent)"; e.currentTarget.style.background = "color-mix(in srgb, var(--brand-color, #b8336a) 6%, transparent)"; }}
+                onMouseLeave={e => { e.currentTarget.style.color = ""; e.currentTarget.style.borderColor = ""; e.currentTarget.style.background = ""; }}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[13px] font-medium text-zinc-500 border border-dashed border-zinc-200 rounded-xl cursor-pointer transition-all duration-150">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add variant
+              </button>
+
+              {/* ── Pricing tip ── bottom of the step, dismissible. "Variants,
+                  files, licence or stock" names what THIS wizard's pricing
+                  step can actually configure later — not events' "ticket
+                  types / capacity / sign-up form" wording, which doesn't
+                  describe a product or course. */}
+              {!pricingTipDismissed && (
+                <DismissibleTipBanner
+                  body="You can always add more variants, upload files, set a licence or track stock for each one later."
+                  onDismiss={() => setPricingTipDismissed(true)}
+                />
+              )}
             </div>
           )}
 
@@ -982,7 +1199,12 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           {showCommerce && (
             <DonationsField
               donation={donation}
-              onUpdate={(patch) => setDonation((d) => ({ ...d, ...patch }))}
+              onUpdate={(patch) => {
+                setDonation((d) => ({ ...d, ...patch }));
+                // Manual edit via the donations field — same dirty rule as
+                // the tier editor above.
+                setPricingDirty(true);
+              }}
               defaultCurrency={currency}
             />
           )}
@@ -1263,6 +1485,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             onDraftCommit={({ tiers: nextTiers, donation: nextDonation }) => {
               setTiers(nextTiers);
               setDonation(nextDonation);
+              // Manual edit via the tier editor — the next preset tap must
+              // confirm before it overwrites this.
+              setPricingDirty(true);
             }}
             onClose={closeTierModal}
             onSaved={closeTierModal}
@@ -1280,6 +1505,23 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           />
         </ProductManagementConfigProvider>
       )}
+
+      {/* ─── Pricing-preset discard guard ───
+          Only raised when the seller manually configured something a preset
+          tap would overwrite (pricingDirty) and the tapped preset is not
+          already the active one — see tapPricingPreset above. */}
+      <DiscardPrompt
+        open={pendingPreset !== null}
+        onCancel={() => setPendingPreset(null)}
+        onConfirm={() => {
+          if (pendingPreset) applyPricingPreset(pendingPreset);
+          setPendingPreset(null);
+        }}
+        title="Replace your pricing setup?"
+        message="Switching to this preset will overwrite the price and donation settings you configured manually."
+        confirmLabel="Use preset"
+        cancelLabel="Keep my setup"
+      />
     </div>
   );
 }

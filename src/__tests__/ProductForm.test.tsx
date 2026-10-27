@@ -57,7 +57,9 @@ describe("ProductForm", () => {
     // Several add-photo affordances (one per empty slot) - one is enough.
     expect(screen.getAllByLabelText("Add photo").length).toBeGreaterThan(0);
     expect(screen.getByText("Call to Action Label")).toBeInTheDocument();
-    expect(screen.getByText("Variants")).toBeInTheDocument();
+    // "Variants" (the old in-card title) is gone (feat/wizard-presets-and-
+    // banners) — the pricing surface is now identified by its own controls.
+    expect(screen.getByRole("button", { name: /add variant/i })).toBeInTheDocument();
   });
 
   it("preloads initialData (name + CTA text)", () => {
@@ -127,7 +129,6 @@ describe("ProductForm", () => {
 
   it("showTiers={true}: the Variants card is there immediately, no opt-in", () => {
     renderWithConfig(<ProductForm {...baseProps({ showTiers: true })} />);
-    expect(screen.getByText("Variants")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /add variant/i })).toBeInTheDocument();
   });
 
