@@ -69,11 +69,23 @@ export function WizardStepBanner({
  * refresh). Acceptable for a "by the way" note; revisit if sellers complain
  * about it coming back.
  *
- * Swipe-to-dismiss on mobile mirrors @cobuntu/management-ui-shared's
- * ActionModalShell (its drag-down-to-dismiss tracking), adapted from a modal
- * card to an inline strip: same touchstart/touchmove/touchend arithmetic and
- * the same 80px release threshold.
+ * Swipe-to-dismiss mirrors @cobuntu/management-ui-shared's ActionModalShell
+ * (its drag-down-to-dismiss tracking), adapted from a modal card to an inline
+ * strip: same drag arithmetic and the same 80px release threshold. Touch
+ * (mobile) and pointer (desktop mouse-drag) events run the SAME drag/release
+ * logic in parallel — kept as two handler sets rather than unifying on
+ * Pointer Events alone because some mobile browsers still fire touch events
+ * ahead of/instead of pointer events on older WebViews; duplicating the three
+ * small handlers was cheaper than chasing that compat matrix.
+ *
+ * Dismissal (X button OR a successful swipe) plays a short close transition
+ * (opacity + max-height collapse) before calling the parent's onDismiss,
+ * instead of unmounting instantly — local "closing" state drives it, with a
+ * setTimeout matching the transition duration to fire onDismiss once the
+ * animation finishes. prefers-reduced-motion skips straight to onDismiss.
  */
+const CLOSE_TRANSITION_MS = 180;
+
 export function DismissibleTipBanner({
   title = "Good to know",
   body,
@@ -85,20 +97,61 @@ export function DismissibleTipBanner({
 }) {
   const dragStartY = React.useRef<number | null>(null);
   const [dragOffsetY, setDragOffsetY] = React.useState(0);
+  const [isClosing, setIsClosing] = React.useState(false);
   const SWIPE_DISMISS_PX = 80;
 
-  function onTouchStart(e: React.TouchEvent) {
-    dragStartY.current = e.touches[0]?.clientY ?? null;
+  function prefersReducedMotion() {
+    return typeof window !== "undefined"
+      && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
   }
-  function onTouchMove(e: React.TouchEvent) {
+
+  function close() {
+    if (isClosing) return;
+    if (prefersReducedMotion()) {
+      onDismiss();
+      return;
+    }
+    setIsClosing(true);
+    setTimeout(onDismiss, CLOSE_TRANSITION_MS);
+  }
+
+  function dragStart(clientY: number) {
+    dragStartY.current = clientY;
+  }
+  function dragMove(clientY: number) {
     if (dragStartY.current === null) return;
-    const delta = (e.touches[0]?.clientY ?? 0) - dragStartY.current;
+    const delta = clientY - dragStartY.current;
     if (delta > 0) setDragOffsetY(delta);
   }
-  function onTouchEnd() {
-    if (dragOffsetY > SWIPE_DISMISS_PX) onDismiss();
+  function dragEnd() {
+    if (dragOffsetY > SWIPE_DISMISS_PX) close();
     setDragOffsetY(0);
     dragStartY.current = null;
+  }
+
+  function onTouchStart(e: React.TouchEvent) {
+    dragStart(e.touches[0]?.clientY ?? 0);
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    dragMove(e.touches[0]?.clientY ?? 0);
+  }
+  function onTouchEnd() {
+    dragEnd();
+  }
+
+  // Mouse-drag on desktop — pointer events so it also covers pen/touch
+  // pointers without clashing with the dedicated touch handlers above.
+  function onPointerDown(e: React.PointerEvent) {
+    if (e.pointerType === "touch") return; // the touch handlers own this
+    dragStart(e.clientY);
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (e.pointerType === "touch") return;
+    dragMove(e.clientY);
+  }
+  function onPointerUp(e: React.PointerEvent) {
+    if (e.pointerType === "touch") return;
+    dragEnd();
   }
 
   return (
@@ -106,10 +159,17 @@ export function DismissibleTipBanner({
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
-      style={dragOffsetY > 0
-        ? { transform: `translateY(${dragOffsetY}px)`, opacity: Math.max(1 - dragOffsetY / 200, 0.4) }
-        : undefined}
-      className="relative flex items-start gap-3 rounded-2xl bg-blue-50 ring-1 ring-blue-100 px-4 py-3.5 transition-transform"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerUp}
+      style={{
+        ...(dragOffsetY > 0
+          ? { transform: `translateY(${dragOffsetY}px)`, opacity: Math.max(1 - dragOffsetY / 200, 0.4) }
+          : undefined),
+        ...(isClosing ? { opacity: 0, maxHeight: 0, marginTop: 0, paddingTop: 0, paddingBottom: 0, overflow: "hidden" } : undefined),
+      }}
+      className={`relative flex items-start gap-3 rounded-2xl bg-blue-50 ring-1 ring-blue-100 px-4 py-3.5 transition-[transform,opacity,max-height,padding,margin] duration-150 ${isClosing ? "" : "cursor-grab"}`}
     >
       {/* Info-blue, not gray — this is an informational note, and flat zinc
           read as a muted aside rather than "worth knowing" per feedback. */}
@@ -126,7 +186,7 @@ export function DismissibleTipBanner({
       </div>
       <button
         type="button"
-        onClick={onDismiss}
+        onClick={close}
         aria-label="Dismiss"
         className="w-7 h-7 rounded-full bg-blue-100 hover:bg-blue-200 flex items-center justify-center shrink-0 cursor-pointer transition-colors"
       >

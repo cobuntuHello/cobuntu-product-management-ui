@@ -128,11 +128,16 @@ describe("reset-confirm guard on preset taps", () => {
 });
 
 describe("pricing tip banner dismiss", () => {
-  it("renders the tip and removes it once dismissed", () => {
+  it("renders the tip and removes it once dismissed", async () => {
+    // Dismiss now plays a short close transition before unmounting (local
+    // "closing" state + setTimeout in DismissibleTipBanner), so the removal
+    // is asynchronous — wait for it instead of asserting immediately.
     renderWithConfig(<ProductForm {...base} />);
     expect(screen.getByText("Good to know")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
-    expect(screen.queryByText("Good to know")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText("Good to know")).not.toBeInTheDocument();
+    });
   });
 });
 
