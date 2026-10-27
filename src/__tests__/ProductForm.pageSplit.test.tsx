@@ -42,7 +42,7 @@ describe("page split — listing vs commerce", () => {
     expect(screen.queryByPlaceholderText("Product Name")).not.toBeInTheDocument();
     expect(screen.queryByText("Add description")).not.toBeInTheDocument();
     expect(screen.queryByText("Call to Action Label")).not.toBeInTheDocument();
-    expect(screen.getByText("Variants")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add variant/i })).toBeInTheDocument();
     // Approval + repeat moved to the "Policies & access" (settings) step.
     expect(screen.queryByText("Require approval")).not.toBeInTheDocument();
     expect(screen.queryByText("Can be bought more than once")).not.toBeInTheDocument();
@@ -59,7 +59,7 @@ describe("page split — listing vs commerce", () => {
     renderWithConfig(<ProductForm {...base} onChange={vi.fn()} />);
     expect(screen.getByPlaceholderText("Product Name")).toBeInTheDocument();
     expect(screen.getByText("Add description")).toBeInTheDocument();
-    expect(screen.getByText("Variants")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add variant/i })).toBeInTheDocument();
     expect(screen.getByText("Require approval")).toBeInTheDocument();
     expect(screen.getByText("Can be bought more than once")).toBeInTheDocument();
   });
@@ -76,7 +76,7 @@ describe("page split — listing vs commerce", () => {
     expect(screen.queryByLabelText(/How many do you have/)).not.toBeInTheDocument();
     expect(screen.queryByText("Add files")).not.toBeInTheDocument();
     // The variants card is still here - that is where they get answered.
-    expect(screen.getByText("Variants")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add variant/i })).toBeInTheDocument();
   });
 
   it("emits the full payload even from the commerce page (shared state)", () => {
