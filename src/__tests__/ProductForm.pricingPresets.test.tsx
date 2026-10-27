@@ -187,6 +187,17 @@ describe("the Paid preset respects the Stripe-connected gate", () => {
     expect(screen.getByText(/Buyers pay to get access/)).toBeInTheDocument();
   });
 
+  it("opens the price editor after applying Paid, since clearing the price to blank gives no other visible feedback", async () => {
+    connectStripe();
+    renderWithConfig(<ProductForm {...base} />);
+    const paidButton = await screen.findByRole("button", { name: /^Paid/ });
+    await waitFor(() => {
+      expect(screen.queryByText(/Connect Stripe to sell for a price/)).not.toBeInTheDocument();
+    });
+    fireEvent.click(paidButton);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
   it("stripeStatusOverride wins over the internal useStripeStatus check", () => {
     // No mockFetch stub here on purpose: the internal hook's own fetch would
     // fail with "Unmocked fetch" if it were ever awaited for this assertion,
