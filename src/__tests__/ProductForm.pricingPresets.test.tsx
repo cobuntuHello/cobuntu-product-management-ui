@@ -163,4 +163,19 @@ describe("the Paid preset respects the Stripe-connected gate", () => {
     fireEvent.click(paidButton);
     expect(screen.getByText(/Buyers pay to get access/)).toBeInTheDocument();
   });
+
+  it("stripeStatusOverride wins over the internal useStripeStatus check", () => {
+    // No mockFetch stub here on purpose: the internal hook's own fetch would
+    // fail with "Unmocked fetch" if it were ever awaited for this assertion,
+    // which proves the override short-circuits it synchronously (the override
+    // path sets `loading: false, known: true` immediately, no fetch needed).
+    // The internal hook still runs (same hook order every render) and is
+    // left to resolve `connected: false` in the background — irrelevant,
+    // since the override must win.
+    renderWithConfig(<ProductForm {...base} stripeStatusOverride={{ connected: true }} />);
+    const paidButton = screen.getByRole("button", { name: /^Paid/ });
+    expect(screen.queryByText(/Connect Stripe to sell for a price/)).not.toBeInTheDocument();
+    fireEvent.click(paidButton);
+    expect(screen.getByText(/Buyers pay to get access/)).toBeInTheDocument();
+  });
 });
