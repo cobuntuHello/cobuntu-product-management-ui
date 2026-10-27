@@ -170,13 +170,23 @@ export function CategoryPickerRow({
             <Check className="h-3 w-3" strokeWidth={3.5} />
           </span>
         ) : (
-          <FolderTree className="h-[18px] w-[18px] text-zinc-400 shrink-0 transition-colors group-hover:text-zinc-500" />
+          // Colored badge, matching the other basics-step rows
+          // (description=amber, tags=purple, CTA=blue) — teal keeps this
+          // row visually distinct from the other three.
+          <span className="flex items-center justify-center w-[22px] h-[22px] rounded-full bg-teal-100 text-teal-600 shrink-0">
+            <FolderTree className="h-3 w-3" />
+          </span>
         )}
         <span className="flex-1 min-w-0">
           <span className={`block text-sm truncate ${summary ? "font-medium text-zinc-800" : "text-zinc-500"}`}>
             {summary ? "Category" : "Choose a category"}
           </span>
-          {summary && <span className="block text-[12.5px] text-zinc-500 truncate">{summary}</span>}
+          {/* Subtitle in BOTH states — a hint when unanswered, the chosen
+              value once set — so the row never shows a bare title with
+              nothing explaining what it's for. */}
+          <span className={`block text-[12.5px] truncate ${summary ? "text-zinc-500" : "text-zinc-400"}`}>
+            {summary ?? `Help people discover this ${noun}`}
+          </span>
         </span>
         <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
       </button>

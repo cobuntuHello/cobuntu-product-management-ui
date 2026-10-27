@@ -21,14 +21,38 @@ export function WizardStepBanner({
   title: string;
   subtitle: string;
 }) {
+  /*
+   * Tinted off the COMMUNITY's own brand color (var(--brand-color), the same
+   * custom property ProductForm's answered-state checkmarks already read),
+   * not a fixed violet palette — a banner hardcoded to one hue looked like a
+   * generic template no matter whose community it rendered in. color-mix
+   * lightens/darkens the single brand color into a background tint, an
+   * icon-circle tint and a readable text tint, so the banner looks native to
+   * whichever brand color is set. #6d28d9 (violet-700) is the fallback for a
+   * community with no brand color configured, keeping roughly today's look.
+   */
+  const BRAND_FALLBACK = "#27272a"; /* zinc-800 — neutral, not purple, when no brand color is set */
+  const brand = `var(--brand-color, ${BRAND_FALLBACK})`;
   return (
-    <div className="flex items-start gap-3 rounded-2xl bg-violet-50 ring-1 ring-violet-100 px-4 py-3.5">
-      <span className="flex items-center justify-center w-9 h-9 rounded-full bg-violet-100 text-violet-600 shrink-0">
+    <div
+      className="flex items-start gap-3 rounded-2xl px-4 py-3.5"
+      style={{
+        background: `color-mix(in srgb, ${brand} 8%, white)`,
+        boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${brand} 16%, white)`,
+      }}
+    >
+      <span
+        className="flex items-center justify-center w-9 h-9 rounded-full shrink-0"
+        style={{
+          background: `color-mix(in srgb, ${brand} 18%, white)`,
+          color: `color-mix(in srgb, ${brand} 85%, black)`,
+        }}
+      >
         {icon}
       </span>
       <div className="min-w-0">
-        <p className="text-[14px] font-semibold text-violet-900 leading-snug">{title}</p>
-        <p className="text-[12.5px] text-violet-600/80 mt-0.5 leading-snug">{subtitle}</p>
+        <p className="text-[14px] font-semibold leading-snug" style={{ color: `color-mix(in srgb, ${brand} 70%, black)` }}>{title}</p>
+        <p className="text-[12.5px] mt-0.5 leading-snug" style={{ color: `color-mix(in srgb, ${brand} 55%, black)` }}>{subtitle}</p>
       </div>
     </div>
   );
@@ -85,9 +109,11 @@ export function DismissibleTipBanner({
       style={dragOffsetY > 0
         ? { transform: `translateY(${dragOffsetY}px)`, opacity: Math.max(1 - dragOffsetY / 200, 0.4) }
         : undefined}
-      className="relative flex items-start gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100 px-4 py-3.5 transition-transform"
+      className="relative flex items-start gap-3 rounded-2xl bg-blue-50 ring-1 ring-blue-100 px-4 py-3.5 transition-transform"
     >
-      <span className="flex items-center justify-center w-7 h-7 rounded-full bg-zinc-200 text-zinc-500 shrink-0 mt-0.5">
+      {/* Info-blue, not gray — this is an informational note, and flat zinc
+          read as a muted aside rather than "worth knowing" per feedback. */}
+      <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 text-blue-600 shrink-0 mt-0.5">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <circle cx="12" cy="12" r="10" />
           <line x1="12" y1="16" x2="12" y2="11" />
@@ -95,16 +121,16 @@ export function DismissibleTipBanner({
         </svg>
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold text-zinc-700">{title}</p>
-        <p className="text-[12px] text-zinc-500 mt-0.5 leading-relaxed">{body}</p>
+        <p className="text-[13px] font-semibold text-blue-900">{title}</p>
+        <p className="text-[12px] text-blue-700/80 mt-0.5 leading-relaxed">{body}</p>
       </div>
       <button
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss"
-        className="w-7 h-7 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+        className="w-7 h-7 rounded-full bg-blue-100 hover:bg-blue-200 flex items-center justify-center shrink-0 cursor-pointer transition-colors"
       >
-        <X className="h-3.5 w-3.5 text-zinc-500" />
+        <X className="h-3.5 w-3.5 text-blue-600" />
       </button>
     </div>
   );

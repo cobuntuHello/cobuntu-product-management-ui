@@ -49,7 +49,7 @@ import {
   Layers, MousePointerClick, ChevronRight,
   Eye, EyeOff, UserCheck, Lock, ClipboardCheck, Repeat,
   Image as ImageIcon, Plus, Check, X,
-  Sparkles, Wallet, Gift, CreditCard,
+  PenLine, Wallet, Gift, CreditCard, AlertCircle,
 } from "lucide-react";
 
 // draftMode makes ZERO API calls (mount fetch, member-pricing fetch, and
@@ -865,8 +865,11 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
            own; sits above the name field it introduces. Copy swaps
            product/course via the same `productType` flag the rest of this
            form already keys off of (see `noun` above). */}
+      {/* Pencil glyph — "naming/starting" the listing, not a generic
+          decorative icon. Each banner's icon must read as the step it
+          sits above (basics vs pricing), never interchangeable. */}
       <WizardStepBanner
-        icon={<Sparkles className="h-[18px] w-[18px]" />}
+        icon={<PenLine className="h-[18px] w-[18px]" />}
         title={basicsBannerTitle}
         subtitle={basicsBannerSubtitle}
       />
@@ -876,10 +879,15 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         <input value={name} onChange={e => setName(e.target.value)} placeholder={L.namePlaceholder}
           aria-invalid={nameTooLong || undefined}
           className="w-full text-[28px] font-bold text-zinc-900 placeholder:text-zinc-300 bg-transparent border-none outline-none p-0 leading-tight" />
+        {/* Soft, rounded error treatment matching the form's language
+            elsewhere (rounded pills/badges, muted tints) instead of a
+            sharp-cornered box or a plain triangle-and-text row. Icon +
+            message together, never color alone. Validation logic
+            unchanged — still only shows when showErrors && no name. */}
         {showErrors && !name.trim() && (
-          <p className="text-[13px] text-amber-600 mt-2 flex items-center gap-1.5">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" className="shrink-0"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99zM11 16h2v2h-2zm0-6h2v4h-2z" /></svg>
-            Give your product a name
+          <p className="inline-flex items-center gap-1.5 mt-2 rounded-full bg-amber-50 px-3 py-1.5 text-[13px] text-amber-700">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            Give your product a name so people know what they&apos;re looking at
           </p>
         )}
         {/*
@@ -976,7 +984,11 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           )}
           <span className="flex-1 min-w-0">
             <span className={`block text-sm truncate ${descriptionPreview ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{descriptionPreview ? "Description" : "Add description"}</span>
-            {descriptionPreview && <span className="block text-[12.5px] text-zinc-500 truncate">{descriptionPreview}</span>}
+            {/* Subtitle in BOTH states — L.descriptionHint explains what the
+                field is for when unanswered, so an empty row isn't bare. */}
+            <span className={`block text-[12.5px] truncate ${descriptionPreview ? "text-zinc-500" : "text-zinc-400"}`}>
+              {descriptionPreview || L.descriptionHint}
+            </span>
           </span>
           <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
         </button>
@@ -990,7 +1002,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           )}
           <span className="flex-1 min-w-0">
             <span className={`block text-sm truncate ${tags.length > 0 ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{tags.length > 0 ? "Tags" : "Add tags"}</span>
-            {tags.length > 0 && <span className="block text-[12.5px] text-zinc-500 truncate">{tags.map(t => t.name).join(" · ")}</span>}
+            <span className={`block text-[12.5px] truncate ${tags.length > 0 ? "text-zinc-500" : "text-zinc-400"}`}>
+              {tags.length > 0 ? tags.map(t => t.name).join(" · ") : L.tagsHint}
+            </span>
           </span>
           <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
         </button>
@@ -1015,7 +1029,11 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           )}
           <span className="flex-1 min-w-0">
             <span className={`block text-sm truncate ${ctaText.trim() ? "font-medium text-zinc-800" : "text-zinc-500"}`}>Call to Action Label<span className="font-normal text-zinc-400 text-[12.5px]">{ctaText.trim() ? "" : " · optional"}</span></span>
-            {ctaText.trim() && <span className="block text-[12.5px] text-zinc-500 truncate">&ldquo;{ctaText}&rdquo;</span>}
+            {/* L.ctaHint is long — truncate rather than shorten, matching how
+                the answered-state summary line already truncates. */}
+            <span className={`block text-[12.5px] truncate ${ctaText.trim() ? "text-zinc-500" : "text-zinc-400"}`}>
+              {ctaText.trim() ? `“${ctaText}”` : L.ctaHint}
+            </span>
           </span>
           <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
         </button>
@@ -1067,7 +1085,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                   the donations field do (see the preset helpers above) —
                   there is no separate "preset" value stored anywhere. */}
               <WizardStepBanner
-                icon={<Sparkles className="h-[18px] w-[18px]" />}
+                icon={<Wallet className="h-[18px] w-[18px]" />}
                 title={pricingBannerTitle}
                 subtitle={pricingBannerSubtitle}
               />
@@ -1076,16 +1094,19 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 {([
                   {
                     kind: "free" as const, label: "Free", icon: Gift,
+                    desc: `Anyone can get it with no payment. The variant underneath stays at $0 — switch to Paid any time without losing its other settings.`,
                     cardSelected: "cursor-pointer border-emerald-300 bg-emerald-50",
                     badgeSelected: "bg-emerald-100 text-emerald-600",
                   },
                   {
                     kind: "paid" as const, label: "Paid", icon: Wallet,
+                    desc: `Buyers pay before they get access. The price lives on the variant below, so you set the exact amount there once Stripe is connected.`,
                     cardSelected: "cursor-pointer border-blue-300 bg-blue-50",
                     badgeSelected: "bg-blue-100 text-blue-600",
                   },
                   {
                     kind: "donations" as const, label: "Free with donations", icon: CreditCard,
+                    desc: `Access stays free, but buyers are offered a voluntary tip at checkout. Nobody is blocked from getting it for not paying.`,
                     cardSelected: "cursor-pointer border-violet-300 bg-violet-50",
                     badgeSelected: "bg-violet-100 text-violet-600",
                   },
@@ -1094,42 +1115,48 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                   // the classes it can see literally in source, so a
                   // template-built class name would be silently absent from
                   // the built CSS.
-                ]).map(({ kind, label, icon: PresetIcon, cardSelected, badgeSelected }) => {
+                ]).map(({ kind, label, icon: PresetIcon, desc, cardSelected, badgeSelected }) => {
                   const selected = activePricingPreset === kind;
-                  // "Paid" needs a Stripe-connected community. Grayed out +
-                  // explained rather than hidden, so a seller discovers the
-                  // requirement here instead of at a save-time 400 — the
-                  // same reasoning event-management-ui's StripePayoutNotice
-                  // documents.
-                  const disabled = kind === "paid" && !stripeStatus.connected;
+                  // "Paid" needs a Stripe-connected community, but the card
+                  // itself stays a real click target either way (feedback:
+                  // a dead disabled card with nothing to click was a worse
+                  // experience than one that guides the seller to connect
+                  // Stripe). Only the VISUAL treatment is muted/locked.
+                  const needsStripe = kind === "paid" && !stripeStatus.connected;
                   return (
                     <button
                       key={kind}
                       type="button"
-                      disabled={disabled}
-                      onClick={() => !disabled && tapPricingPreset(kind)}
+                      aria-label={label}
+                      onClick={() => {
+                        if (needsStripe) {
+                          if (stripeStatus.connectUrl) window.location.href = stripeStatus.connectUrl;
+                          return;
+                        }
+                        tapPricingPreset(kind);
+                      }}
                       aria-pressed={selected}
                       className={cn(
-                        "group text-left rounded-xl border px-3.5 py-3 transition-all duration-150",
-                        disabled
-                          ? "opacity-50 cursor-not-allowed border-zinc-100 bg-zinc-50"
+                        "group text-left rounded-xl border px-3.5 py-3 transition-all duration-150 cursor-pointer",
+                        needsStripe
+                          ? "border-zinc-100 bg-zinc-50 hover:border-zinc-200"
                           : selected
                             ? cardSelected
-                            : "cursor-pointer border-zinc-100 bg-white hover:border-zinc-200 hover:bg-zinc-50",
+                            : "border-zinc-100 bg-white hover:border-zinc-200 hover:bg-zinc-50",
                       )}
                     >
+                      {/* Bigger icon + badge — a real visual anchor for the
+                          card, not a tiny decoration. */}
                       <span className={cn(
-                        "flex items-center justify-center w-7 h-7 rounded-full mb-2",
-                        selected && !disabled ? badgeSelected : "bg-zinc-100 text-zinc-500",
+                        "flex items-center justify-center w-10 h-10 rounded-full mb-2",
+                        needsStripe ? "bg-zinc-200 text-zinc-400" : selected ? badgeSelected : "bg-zinc-100 text-zinc-500",
                       )}>
-                        <PresetIcon className="h-3.5 w-3.5" />
+                        <PresetIcon className="h-5 w-5" />
                       </span>
-                      <p className="text-[13px] font-semibold text-zinc-800">{label}</p>
-                      {disabled && (
-                        <p className="text-[11px] text-zinc-400 mt-0.5 leading-snug">
-                          Connect Stripe first to sell for a price.
-                        </p>
-                      )}
+                      <p className={cn("text-[13px] font-semibold", needsStripe ? "text-zinc-500" : "text-zinc-800")}>{label}</p>
+                      <p className={cn("text-[11.5px] mt-0.5 leading-snug", needsStripe ? "text-zinc-400" : "text-zinc-500")}>
+                        {needsStripe ? "Connect Stripe to sell for a price — tap to connect now." : desc}
+                      </p>
                     </button>
                   );
                 })}
@@ -1179,18 +1206,6 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Add variant
               </button>
-
-              {/* ── Pricing tip ── bottom of the step, dismissible. "Variants,
-                  files, licence or stock" names what THIS wizard's pricing
-                  step can actually configure later — not events' "ticket
-                  types / capacity / sign-up form" wording, which doesn't
-                  describe a product or course. */}
-              {!pricingTipDismissed && (
-                <DismissibleTipBanner
-                  body="You can always add more variants, upload files, set a licence or track stock for each one later."
-                  onDismiss={() => setPricingTipDismissed(true)}
-                />
-              )}
             </div>
           )}
 
@@ -1206,6 +1221,19 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 setPricingDirty(true);
               }}
               defaultCurrency={currency}
+            />
+          )}
+
+          {/* ── Pricing tip ── very bottom of the step, below Donations (not
+              between "Add variant" and Donations as before), dismissible.
+              "Variants, files, licence or stock" names what THIS wizard's
+              pricing step can actually configure later — not events' "ticket
+              types / capacity / sign-up form" wording, which doesn't
+              describe a product or course. */}
+          {showCommerce && showTiers && !pricingTipDismissed && (
+            <DismissibleTipBanner
+              body="You can always add more variants, upload files, set a licence or track stock for each one later."
+              onDismiss={() => setPricingTipDismissed(true)}
             />
           )}
 

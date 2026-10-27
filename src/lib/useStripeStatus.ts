@@ -43,6 +43,14 @@ export interface StripeStatus {
    * connected Stripe" — that claim is only true when `known` is true too.
    */
   known: boolean;
+  /**
+   * Where to send the seller to connect Stripe, so the "Paid" preset card
+   * can be a real click target instead of a dead disabled card when Stripe
+   * isn't connected yet. Null when there is no config (e.g. no provider
+   * wired, same guard as above) — the card falls back to doing nothing
+   * rather than throwing.
+   */
+  connectUrl: string | null;
 }
 
 export function useStripeStatus(communityTag: string): StripeStatus {
@@ -63,7 +71,8 @@ export function useStripeStatus(communityTag: string): StripeStatus {
   } catch {
     config = null;
   }
-  const [status, setStatus] = useState<StripeStatus>({ connected: false, loading: true, known: false });
+  const [status, setStatus] = useState<Omit<StripeStatus, "connectUrl">>({ connected: false, loading: true, known: false });
+  const connectUrl = config ? config.stripeConnectUrl(communityTag) : null;
 
   useEffect(() => {
     if (!communityTag || !config) {
@@ -92,5 +101,5 @@ export function useStripeStatus(communityTag: string): StripeStatus {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [communityTag, config]);
 
-  return status;
+  return { ...status, connectUrl };
 }

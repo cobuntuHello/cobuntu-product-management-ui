@@ -137,16 +137,30 @@ describe("pricing tip banner dismiss", () => {
 });
 
 describe("the Paid preset respects the Stripe-connected gate", () => {
-  it("is disabled until the community has a connected account", () => {
+  // The card is now ALWAYS a real click target (product-owner feedback: a
+  // dead disabled card with nothing to click was worse than one that guides
+  // the seller toward connecting Stripe) — never `disabled`. It stays
+  // visually muted and does not apply the preset until Stripe is connected.
+  it("stays clickable (not disabled) and does not apply the preset until the community has a connected account", () => {
     renderWithConfig(<ProductForm {...base} />);
-    expect(screen.getByRole("button", { name: /^Paid/ })).toBeDisabled();
+    const paidButton = screen.getByRole("button", { name: /^Paid/ });
+    expect(paidButton).not.toBeDisabled();
+    expect(screen.getByText(/Connect Stripe to sell for a price/)).toBeInTheDocument();
+    fireEvent.click(paidButton);
+    expect(paidButton).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("is enabled once useStripeStatus resolves connected: true", async () => {
+  it("drops the Stripe-connect hint once useStripeStatus resolves connected: true, and clicking applies the preset path (not a navigation)", async () => {
     connectStripe();
     renderWithConfig(<ProductForm {...base} />);
+    const paidButton = screen.getByRole("button", { name: /^Paid/ });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /^Paid/ })).not.toBeDisabled();
+      expect(screen.queryByText(/Connect Stripe to sell for a price/)).not.toBeInTheDocument();
     });
+    // Clicking now goes through tapPricingPreset rather than the
+    // connect-Stripe redirect — the rich description (not the connect hint)
+    // stays on screen.
+    fireEvent.click(paidButton);
+    expect(screen.getByText(/The price lives on the variant below/)).toBeInTheDocument();
   });
 });
