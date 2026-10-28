@@ -122,8 +122,8 @@ export function ProductCreateWizard(props: ProductCreateWizardProps) {
         <WizardNavProvider value={nav}>
           <ProductManagementConfigProvider
             value={{
-              apiBaseUrl: "",
-              authHeaders: () => ({}),
+              apiBaseUrl: props.apiBaseUrl ?? "",
+              authHeaders: props.authHeaders ?? (() => ({})),
               stripeConnectUrl: () => navigation.hrefs.connectStripe,
             }}
           >
