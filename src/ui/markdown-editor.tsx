@@ -2,6 +2,15 @@
 
 import { useRef, useLayoutEffect, useState, useCallback } from "react";
 
+/** No prior limit existed on this field; 2000 is a sensible cap for a product
+ * description (long enough for real detail, short enough that a listing page
+ * doesn't become a wall of text). */
+const DEFAULT_MAX_LENGTH = 2000;
+
+/** Textarea grows naturally up to this height as you type, then scrolls --
+ * never fully unbounded, never a rigid fixed height from the first keystroke. */
+const MAX_TEXTAREA_HEIGHT = 200;
+
 export interface MarkdownEditorProps {
   value: string;
   onChange: (next: string) => void;
@@ -9,6 +18,8 @@ export interface MarkdownEditorProps {
   disabled?: boolean;
   minRows?: number;
   autoFocus?: boolean;
+  /** @default 2000 */
+  maxLength?: number;
 }
 
 /**
@@ -88,15 +99,31 @@ export function MarkdownEditor({
   disabled,
   minRows = 6,
   autoFocus,
+  maxLength = DEFAULT_MAX_LENGTH,
 }: MarkdownEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const [focused, setFocused] = useState(false);
 
+  // Grows with content up to MAX_TEXTAREA_HEIGHT, same as before that cap;
+  // past it, height stops changing and the textarea scrolls internally
+  // instead -- a modal containing this no longer visibly resizes as someone
+  // keeps typing.
   const resize = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
+    el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
+  }, []);
+
+  // The formatted preview is a separate absolutely-positioned element pinned
+  // over the (invisible-text) textarea; once the textarea scrolls instead of
+  // growing, the overlay has to scroll in lockstep or the preview and the
+  // real caret/selection drift apart.
+  const syncOverlayScroll = useCallback(() => {
+    if (overlayRef.current && textareaRef.current) {
+      overlayRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
   }, []);
 
   useLayoutEffect(() => {
@@ -117,6 +144,7 @@ export function MarkdownEditor({
         }`}
       >
         <div
+          ref={overlayRef}
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-4 py-3.5 text-[14.5px] leading-relaxed text-zinc-800"
           dangerouslySetInnerHTML={{ __html: html || "&nbsp;" }}
@@ -127,15 +155,23 @@ export function MarkdownEditor({
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
+          onScroll={syncOverlayScroll}
           placeholder={placeholder}
           disabled={disabled}
           autoFocus={autoFocus}
           rows={minRows}
+          maxLength={maxLength}
           spellCheck
-          className="relative w-full resize-none overflow-hidden whitespace-pre-wrap break-words border-0 bg-transparent px-4 py-3.5 text-[14.5px] leading-relaxed text-transparent caret-zinc-900 outline-none placeholder:text-zinc-300"
+          style={{ maxHeight: MAX_TEXTAREA_HEIGHT }}
+          className="relative w-full resize-none overflow-y-auto whitespace-pre-wrap break-words border-0 bg-transparent px-4 py-3.5 text-[14.5px] leading-relaxed text-transparent caret-zinc-900 outline-none placeholder:text-zinc-300"
         />
       </div>
-      <p className="mt-1.5 px-1 text-[11.5px] text-zinc-400">Markdown supported: use **bold**, *italic*, and - for lists.</p>
+      <div className="mt-1.5 flex items-center justify-between gap-2 px-1">
+        <p className="text-[11.5px] text-zinc-400">Markdown supported: use **bold**, *italic*, and - for lists.</p>
+        <span className="shrink-0 text-[11.5px] tabular-nums text-zinc-400">
+          {value.length} / {maxLength}
+        </span>
+      </div>
     </div>
   );
 }

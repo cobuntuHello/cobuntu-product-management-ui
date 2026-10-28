@@ -1055,6 +1055,21 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
         </button>
 
+        {/* Category above tags: categories take priority (a product's single
+            primary classification) over tags (secondary, free-form, many
+            per product) -- swapped from the original description/tags/
+            category order per the user's explicit call. */}
+        <CategoryPickerRow
+          categories={categories ?? []}
+          categoryId={categoryId}
+          subCategoryId={subCategoryId}
+          noun="product"
+          onChange={({ categoryId: c, subCategoryId: sc }) => {
+            setCategoryId(c);
+            setSubCategoryId(sc);
+          }}
+        />
+
         <button type="button" onClick={() => setIsTagsOpen(true)}
           className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
           {tags.length > 0 ? (
@@ -1070,17 +1085,6 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           </span>
           <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
         </button>
-
-        <CategoryPickerRow
-          categories={categories ?? []}
-          categoryId={categoryId}
-          subCategoryId={subCategoryId}
-          noun="product"
-          onChange={({ categoryId: c, subCategoryId: sc }) => {
-            setCategoryId(c);
-            setSubCategoryId(sc);
-          }}
-        />
 
         <button type="button" onClick={() => setIsCtaOpen(true)}
           className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
@@ -1531,7 +1535,13 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
 
       {/* ─── Description Editor Dialog ─── */}
       <Dialog open={isDescriptionOpen} onOpenChange={setIsDescriptionOpen}>
-        <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col">
+        {/* Fixed height (not just a max-height cap): this dialog holds only the
+            description editor, and now that MarkdownEditor's own textarea caps
+            its growth and scrolls internally past ~200px, nothing left inside
+            this dialog still changes size as you type -- h-[520px] keeps the
+            dialog itself from visibly resizing too, on top of that. max-h-[85vh]
+            stays as the safety cap for short/mobile viewports. */}
+        <DialogContent className="sm:max-w-3xl h-[520px] max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{L.descriptionTitle}</DialogTitle>
             <DialogDescription>{L.descriptionHint}</DialogDescription>

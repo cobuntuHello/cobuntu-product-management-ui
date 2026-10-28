@@ -250,6 +250,18 @@ export interface ProductCreateWizardProps {
   transport: ProductCreateWizardTransport;
   navigation: ProductCreateWizardNavigation;
   copy?: ProductCreateWizardCopy;
+  /**
+   * Config for the few components inside this wizard (currently: the tags
+   * autocomplete, `EventTags`) that call the Cobuntu API directly instead of
+   * going through `transport` -- same contract `ProductManagementConfig`
+   * (../config.tsx) documents: "each app has its own way of computing the
+   * API base URL and the Authorization header". Omitted, both default to the
+   * wizard's long-standing behavior (`apiBaseUrl: ""`, no auth header), which
+   * only works for a host that happens to serve `/api/tags/*` itself on its
+   * own origin -- every other host silently 404s. Pass these to fix that.
+   */
+  apiBaseUrl?: string;
+  authHeaders?: () => Record<string, string>;
   extraSteps?: ProductCreateWizardExtraStep<any>[];
   theme?: ProductCreateWizardTheme;
   /**
