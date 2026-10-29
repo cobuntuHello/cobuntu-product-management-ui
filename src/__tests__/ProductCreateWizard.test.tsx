@@ -326,6 +326,38 @@ describe("course vs product steps", () => {
   });
 });
 
+describe("Save Draft and onDone", () => {
+  // Regression coverage for the bug where Save Draft never called onDone: a
+  // COURSE host (dddimo-entry) relies on onDone to transition into its
+  // syllabus-builder phase after the base product exists. The early
+  // navigate(hrefs.drafts) exit skipped that call entirely, so a drafted
+  // course had zero syllabus with no way back in.
+  it("COURSE + Save Draft calls onDone with the new product id, not navigate(hrefs.drafts)", async () => {
+    const { tr, onDone, navigate } = renderWizard({
+      initialDrafts: [], canCreateForCommunity: true, productType: "COURSE",
+    });
+    await screen.findByTestId("product-form");
+    press("Save Draft");
+    await waitFor(() => expect(tr.createProduct).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith(expect.objectContaining({
+      product: { id: "p-1", name: "Handmade candle" },
+      outcome: "saved",
+    })));
+    expect(navigate).not.toHaveBeenCalledWith("/profile");
+  });
+
+  it("DIGITAL + Save Draft still navigates to hrefs.drafts and never calls onDone", async () => {
+    const { tr, onDone, navigate } = renderWizard({
+      initialDrafts: [], canCreateForCommunity: false, productType: "DIGITAL",
+    });
+    await screen.findByTestId("product-form");
+    press("Save Draft");
+    await waitFor(() => expect(tr.createProduct).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/profile"));
+    expect(onDone).not.toHaveBeenCalled();
+  });
+});
+
 describe("copy", () => {
   it("defaults to English without a host t", async () => {
     renderWizard({ initialDrafts: [], canCreateForCommunity: false });

@@ -572,14 +572,20 @@ function WizardInner({
         return;
       }
 
-      if (asDraft) {
+      if (asDraft && productType !== "COURSE") {
         setCreating(false);
         navigate(hrefs.drafts);
         return;
       }
 
+      // Save Draft is never a publish request, so this always resolves to
+      // "saved" (or "pending"/"unlisted" if the listing question says so) -
+      // never "published". A COURSE draft still needs onDone: it's the only
+      // hook that tells the host to continue into syllabus authoring for
+      // this product id, so it can't take the early navigate-to-drafts exit
+      // the other product types use.
       const outcome = resolveCreateOutcome({
-        requestedPublish: action?.publish === true,
+        requestedPublish: asDraft ? false : action?.publish === true,
         canSelfList: isLeaderHere,
         requestedListing: flowSteps.includes("listing") ? wantsListing : undefined,
       });
@@ -589,7 +595,7 @@ function WizardInner({
       navigation.onDone?.({
         product: { id: result.productId, name },
         outcome,
-        action: (action?.kind ?? "createRequest") as SubmitAction["kind"],
+        action: (asDraft ? "save" : (action?.kind ?? "createRequest")) as SubmitAction["kind"],
         ownership: effectiveOwnership,
         extraValues,
       });
