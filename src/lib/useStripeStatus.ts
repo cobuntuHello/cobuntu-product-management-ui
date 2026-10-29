@@ -53,7 +53,53 @@ export interface StripeStatus {
   connectUrl: string | null;
 }
 
-export function useStripeStatus(communityTag: string): StripeStatus {
+/**
+ * Who the Stripe-connected question is actually about.
+ *
+ * "community" (default — byte-identical to this hook's original behaviour)
+ * hits the COMMUNITY-scoped, admin-gated `/api/communities/:tag/stripe/
+ * connected` endpoint. "personal" hits the USER-scoped
+ * `/api/users/me/stripe/status` endpoint instead — the correct check for a
+ * member/personal-owned listing, where the seller's OWN account is what
+ * matters, not the community's. See ProductForm's `ownership` prop and
+ * PriceEditModal's `ownerType` prop, which both thread this through.
+ */
+export type StripeOwnerType = "community" | "personal";
+
+/**
+ * One-shot status fetch, usable outside a hook (e.g. PriceEditModal's
+ * save-time gate, which must re-check status on every Save rather than once
+ * on mount — a hook call cannot be made conditionally or inside an event
+ * handler, so the fetch itself is pulled out as a plain async function and
+ * `useStripeStatus` below is a thin effect wrapper around it).
+ *
+ * Never throws; a network failure or non-OK response collapses to
+ * `{ connected: false, known: false }`, same safety rule as the hook.
+ */
+export async function fetchStripeStatus(
+  config: Pick<ProductManagementConfig, "apiBaseUrl" | "authHeaders">,
+  params: { communityTag: string; ownerType?: StripeOwnerType },
+): Promise<{ connected: boolean; known: boolean }> {
+  const { apiBaseUrl, authHeaders } = config;
+  const ownerType = params.ownerType ?? "community";
+  const url = ownerType === "personal"
+    ? `${apiBaseUrl}/api/users/me/stripe/status`
+    : `${apiBaseUrl}/api/communities/${params.communityTag}/stripe/connected`;
+  try {
+    const res = await fetch(url, { headers: authHeaders() });
+    if (!res.ok) return { connected: false, known: false };
+    const data = await res.json();
+    // Defensive on the field name: the community endpoint answers
+    // `{ connected }`, the user-scoped one may answer `{ connected }` or
+    // `{ chargesEnabled }` — accept either rather than guessing wrong and
+    // reading a real "yes" as "no".
+    return { connected: !!(data?.connected ?? data?.chargesEnabled), known: true };
+  } catch {
+    return { connected: false, known: false };
+  }
+}
+
+export function useStripeStatus(communityTag: string, ownerType: StripeOwnerType = "community"): StripeStatus {
   /*
    * NOT a bare `useProductManagementConfig()` call. ProductForm's own doc
    * comment on DRAFT_CONFIG_STUB promises the create-time wizard makes ZERO
@@ -79,27 +125,14 @@ export function useStripeStatus(communityTag: string): StripeStatus {
       setStatus({ connected: false, loading: false, known: false });
       return;
     }
-    const { apiBaseUrl, authHeaders } = config;
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch(`${apiBaseUrl}/api/communities/${communityTag}/stripe/connected`, {
-          headers: authHeaders(),
-        });
-        if (cancelled) return;
-        if (res.ok) {
-          const data = await res.json();
-          setStatus({ connected: !!data.connected, loading: false, known: true });
-        } else {
-          setStatus({ connected: false, loading: false, known: false });
-        }
-      } catch {
-        if (!cancelled) setStatus({ connected: false, loading: false, known: false });
-      }
+      const result = await fetchStripeStatus(config, { communityTag, ownerType });
+      if (!cancelled) setStatus({ ...result, loading: false });
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityTag, config]);
+  }, [communityTag, config, ownerType]);
 
   return { ...status, connectUrl };
 }

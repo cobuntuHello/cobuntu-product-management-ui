@@ -11,9 +11,13 @@ import {
 } from "@dnd-kit/sortable";
 import { ModalShell } from "../ui/modal-shell";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
-// NOTE: `useStripeStatus` / `StripeRequiredWarning` are deliberately NOT
-// imported here any more. See the long comment at the old gate site below for
-// why editing a price is the wrong moment to check a payment account.
+// NOTE: `useStripeStatus` (the HOOK) is deliberately NOT imported here. See
+// the long comment at the old gate site below for why editing a price is the
+// wrong moment to check a payment account — the hook fires on MOUNT, which is
+// exactly the old gate's first bug. `fetchStripeStatus` (the plain async
+// function) IS used, from the new SAVE-time gate further down, which re-runs
+// the check on every Save rather than once when the modal opens.
+import { fetchStripeStatus, type StripeOwnerType } from "../lib/useStripeStatus";
 import {
   buildRowsFromOverrides,
   buildUpsertBody,
@@ -172,9 +176,36 @@ export interface PriceEditModalProps {
    * Defaults to DIGITAL so existing callers are unchanged.
    */
   productType?: "DIGITAL" | "PHYSICAL" | "COURSE";
+  /**
+   * Who the save-time Stripe gate (below) checks. "community" (default,
+   * byte-identical to before this gate existed) checks the community's own
+   * account; "personal" checks the SELLER's own account instead, for a
+   * member/personal-owned listing. Mirrors ProductForm's `ownership` prop —
+   * not read in draftMode, where no network check runs at all (see the gate's
+   * own comment for why).
+   */
+  ownerType?: StripeOwnerType;
 }
 
-export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing, draftMode, initialDraftTiers, initialDraftDonation, onDraftCommit, openTierLocalId, openNewTier, productType = "DIGITAL" }: PriceEditModalProps) {
+/**
+ * Reads the backend's save-time Stripe gate (shipping separately, in
+ * parallel, in the backend monorepo) off an error response, so a rejected
+ * save shows a clear "connect Stripe" message instead of a generic one.
+ *
+ * Checks the `code` field specifically rather than shape-matching the whole
+ * body — the exact response shape (`{ code, ownerType, ownerId }`) can't be
+ * verified live from here, and `code` is the one field this can safely
+ * depend on without over-fitting to details that might not land exactly as
+ * described.
+ */
+function stripeNotConnectedMessage(e: unknown): string | null {
+  if (e && typeof e === "object" && (e as { code?: unknown }).code === "STRIPE_NOT_CONNECTED") {
+    return "Connect Stripe to receive payment for this listing, then try saving again.";
+  }
+  return null;
+}
+
+export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing, draftMode, initialDraftTiers, initialDraftDonation, onDraftCommit, openTierLocalId, openNewTier, productType = "DIGITAL", ownerType = "community" }: PriceEditModalProps) {
   const isDigital = productType !== "PHYSICAL";
   const { apiBaseUrl, authHeaders } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
@@ -688,6 +719,58 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
       const donationErr = validateDonation(donation);
       if (donationErr) throw new Error(donationErr);
 
+      /*
+       * ── Save-time Stripe gate (NOT draftMode) ──────────────────────────
+       *
+       * This is a NEW gate, scoped to avoid all three bugs the removed gate
+       * had (see the "NO STRIPE GATE HERE" comment below, kept for the
+       * draftMode/mount-time case it still documents):
+       *
+       *   1. WRONG MOMENT — fixed by living HERE, inside Save, not in an
+       *      effect that runs on mount. Nothing above this point has made a
+       *      network request about Stripe; a seller editing a price that
+       *      isn't actually being changed to something that needs a payment
+       *      account never triggers it.
+       *   2. WRONG ACCOUNT — fixed by `ownerType`: a personal/member-owned
+       *      listing checks the SELLER's own account (/api/users/me/stripe/
+       *      status), not the community's.
+       *   3. FALSE POSITIVE FROM A GENERIC 403 — fixed by only ever reading
+       *      `known` from `fetchStripeStatus`'s own response, never a side
+       *      effect of some OTHER request 403ing. A 403/network failure on
+       *      the status check itself collapses to `known: false`, which
+       *      this gate treats as "can't tell" and lets the save proceed —
+       *      the backend's own listing-time check (companion change, in
+       *      flight separately) is the real enforcement; this is UI-side
+       *      guidance, not the source of truth, so it must never block on a
+       *      guess.
+       *
+       * Only runs when the save actually needs a payment account — a tier
+       * that charges (fixed price or PWYW) or an enabled donation — so an
+       * edit to a free tier's capacity/form/license never asks about Stripe
+       * at all, same as before this gate existed.
+       *
+       * Skipped entirely in draftMode: the create wizard's own config is a
+       * zero-API stub (see ProductForm's DRAFT_CONFIG_STUB doc comment) —
+       * calling a real endpoint here would violate that contract. The
+       * create wizard's "Paid"/"Free with donations" preset cards already
+       * gate at their own layer (ProductForm's `needsStripe` + the
+       * DonationsField wrapper's guarded `onUpdate`) using the SAME
+       * ownership-aware source, so draft-mode sellers are still covered.
+       */
+      if (!draftMode) {
+        const needsPaymentAccount = drafts.some((t) =>
+          !t.deleted && (t.priceMode === "pwyw" || (!!t.price && parseFloat(t.price) > 0)),
+        ) || donation.enabled;
+        if (needsPaymentAccount) {
+          const status = await fetchStripeStatus({ apiBaseUrl, authHeaders }, { communityTag, ownerType });
+          if (status.known && !status.connected) {
+            throw new Error(
+              "Connect Stripe before saving a priced tier or enabled donation for this listing.",
+            );
+          }
+        }
+      }
+
       // Draft mode: hand the validated drafts to the parent and close. No
       // backend writes — the parent (ProductForm) owns the source of truth
       // and POSTs these as part of the create-product payload. Member pricing
@@ -755,16 +838,16 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         const body = buildTierBody(t);
         if (t.deleted && t.id) {
           const res = await fetch(`${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/tiers/${t.id}`, { method: "DELETE", headers: authHeaders() });
-          if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Failed to delete "${t.name}"`); }
+          if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(stripeNotConnectedMessage(e) || e.error || `Failed to delete "${t.name}"`); }
         } else if (t.id) {
           const res = await fetch(`${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/tiers/${t.id}`, { method: "PUT", headers: jsonHeaders(), body: JSON.stringify(body) });
-          if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Failed to update "${t.name}"`); }
+          if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(stripeNotConnectedMessage(e) || e.error || `Failed to update "${t.name}"`); }
           // Files: JSON PUT above handled scalars + links; sync files to the
           // variant's child product.
           if (t.productId) await syncTierFiles(t.productId, t);
         } else if (!t.deleted) {
           const res = await fetch(`${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/tiers`, { method: "POST", headers: jsonHeaders(), body: JSON.stringify(body) });
-          if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Failed to create "${t.name}"`); }
+          if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(stripeNotConnectedMessage(e) || e.error || `Failed to create "${t.name}"`); }
           // A tier created on manage: pull its new child product id from the
           // response so any files added in the same session get uploaded.
           const created = await res.json().catch(() => null);
@@ -839,7 +922,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         });
         if (!res.ok) {
           const e = await res.json().catch(() => ({}));
-          throw new Error(e.error || "Failed to save donation settings");
+          throw new Error(stripeNotConnectedMessage(e) || e.error || "Failed to save donation settings");
         }
       }
 
@@ -916,9 +999,12 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
     }
   }
 
-  // NO STRIPE GATE HERE — deliberately. This used to replace the whole tier
-  // editor with a "Connect Stripe" warning whenever the community had no
-  // connected account and any tier was paid. That was wrong three times over:
+  // NO MOUNT-TIME STRIPE GATE HERE — deliberately. This used to replace the
+  // whole tier editor with a "Connect Stripe" warning whenever the community
+  // had no connected account and any tier was paid. That was wrong three
+  // times over. (A SAVE-time gate now exists — see `save()` above — built
+  // specifically to avoid all three; opening/editing the editor itself still
+  // makes no Stripe-related request.)
   //
   //   1. WRONG MOMENT. Editing a price is not when money moves. The gate
   //      belongs where an item becomes BUYABLE — at listing — which is where
