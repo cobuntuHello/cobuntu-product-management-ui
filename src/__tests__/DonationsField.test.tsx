@@ -141,6 +141,62 @@ describe("DonationsField — the modal, once there is something in it", () => {
   });
 });
 
+describe("DonationsField — Stripe gate (block the save, not just the look)", () => {
+  /*
+   * Donations are charged through the same Connect account a priced tier is,
+   * so they need the same gate. `stripeConnected`/`onNeedsStripe` are new,
+   * optional props: omitted entirely, this component is byte-identical to
+   * before (every test above passes with neither set).
+   */
+  it("refuses to enable donations while disconnected, and calls onNeedsStripe instead", async () => {
+    const onUpdate = vi.fn();
+    const onNeedsStripe = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <DonationsField
+        donation={draft({ enabled: false })}
+        onUpdate={onUpdate}
+        defaultCurrency="EUR"
+        stripeConnected={false}
+        onNeedsStripe={onNeedsStripe}
+      />,
+    );
+    await user.click(screen.getByRole("switch", { name: /enable donations/i }));
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(onNeedsStripe).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses an amount/goal edit on an already-enabled donation while disconnected — blocks the save, not merely the switch", async () => {
+    const onUpdate = vi.fn();
+    const onNeedsStripe = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <DonationsField
+        donation={draft({ enabled: true, amounts: ["5"] })}
+        onUpdate={onUpdate}
+        defaultCurrency="EUR"
+        stripeConnected={false}
+        onNeedsStripe={onNeedsStripe}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /edit donation settings/i }));
+    // Flipping the mode (any write through onUpdate) inside the already-open
+    // editor must still be refused — the gate is not limited to the
+    // enable switch.
+    await user.click(screen.getByRole("button", { name: /^any amount$/i }));
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(onNeedsStripe).toHaveBeenCalled();
+  });
+
+  it("allows every write once connected (default true, byte-identical to before this gate existed)", async () => {
+    const onUpdate = vi.fn();
+    const user = userEvent.setup();
+    render(<DonationsField donation={draft({ enabled: false })} onUpdate={onUpdate} defaultCurrency="EUR" />);
+    await user.click(screen.getByRole("switch", { name: /enable donations/i }));
+    expect(onUpdate).toHaveBeenCalledWith({ enabled: true });
+  });
+});
+
 describe("DonationsField — the row summarises the live config", () => {
   it("lists the suggested amounts", () => {
     setup({ enabled: true, amounts: ["5", "10", "25"] });

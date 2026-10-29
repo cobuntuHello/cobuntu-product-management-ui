@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { renderWithConfig, mockFetch } from "./test-utils";
@@ -83,8 +83,13 @@ describe("preset-card selection sync", () => {
 });
 
 describe("reset-confirm guard on preset taps", () => {
+  // These tests are about the discard-confirm flow, not the Stripe gate —
+  // pass a connected override so "Free with donations" / the donations row
+  // behave exactly as they did before the gate existed.
+  const connected = { stripeStatusOverride: { connected: true } };
+
   it("applies immediately with no modal on a pristine form", () => {
-    renderWithConfig(<ProductForm {...base} />);
+    renderWithConfig(<ProductForm {...base} {...connected} />);
     fireEvent.click(screen.getByRole("button", { name: "Free with donations" }));
     // No discard prompt — nothing was configured yet to lose.
     expect(screen.queryByText("Replace your pricing setup?")).not.toBeInTheDocument();
@@ -92,13 +97,13 @@ describe("reset-confirm guard on preset taps", () => {
   });
 
   it("applies immediately when the tapped preset already matches the current state", () => {
-    renderWithConfig(<ProductForm {...base} initialData={{ tiers: [blankTier({ currency: "EUR" })] }} />);
+    renderWithConfig(<ProductForm {...base} {...connected} initialData={{ tiers: [blankTier({ currency: "EUR" })] }} />);
     fireEvent.click(screen.getByRole("button", { name: /^Free$/ }));
     expect(screen.queryByText("Replace your pricing setup?")).not.toBeInTheDocument();
   });
 
   it("confirms before overwriting donation config the seller set manually", async () => {
-    renderWithConfig(<ProductForm {...base} />);
+    renderWithConfig(<ProductForm {...base} {...connected} />);
     // Manually enable donations via the real donations field (sets the
     // pricingDirty flag), not via a preset tap.
     const donationsToggle = screen.getByRole("switch", { name: /donation/i });
@@ -114,7 +119,7 @@ describe("reset-confirm guard on preset taps", () => {
   });
 
   it("applies the preset once the discard is confirmed", async () => {
-    renderWithConfig(<ProductForm {...base} />);
+    renderWithConfig(<ProductForm {...base} {...connected} />);
     const donationsToggle = screen.getByRole("switch", { name: /donation/i });
     fireEvent.click(donationsToggle);
 
@@ -150,7 +155,7 @@ describe("the Paid preset respects the Stripe-connected gate", () => {
     renderWithConfig(<ProductForm {...base} />);
     const paidButton = screen.getByRole("button", { name: /^Paid/ });
     expect(paidButton).not.toBeDisabled();
-    expect(screen.getByText(/Connect Stripe to sell for a price/)).toBeInTheDocument();
+    expect(within(paidButton).getByText(/Connect Stripe to sell for a price/)).toBeInTheDocument();
     fireEvent.click(paidButton);
     expect(paidButton).toHaveAttribute("aria-pressed", "false");
   });
@@ -178,7 +183,7 @@ describe("the Paid preset respects the Stripe-connected gate", () => {
     renderWithConfig(<ProductForm {...base} />);
     const paidButton = screen.getByRole("button", { name: /^Paid/ });
     await waitFor(() => {
-      expect(screen.queryByText(/Connect Stripe to sell for a price/)).not.toBeInTheDocument();
+      expect(within(paidButton).queryByText(/Connect Stripe to sell for a price/)).not.toBeInTheDocument();
     });
     // Clicking now goes through tapPricingPreset rather than the
     // connect-Stripe redirect — the rich description (not the connect hint)
@@ -192,7 +197,7 @@ describe("the Paid preset respects the Stripe-connected gate", () => {
     renderWithConfig(<ProductForm {...base} />);
     const paidButton = await screen.findByRole("button", { name: /^Paid/ });
     await waitFor(() => {
-      expect(screen.queryByText(/Connect Stripe to sell for a price/)).not.toBeInTheDocument();
+      expect(within(paidButton).queryByText(/Connect Stripe to sell for a price/)).not.toBeInTheDocument();
     });
     fireEvent.click(paidButton);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -208,8 +213,84 @@ describe("the Paid preset respects the Stripe-connected gate", () => {
     // since the override must win.
     renderWithConfig(<ProductForm {...base} stripeStatusOverride={{ connected: true }} />);
     const paidButton = screen.getByRole("button", { name: /^Paid/ });
-    expect(screen.queryByText(/Connect Stripe to sell for a price/)).not.toBeInTheDocument();
+    expect(within(paidButton).queryByText(/Connect Stripe to sell for a price/)).not.toBeInTheDocument();
     fireEvent.click(paidButton);
     expect(screen.getByText(/Buyers pay to get access/)).toBeInTheDocument();
+  });
+});
+
+describe("the 'Free with donations' preset respects the same Stripe-connected gate", () => {
+  // Donations are charged through the same Connect account a priced tier is
+  // — this used to have NO Stripe awareness at all; it now mirrors "Paid"
+  // exactly: muted visual + redirect-to-connect, never a disabled dead card.
+  it("stays clickable, shows the locked copy, and does not enable donations until connected", () => {
+    renderWithConfig(<ProductForm {...base} />);
+    const donationsButton = screen.getByRole("button", { name: "Free with donations" });
+    expect(donationsButton).not.toBeDisabled();
+    expect(within(donationsButton).getByText(/Connect Stripe to sell for a price/)).toBeInTheDocument();
+    fireEvent.click(donationsButton);
+    expect(donationsButton).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("confirms before leaving for Stripe Connect from the donations card too", () => {
+    const hrefSpy = vi.fn();
+    Object.defineProperty(window, "location", {
+      value: { ...window.location, set href(v: string) { hrefSpy(v); } },
+      writable: true,
+    });
+    renderWithConfig(
+      <ProductForm {...base} stripeStatusOverride={{ connected: false, connectUrl: "https://connect.stripe.com/x" }} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Free with donations" }));
+    expect(hrefSpy).not.toHaveBeenCalled();
+    expect(screen.getByText(/Connect Stripe to accept payments/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Continue to Stripe/ }));
+    expect(hrefSpy).toHaveBeenCalledWith("https://connect.stripe.com/x");
+  });
+
+  it("applies once connected", async () => {
+    connectStripe();
+    renderWithConfig(<ProductForm {...base} />);
+    const donationsButton = await screen.findByRole("button", { name: "Free with donations" });
+    await waitFor(() => {
+      expect(within(donationsButton).queryByText(/Connect Stripe to sell for a price/)).not.toBeInTheDocument();
+    });
+    fireEvent.click(donationsButton);
+    expect(donationsButton).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("the donations ROW (DonationsField) is also locked while disconnected — the tile isn't the only path to it", () => {
+    renderWithConfig(<ProductForm {...base} />);
+    // The row's own switch must refuse to enable donations directly,
+    // bypassing the preset tile entirely, while Stripe isn't connected.
+    const donationsToggle = screen.getByRole("switch", { name: /donation/i });
+    fireEvent.click(donationsToggle);
+    // Blocked: the preset card never flips to selected, and the same
+    // "connect Stripe?" confirm is raised instead of enabling anything.
+    expect(screen.getByRole("button", { name: "Free with donations" })).toHaveAttribute("aria-pressed", "false");
+  });
+});
+
+describe("ownership-aware Stripe status (no override supplied)", () => {
+  it("defaults to the community-scoped endpoint when `ownership` is omitted", async () => {
+    const fetchFn = mockFetch([
+      { method: "GET", url: /\/api\/communities\/acme\/stripe\/connected$/, body: { connected: true } },
+    ]);
+    renderWithConfig(<ProductForm {...base} />);
+    await waitFor(() => expect(fetchFn).toHaveBeenCalled());
+    const urls = fetchFn.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => /\/api\/communities\/acme\/stripe\/connected$/.test(u))).toBe(true);
+    expect(urls.some((u) => /\/api\/users\/me\/stripe\/status$/.test(u))).toBe(false);
+  });
+
+  it("hits the user-scoped endpoint instead when ownership=\"personal\"", async () => {
+    const fetchFn = mockFetch([
+      { method: "GET", url: /\/api\/users\/me\/stripe\/status$/, body: { connected: true } },
+    ]);
+    renderWithConfig(<ProductForm {...base} ownership="personal" />);
+    await waitFor(() => expect(fetchFn).toHaveBeenCalled());
+    const urls = fetchFn.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => /\/api\/users\/me\/stripe\/status$/.test(u))).toBe(true);
+    expect(urls.some((u) => /\/api\/communities\/acme\/stripe\/connected$/.test(u))).toBe(false);
   });
 });

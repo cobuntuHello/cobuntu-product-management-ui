@@ -310,6 +310,18 @@ export interface ProductFormProps {
    */
   stripeStatusOverride?: { connected: boolean; connectUrl?: string | null };
   /**
+   * Who the "Paid" / "Free with donations" Stripe gate is actually about.
+   *
+   * "community" (default — byte-identical to before) checks the community's
+   * own Stripe account via `useStripeStatus`. "personal" is for a member/
+   * personal-owned listing, where it is the SELLER's own account that matters
+   * — this threads through to `useStripeStatus`'s ownerType so the internal
+   * check hits `/api/users/me/stripe/status` instead of the community-scoped,
+   * admin-gated endpoint. Irrelevant when `stripeStatusOverride` is supplied,
+   * since the host app has already resolved the correct answer itself.
+   */
+  ownership?: "community" | "personal";
+  /**
    * Override the words this form uses for the thing being sold.
    *
    * Omitted everywhere except the course wizard, which renders this form for
@@ -421,7 +433,7 @@ const AUTO_SEED_NAME = /^(Standard|Tier \d+)$/;
 
 // ─── Component ─────────────────────────────────────────────────
 
-export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, hideRepeatPurchase, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false, labels, stripeStatusOverride }: ProductFormProps) {
+export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, hideRepeatPurchase, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false, labels, stripeStatusOverride, ownership = "community" }: ProductFormProps) {
   /* Merged once rather than at each use, so a partial override cannot leave
    * one string reading "course" beside another still reading "product". */
   const L = { ...DEFAULT_LABELS, ...(labels ?? {}) };
@@ -632,7 +644,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
    * correct user-scoped answer (e.g. via `GET /api/users/me/stripe/status`)
    * passes it as `stripeStatusOverride` instead of letting this mismatched
    * check override it. */
-  const internalStripeStatus = useStripeStatus(communityTag);
+  const internalStripeStatus = useStripeStatus(communityTag, ownership === "personal" ? "personal" : "community");
   const stripeStatus = stripeStatusOverride
     ? {
         connected: stripeStatusOverride.connected,
@@ -1183,12 +1195,14 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                   // the built CSS.
                 ]).map(({ kind, label, icon: PresetIcon, desc, cardSelected, badgeSelected }) => {
                   const selected = activePricingPreset === kind;
-                  // "Paid" needs a Stripe-connected community, but the card
-                  // itself stays a real click target either way (feedback:
-                  // a dead disabled card with nothing to click was a worse
-                  // experience than one that guides the seller to connect
-                  // Stripe). Only the VISUAL treatment is muted/locked.
-                  const needsStripe = kind === "paid" && !stripeStatus.connected;
+                  // "Paid" AND "Free with donations" both need a connected
+                  // Stripe account — a donation is charged through the same
+                  // Connect account a priced tier is. The card itself stays a
+                  // real click target either way (feedback: a dead disabled
+                  // card with nothing to click was a worse experience than
+                  // one that guides the seller to connect Stripe). Only the
+                  // VISUAL treatment is muted/locked.
+                  const needsStripe = (kind === "paid" || kind === "donations") && !stripeStatus.connected;
                   return (
                     <button
                       key={kind}
@@ -1292,6 +1306,19 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 setPricingDirty(true);
               }}
               defaultCurrency={currency}
+              /*
+               * Same Stripe gate as the "Free with donations" preset card
+               * above, applied here too: a seller can also reach donations
+               * directly (the row's own switch / Edit), bypassing the preset
+               * tiles entirely. Blocks the save, not just the visual —
+               * DonationsField refuses every patch (enabling, amounts, goal)
+               * while disconnected, rather than decorating a control that
+               * still writes.
+               */
+              stripeConnected={stripeStatus.connected}
+              onNeedsStripe={() => {
+                if (stripeStatus.connectUrl) setConfirmingStripeLeave(true);
+              }}
             />
           )}
 

@@ -697,6 +697,7 @@ function WizardInner({
                 hideRepeatPurchase={productType === "COURSE"}
                 productType={productType === "COURSE" ? "DIGITAL" : productType}
                 showMemberPricing={effectiveOwnership === "community"}
+                ownership={effectiveOwnership}
                 initialData={draftInitial}
               />
             )}
