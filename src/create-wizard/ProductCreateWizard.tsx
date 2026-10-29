@@ -444,6 +444,19 @@ function WizardInner({
     return s?.validate ? s.validate(extraValues[id]) : null;
   }
 
+  /*
+   * True when the step on screen right now is the one that already renders
+   * its OWN inline warning for a missing name (ProductForm, page="listing",
+   * `showErrors && !name.trim()`). Showing the top FormErrorBanner too just
+   * repeated the exact same "give it a name" sentence a second time in the
+   * same viewport — the redundant-banner bug. Scoped to the "details" step
+   * specifically: on any other step the inline warning isn't on screen, so
+   * the banner is the only signal and must stay.
+   */
+  function nameErrorIsAlreadyInline(): boolean {
+    return step === "details" && !formDataRef.current?.name?.trim();
+  }
+
   function handleFormChange(data: ProductFormData) {
     formDataRef.current = data;
     autosave.schedule();
@@ -453,7 +466,7 @@ function WizardInner({
   function goNext() {
     if (step === "details" || step === "commerce") {
       const invalid = validationMessage();
-      if (invalid) { setShowErrors(true); setError(invalid); return; }
+      if (invalid) { setShowErrors(true); setError(nameErrorIsAlreadyInline() ? "" : invalid); return; }
     }
     if (onContentStep) {
       const v = validateContentStep?.(contentValue) ?? null;
@@ -484,11 +497,11 @@ function WizardInner({
   async function handleCreate(action?: SubmitAction, asDraft?: boolean) {
     if (asDraft) {
       const name = formDataRef.current?.name?.trim();
-      if (!name) { setShowErrors(true); setError(t("errDraftNeedsName")); return; }
+      if (!name) { setShowErrors(true); setError(nameErrorIsAlreadyInline() ? "" : t("errDraftNeedsName")); return; }
     } else {
       setShowErrors(true);
       const invalid = validationMessage();
-      if (invalid) { setError(invalid); return; }
+      if (invalid) { setError(nameErrorIsAlreadyInline() ? "" : invalid); return; }
       for (const s of extraSteps) {
         const ev = validateExtra(s.id);
         if (ev) {

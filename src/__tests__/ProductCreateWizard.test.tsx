@@ -183,13 +183,33 @@ describe("transport", () => {
     expect(onCancel).toHaveBeenCalled();
   });
 
-  it("Save Draft is available on every step and asks for a name", async () => {
+  it("Save Draft with an empty name, on the details step, relies on ProductForm's own inline warning instead of repeating it in the top banner", async () => {
+    // Regression test for the duplicate "give it a name" messages bug: the
+    // top FormErrorBanner and ProductForm's inline warning under the Product
+    // Name field used to both fire off the same missing-name check. On the
+    // "details" step (the step that mounts ProductForm with the name field
+    // on screen), the banner must stay silent and let `showErrors` alone
+    // drive the inline warning.
     const { tr } = renderWizard({ initialDrafts: [], canCreateForCommunity: false, transport: transport({}) });
     await screen.findByTestId("product-form");
     h.props.at(-1).onChange(fake({ name: "" }));
     press("Save Draft");
-    expect(await screen.findByRole("alert")).toHaveTextContent("Give it a name first");
+    expect(screen.queryByRole("alert")).toBeNull();
+    // showErrors still flips true — that's what turns on ProductForm's own
+    // inline "Give your product a name" warning.
+    await waitFor(() => expect(h.props.at(-1).showErrors).toBe(true));
     expect(tr.createProduct).not.toHaveBeenCalled();
+  });
+
+  it("Next with an empty name, on the details step, also stays silent on the top banner", async () => {
+    renderWizard({ initialDrafts: [], canCreateForCommunity: false, transport: transport({}) });
+    await screen.findByTestId("product-form");
+    h.props.at(-1).onChange(fake({ name: "" }));
+    press("Next");
+    expect(screen.queryByRole("alert")).toBeNull();
+    await waitFor(() => expect(h.props.at(-1).showErrors).toBe(true));
+    // Still blocked from advancing.
+    expect(screen.getByTestId("product-form")).toHaveAttribute("data-page", "listing");
   });
 });
 
