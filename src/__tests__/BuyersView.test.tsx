@@ -140,6 +140,34 @@ describe("customers", () => {
         expect(await screen.findByText("Nobody has bought this yet")).toBeInTheDocument();
     });
 
+    it("shows a count beside each section title", async () => {
+        renderWithCustomers([
+            { id: "s1", grossAmount: 0, currency: "EUR", createdAt: "2026-01-01T00:00:00Z", guestEmail: null,
+              user: { id: "u-ana", name: "Ana Neto", usertag: "ana-neto", profileImage: null } },
+            { id: "s2", grossAmount: 2400, currency: "EUR", createdAt: "2026-01-01T00:00:00Z", guestEmail: null,
+              user: { id: "u-bo", name: "Bo Silva", usertag: "bo-silva", profileImage: null } },
+        ]);
+
+        await screen.findByText("Ana Neto");
+        expect(screen.getByText("· 2")).toBeInTheDocument();
+        // Has access / Invited are both empty in this fixture.
+        expect(screen.getAllByText("· 0")).toHaveLength(2);
+    });
+
+    /**
+     * "Give access" and "Invite to buy" already sit in the page header.
+     * The empty-state row for each section used to repeat the SAME label as
+     * an inline button, which was both a redundant control and ambiguous for
+     * `findByText("Give access")`-style queries — fixed by dropping the
+     * inline action entirely rather than by giving it a different label.
+     */
+    it("does not repeat the header actions inside the empty rows", async () => {
+        renderWithCustomers([]);
+        await screen.findByText("Nobody has bought this yet");
+        expect(screen.getAllByText("Give access")).toHaveLength(1);
+        expect(screen.getAllByText("Invite to buy")).toHaveLength(1);
+    });
+
     it("does not re-offer somebody who already bought it", async () => {
         // Already a customer — give-access and invite-to-buy are both moot.
         const user = userEvent.setup();
@@ -157,9 +185,17 @@ describe("customers", () => {
 
     /**
      * How many downloads from how many possible, and the licence if the tier
-     * carries one — fetched only once a row is expanded, and only then.
+     * carries one — fetched only once a row is clicked open, and only then.
+     *
+     * Opens in ResponsiveDrawer now, not in place under the row. Its side
+     * panel and bottom sheet both mount at once (a CSS breakpoint picks which
+     * is visible, not JS — see that component's own tests), so content that
+     * appears "once you open the drawer" actually appears TWICE in the DOM.
+     * The row itself is the first "Ana Neto" in document order — the drawer
+     * is rendered after the three sections — so `getAllByText(...)[0]` reaches
+     * the row specifically wherever a query would otherwise be ambiguous.
      */
-    describe("expanding for download/licence detail", () => {
+    describe("opening the download/licence detail drawer", () => {
         const ONE = [
             { id: "s1", grossAmount: 0, currency: "EUR", createdAt: "2026-01-01T00:00:00Z", guestEmail: null,
               user: { id: "u-ana", name: "Ana Neto", usertag: "ana-neto", profileImage: null } },
@@ -172,10 +208,10 @@ describe("customers", () => {
                   body: { licenseTerms: null, downloads: [{ name: "Guide.pdf", used: 2, max: 5 }], linkOpens: [] } },
             ]);
 
-            await user.click(await screen.findByText("Ana Neto"));
+            await user.click((await screen.findAllByText("Ana Neto"))[0]);
 
-            expect(await screen.findByText("Guide.pdf")).toBeInTheDocument();
-            expect(await screen.findByText("2 of 5 downloads")).toBeInTheDocument();
+            expect((await screen.findAllByText("Guide.pdf"))[0]).toBeInTheDocument();
+            expect((await screen.findAllByText("2 of 5 downloads"))[0]).toBeInTheDocument();
         });
 
         it("reads no cap as unlimited, not as zero", async () => {
@@ -185,9 +221,9 @@ describe("customers", () => {
                   body: { licenseTerms: null, downloads: [{ name: "Guide.pdf", used: 4, max: null }], linkOpens: [] } },
             ]);
 
-            await user.click(await screen.findByText("Ana Neto"));
+            await user.click((await screen.findAllByText("Ana Neto"))[0]);
 
-            expect(await screen.findByText("4 downloads")).toBeInTheDocument();
+            expect((await screen.findAllByText("4 downloads"))[0]).toBeInTheDocument();
             expect(screen.queryByText(/of null|of unlimited/)).not.toBeInTheDocument();
         });
 
@@ -198,9 +234,9 @@ describe("customers", () => {
                   body: { licenseTerms: "Personal use only.", downloads: [], linkOpens: [] } },
             ]);
 
-            await user.click(await screen.findByText("Ana Neto"));
+            await user.click((await screen.findAllByText("Ana Neto"))[0]);
 
-            expect(await screen.findByText(/Personal use only\./)).toBeInTheDocument();
+            expect((await screen.findAllByText(/Personal use only\./))[0]).toBeInTheDocument();
         });
 
         it("says so when there is nothing downloadable on the sale", async () => {
@@ -209,24 +245,24 @@ describe("customers", () => {
                 { method: "GET", url: /\/customers\/s1$/, body: { licenseTerms: null, downloads: [], linkOpens: [] } },
             ]);
 
-            await user.click(await screen.findByText("Ana Neto"));
+            await user.click((await screen.findAllByText("Ana Neto"))[0]);
 
-            expect(await screen.findByText("No downloadable content on this sale.")).toBeInTheDocument();
+            expect((await screen.findAllByText("No downloadable content on this sale."))[0]).toBeInTheDocument();
         });
 
-        it("fetches once and collapses on a second click, without re-fetching", async () => {
+        it("fetches once and does not re-fetch on a second open", async () => {
             const user = userEvent.setup();
             const fetchMock = renderWithCustomers(ONE, PRODUCT, [
                 { method: "GET", url: /\/customers\/s1$/,
                   body: { licenseTerms: null, downloads: [{ name: "Guide.pdf", used: 1, max: 5 }], linkOpens: [] } },
             ]);
 
-            await user.click(await screen.findByText("Ana Neto"));
-            await screen.findByText("Guide.pdf");
-            await user.click(screen.getByText("Ana Neto"));
-            expect(screen.queryByText("Guide.pdf")).not.toBeInTheDocument();
-            await user.click(screen.getByText("Ana Neto"));
-            await screen.findByText("Guide.pdf");
+            await user.click((await screen.findAllByText("Ana Neto"))[0]);
+            await screen.findAllByText("Guide.pdf");
+            // Close via the drawer's own close button, then reopen the row.
+            await user.click(screen.getAllByRole("button", { name: "Close" })[0]);
+            await user.click(screen.getAllByText("Ana Neto")[0]);
+            await screen.findAllByText("Guide.pdf");
 
             const detailCalls = fetchMock.mock.calls.filter(([url]: any) => /\/customers\/s1$/.test(String(url)));
             expect(detailCalls).toHaveLength(1);
@@ -238,9 +274,9 @@ describe("customers", () => {
                 { method: "GET", url: /\/customers\/s1$/, status: 500, body: { error: "nope" } },
             ]);
 
-            await user.click(await screen.findByText("Ana Neto"));
+            await user.click((await screen.findAllByText("Ana Neto"))[0]);
 
-            expect(await screen.findByText("Could not load this customer's download detail.")).toBeInTheDocument();
+            expect((await screen.findAllByText("Could not load this customer's download detail."))[0]).toBeInTheDocument();
         });
     });
 });

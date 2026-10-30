@@ -5,7 +5,7 @@ import { useProductManagementConfig, useJsonHeaders } from "../../config";
 import { UserAvatarFallback } from "../../ui/user-avatar-fallback";
 import { useCanEdit } from "../../lib/manageAccess";
 import {
-    EmptyState, PersonPickerModal,
+    PersonPickerModal, ResponsiveDrawer,
     userIdsOf, recipientsToApi, perRecipientMessages,
     type Recipient, type PersonPickerTierStep,
 } from "@cobuntu/management-ui-shared";
@@ -110,7 +110,8 @@ export function BuyersView({
     const [grants, setGrants] = React.useState<Grant[] | null>(null);
     const [invites, setInvites] = React.useState<Invitation[] | null>(null);
     const [customers, setCustomers] = React.useState<Customer[] | null>(null);
-    const [expandedCustomerId, setExpandedCustomerId] = React.useState<string | null>(null);
+    /** The customer whose download/licence detail is open in the drawer, if any. */
+    const [detailCustomer, setDetailCustomer] = React.useState<Customer | null>(null);
     /* Keyed by sale id. "loading"/"error" are states, not data — kept in the
        same map rather than a parallel one so there is one source of truth per
        row and no risk of the two falling out of sync. */
@@ -146,25 +147,26 @@ export function BuyersView({
     React.useEffect(() => { load(); }, [load]);
 
     /**
-     * Expand a customer row to its download/licence detail, fetched once and
-     * cached in `customerDetails` — re-opening the same row does not re-fetch.
-     * Collapsing is just closing the one open row; there is at most one at a
-     * time, which keeps "which row is this detail under" unambiguous.
+     * Open a customer's download/licence detail in the drawer, fetched once
+     * and cached in `customerDetails` — reopening the same customer does not
+     * re-fetch. This used to expand the row in place; every row below it
+     * shoved down the page, and a data panel (several download-usage lines
+     * plus a licence paragraph) crammed into an indented strip under a list
+     * row read cramped no matter how it was styled.
      */
-    const toggleCustomer = React.useCallback(async (saleId: string) => {
-        if (expandedCustomerId === saleId) { setExpandedCustomerId(null); return; }
-        setExpandedCustomerId(saleId);
-        if (customerDetails[saleId] !== undefined) return;
-        setCustomerDetails((d) => ({ ...d, [saleId]: "loading" }));
+    const openCustomer = React.useCallback(async (customer: Customer) => {
+        setDetailCustomer(customer);
+        if (customerDetails[customer.id] !== undefined) return;
+        setCustomerDetails((d) => ({ ...d, [customer.id]: "loading" }));
         try {
-            const res = await fetch(`${apiBaseUrl}/api/products/${product.id}/customers/${saleId}`, { headers: authHeaders() });
+            const res = await fetch(`${apiBaseUrl}/api/products/${product.id}/customers/${customer.id}`, { headers: authHeaders() });
             if (!res.ok) throw new Error(String(res.status));
             const body = await res.json();
-            setCustomerDetails((d) => ({ ...d, [saleId]: body }));
+            setCustomerDetails((d) => ({ ...d, [customer.id]: body }));
         } catch {
-            setCustomerDetails((d) => ({ ...d, [saleId]: "error" }));
+            setCustomerDetails((d) => ({ ...d, [customer.id]: "error" }));
         }
-    }, [apiBaseUrl, authHeaders, product.id, expandedCustomerId, customerDetails]);
+    }, [apiBaseUrl, authHeaders, product.id, customerDetails]);
 
     /** Everyone who already has it or has been asked — never offered again. */
     const excludeUserIds = React.useMemo(() => [
@@ -327,27 +329,23 @@ export function BuyersView({
                 )}
             </div>
 
-            <Section title="Customers" subtitle="Bought it themselves — free or paid.">
+            <Section title="Customers" count={customers?.length} subtitle="Bought it themselves — free or paid.">
                 {customers === null ? (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
                 ) : customers.length === 0 ? (
-                    <EmptyState
+                    <CompactEmptyRow
                         icon={<PeopleIcon />}
                         title="Nobody has bought this yet"
-                        body="Once somebody checks out — free or paid — they show up here."
+                        hint="Free or paid checkouts show up here."
                     />
                 ) : (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
                     <ul className="divide-y divide-zinc-100">
-                        {customers.map((c) => {
-                            const expanded = expandedCustomerId === c.id;
-                            const detail = customerDetails[c.id];
-                            return (
+                        {customers.map((c) => (
                             <li key={c.id}>
                                 <button
                                     type="button"
-                                    onClick={() => void toggleCustomer(c.id)}
-                                    aria-expanded={expanded}
+                                    onClick={() => void openCustomer(c)}
                                     className="flex w-full items-center gap-3 px-5 py-3 text-left cursor-pointer hover:bg-zinc-50"
                                 >
                                     <UserAvatar user={c.user ?? { id: c.guestEmail ?? c.id }} className="w-8 h-8 shrink-0" />
@@ -362,36 +360,24 @@ export function BuyersView({
                                     <span className="text-[12px] font-medium text-zinc-500 shrink-0">
                                         {formatCustomerAmount(c.grossAmount, c.currency)}
                                     </span>
-                                    <ChevronIcon className={`shrink-0 text-zinc-300 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                                    <ChevronRightIcon className="shrink-0 text-zinc-300" />
                                 </button>
-                                {expanded && (
-                                    <div className="px-5 pb-4 pl-[52px]">
-                                        {detail === "loading" || detail === undefined ? (
-                                            <p className="text-[12px] text-zinc-400">Loading…</p>
-                                        ) : detail === "error" ? (
-                                            <p className="text-[12px] text-red-600">Could not load this customer's download detail.</p>
-                                        ) : (
-                                            <CustomerDownloadDetailPanel detail={detail} />
-                                        )}
-                                    </div>
-                                )}
                             </li>
-                            );
-                        })}
+                        ))}
                     </ul>
                     </div>
                 )}
             </Section>
 
             <div className="mt-5">
-            <Section title="Has access" subtitle="Given the product for free. Not a sale.">
+            <Section title="Has access" count={grants?.length} subtitle="Given the product for free. Not a sale.">
                 {grants === null ? (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
                 ) : grants.length === 0 ? (
-                    <EmptyState
+                    <CompactEmptyRow
                         icon={<PeopleIcon />}
                         title="Nobody has been given this yet"
-                        body="Give access to hand somebody the product without charging them."
+                        hint="Hand somebody the product without charging them."
                     />
                 ) : (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
@@ -422,14 +408,14 @@ export function BuyersView({
             </div>
 
             <div className="mt-5">
-                <Section title="Invited" subtitle="Asked to buy it. They still pay.">
+                <Section title="Invited" count={invites?.length} subtitle="Asked to buy it. They still pay.">
                     {invites === null ? (
                         <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
                     ) : invites.length === 0 ? (
-                        <EmptyState
+                        <CompactEmptyRow
                             icon={<PeopleIcon />}
                             title="No invitations sent"
-                            body="Invite somebody to buy this and they get an email with your note."
+                            hint="They get an email with your note, and still pay."
                         />
                     ) : (
                         <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
@@ -457,6 +443,30 @@ export function BuyersView({
             </div>
 
             {error && <p className="mt-3 text-[12px] text-red-600">{error}</p>}
+
+            <ResponsiveDrawer
+                open={!!detailCustomer}
+                onClose={() => setDetailCustomer(null)}
+                title={detailCustomer?.user?.name || detailCustomer?.guestEmail || "Customer"}
+                subtitle={detailCustomer ? formatCustomerAmount(detailCustomer.grossAmount, detailCustomer.currency) : undefined}
+                headerExtra={
+                    detailCustomer?.user?.usertag ? (
+                        <span className="text-[11px] text-zinc-400">@{detailCustomer.user.usertag}</span>
+                    ) : undefined
+                }
+            >
+                {(() => {
+                    if (!detailCustomer) return null;
+                    const detail = customerDetails[detailCustomer.id];
+                    if (detail === "loading" || detail === undefined) {
+                        return <p className="text-[12px] text-zinc-400">Loading…</p>;
+                    }
+                    if (detail === "error") {
+                        return <p className="text-[12px] text-red-600">Could not load this customer's download detail.</p>;
+                    }
+                    return <CustomerDownloadDetailPanel detail={detail} />;
+                })()}
+            </ResponsiveDrawer>
 
             {mode === "grant" && (
                 <PersonPickerModal
@@ -611,17 +621,52 @@ const BASE_COPY = {
     remove: (name: string) => `Remove ${name}`,
 };
 
-function Section({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
-    /* The card wrapper lives with the LIST now, not here: a dotted empty state
-       renders on its own (no box-in-box), while a populated list still gets its
-       card. The caller decides which, so Section is just the titled container. */
+function Section({
+    title, count, subtitle, children,
+}: { title: string; count?: number; subtitle: string; children: React.ReactNode }) {
+    /* The card wrapper lives with the LIST now, not here: the compact empty
+       row renders on its own (no box-in-box), while a populated list still
+       gets its card. The caller decides which, so Section is just the
+       titled container. The count sits beside the title so you can tell at
+       a glance which of the three sections actually have anything in them,
+       instead of having to open each one to find out. */
     return (
         <div>
             <div className="mb-2">
-                <h3 className="text-[13px] font-semibold text-zinc-900">{title}</h3>
+                <div className="flex items-baseline gap-1.5">
+                    <h3 className="text-[13px] font-semibold text-zinc-900">{title}</h3>
+                    {typeof count === "number" && (
+                        <span className="text-[11.5px] font-medium text-zinc-400 tabular-nums">· {count}</span>
+                    )}
+                </div>
                 <p className="text-[11.5px] text-zinc-400">{subtitle}</p>
             </div>
             {children}
+        </div>
+    );
+}
+
+/**
+ * A single compact row in place of a 250px dashed box. Three of these
+ * sections are very often empty (give-away and invite are opt-in actions,
+ * not every product's default state), and a tall placeholder for each one
+ * made the page mostly whitespace saying "nothing here" three times over.
+ * This holds the same information at roughly the height of one populated
+ * list row.
+ *
+ * No inline action: "Give access" and "Invite to buy" already sit in the
+ * page header above every section, so a second copy of either button inside
+ * its own empty row would be the exact same control twice on one screen —
+ * confusing, and ambiguous for anything querying the page by that label.
+ */
+function CompactEmptyRow({ icon, title, hint }: { icon: React.ReactNode; title: string; hint: string }) {
+    return (
+        <div className="flex items-center gap-3 rounded-2xl border border-dashed border-zinc-200 px-5 py-3.5">
+            <span className="shrink-0 text-zinc-300" aria-hidden="true">{icon}</span>
+            <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-medium text-zinc-900">{title}</p>
+                <p className="text-[11.5px] text-zinc-400 truncate">{hint}</p>
+            </div>
         </div>
     );
 }
@@ -693,10 +738,12 @@ function PeopleIcon() {
     );
 }
 
-function ChevronIcon({ className = "" }: { className?: string }) {
+/** Row affordance for "opens a drawer" — a sideways chevron, not the
+ *  downward one this used to use for in-place expand/collapse. */
+function ChevronRightIcon({ className = "" }: { className?: string }) {
     return (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-            <path d="m6 9 6 6 6-6" />
+            <path d="m9 6 6 6-6 6" />
         </svg>
     );
 }
