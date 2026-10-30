@@ -1461,7 +1461,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           {showSettings && (
           <div>
             <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Refunds</p>
-            <RefundPolicyField value={refundPolicy} onChange={setRefundPolicy} />
+            <RefundPolicyField value={refundPolicy} onChange={setRefundPolicy} anchor="PURCHASE" />
           </div>
           )}
 
