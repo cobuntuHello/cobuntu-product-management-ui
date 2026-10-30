@@ -304,30 +304,25 @@ export function BuyersView({
 
     return (
         <div>
-            <div className="flex flex-col sm:flex-row sm:items-start gap-3 mb-5">
-                <div className="flex-1">
-                    <h2 className="text-[15px] font-semibold text-zinc-900">Buyers</h2>
-                    <p className="text-[12px] text-zinc-400 mt-0.5">
-                        People you gave this to, and people you asked to buy it.
-                    </p>
+            {/* No "Buyers" title/subtitle here — the tab itself is already
+                labelled "Buyers" in the nav, so a repeat heading right below
+                it said nothing new. */}
+            {mayEdit && (
+                <div className="flex items-center justify-end gap-2 flex-wrap mb-5">
+                    <button
+                        onClick={() => setMode("invite")}
+                        className="flex-1 sm:flex-none px-4 py-2 text-[13px] font-medium rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
+                    >
+                        Invite to buy
+                    </button>
+                    <button
+                        onClick={() => setMode("grant")}
+                        className="flex-1 sm:flex-none px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
+                    >
+                        Give access
+                    </button>
                 </div>
-                {mayEdit && (
-                    <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-                        <button
-                            onClick={() => setMode("invite")}
-                            className="flex-1 sm:flex-none px-4 py-2 text-[13px] font-medium rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
-                        >
-                            Invite to buy
-                        </button>
-                        <button
-                            onClick={() => setMode("grant")}
-                            className="flex-1 sm:flex-none px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
-                        >
-                            Give access
-                        </button>
-                    </div>
-                )}
-            </div>
+            )}
 
             <Section title="Customers" count={customers?.length} subtitle="Bought it themselves — free or paid.">
                 {customers === null ? (
