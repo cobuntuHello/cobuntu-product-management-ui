@@ -300,30 +300,14 @@ export function BuyersView({
         }
     }
 
-    const isFree = Number(product?.price ?? 0) === 0;
-
     return (
         <div>
             {/* No "Buyers" title/subtitle here — the tab itself is already
                 labelled "Buyers" in the nav, so a repeat heading right below
-                it said nothing new. */}
-            {mayEdit && (
-                <div className="flex items-center justify-end gap-2 flex-wrap mb-5">
-                    <button
-                        onClick={() => setMode("invite")}
-                        className="flex-1 sm:flex-none px-4 py-2 text-[13px] font-medium rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
-                    >
-                        Invite to buy
-                    </button>
-                    <button
-                        onClick={() => setMode("grant")}
-                        className="flex-1 sm:flex-none px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
-                    >
-                        Give access
-                    </button>
-                </div>
-            )}
-
+                it said nothing new. Each action button now sits beside the
+                title of the section it actually acts on, rather than grouped
+                together above all three sections where neither read as
+                belonging to one in particular. */}
             <Section title="Customers" count={customers?.length} subtitle="Bought it themselves — free or paid.">
                 {customers === null ? (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
@@ -365,7 +349,19 @@ export function BuyersView({
             </Section>
 
             <div className="mt-5">
-            <Section title="Has access" count={grants?.length} subtitle="Given the product for free. Not a sale.">
+            <Section
+                title="Has access"
+                count={grants?.length}
+                subtitle="Given the product for free. Not a sale."
+                action={mayEdit ? (
+                    <button
+                        onClick={() => setMode("grant")}
+                        className="shrink-0 px-3 py-1.5 text-[12px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
+                    >
+                        Give access
+                    </button>
+                ) : undefined}
+            >
                 {grants === null ? (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
                 ) : grants.length === 0 ? (
@@ -403,7 +399,19 @@ export function BuyersView({
             </div>
 
             <div className="mt-5">
-                <Section title="Invited" count={invites?.length} subtitle="Asked to buy it. They still pay.">
+                <Section
+                    title="Invited"
+                    count={invites?.length}
+                    subtitle="Asked to buy it. They still pay."
+                    action={mayEdit ? (
+                        <button
+                            onClick={() => setMode("invite")}
+                            className="shrink-0 px-3 py-1.5 text-[12px] font-medium rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
+                        >
+                            Invite to buy
+                        </button>
+                    ) : undefined}
+                >
                     {invites === null ? (
                         <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
                     ) : invites.length === 0 ? (
@@ -570,7 +578,6 @@ export function BuyersView({
                                 productName={product?.name ?? "this product"}
                                 price={product?.price ?? 0}
                                 currency={product?.currency ?? "EUR"}
-                                isFree={isFree}
                                 message={message}
                             />
                         ),
@@ -638,24 +645,32 @@ const BASE_COPY = {
 };
 
 function Section({
-    title, count, subtitle, children,
-}: { title: string; count?: number; subtitle: string; children: React.ReactNode }) {
+    title, count, subtitle, action, children,
+}: { title: string; count?: number; subtitle: string; action?: React.ReactNode; children: React.ReactNode }) {
     /* The card wrapper lives with the LIST now, not here: the compact empty
        row renders on its own (no box-in-box), while a populated list still
        gets its card. The caller decides which, so Section is just the
        titled container. The count sits beside the title so you can tell at
        a glance which of the three sections actually have anything in them,
-       instead of having to open each one to find out. */
+       instead of having to open each one to find out.
+
+       `action`, when given, sits on the SAME row as the title rather than
+       grouped with other sections' actions somewhere above the page —
+       "Give access" and "Invite to buy" used to sit together at the top,
+       where neither read as belonging to the section it actually acts on. */
     return (
         <div>
-            <div className="mb-2">
-                <div className="flex items-baseline gap-1.5">
-                    <h3 className="text-[13px] font-semibold text-zinc-900">{title}</h3>
-                    {typeof count === "number" && (
-                        <span className="text-[11.5px] font-medium text-zinc-400 tabular-nums">· {count}</span>
-                    )}
+            <div className="mb-2 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <div className="flex items-baseline gap-1.5">
+                        <h3 className="text-[13px] font-semibold text-zinc-900">{title}</h3>
+                        {typeof count === "number" && (
+                            <span className="text-[11.5px] font-medium text-zinc-400 tabular-nums">· {count}</span>
+                        )}
+                    </div>
+                    <p className="text-[11.5px] text-zinc-400">{subtitle}</p>
                 </div>
-                <p className="text-[11.5px] text-zinc-400">{subtitle}</p>
+                {action}
             </div>
             {children}
         </div>
@@ -688,12 +703,14 @@ function CompactEmptyRow({ icon, title, hint }: { icon: React.ReactNode; title: 
 }
 
 /**
- * The customer row's amount — "Free" for a genuine $0 acquisition (the bug
- * this section exists to fix), the real price otherwise. Cents, like
- * everywhere else on the platform.
+ * The customer row's amount — the real price, zero included. A genuine $0
+ * acquisition (the bug this section exists to fix) still prints as a real
+ * currency amount ("€0.00"), never the word "Free" — a figure in the
+ * buyer's own currency is the one thing every other row here already shows,
+ * and swapping to a word only on the zero case is the inconsistency.
+ * Cents, like everywhere else on the platform.
  */
 function formatCustomerAmount(grossAmount: number, currency: string): string {
-    if (!grossAmount) return "Free";
     try {
         return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 2 })
             .format(grossAmount / 100);
@@ -709,17 +726,16 @@ function formatCustomerAmount(grossAmount: number, currency: string): string {
  * that hid what the email says would defeat the point of previewing it.
  */
 function EmailPreview({
-    productName, price, currency, isFree, message,
-}: { productName: string; price: number; currency: string; isFree: boolean; message: string }) {
-    // Cents, like everywhere else on the platform.
-    let priceLabel = "Free";
-    if (!isFree) {
-        try {
-            priceLabel = new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 2 })
-                .format(Number(price) / 100);
-        } catch {
-            priceLabel = `${(Number(price) / 100).toFixed(2)} ${currency}`;
-        }
+    productName, price, currency, message,
+}: { productName: string; price: number; currency: string; message: string }) {
+    // Cents, like everywhere else on the platform. Always a real currency
+    // amount — zero included — never the word "Free".
+    let priceLabel: string;
+    try {
+        priceLabel = new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 2 })
+            .format(Number(price) / 100);
+    } catch {
+        priceLabel = `${(Number(price) / 100).toFixed(2)} ${currency}`;
     }
     return (
         <div className="rounded-xl border border-zinc-200 overflow-hidden">
