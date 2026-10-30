@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronRight, Layers } from "lucide-react";
+import { SectionCard } from "@cobuntu/management-ui-shared";
 import { PriceEditModal } from "../../components/PriceEditModal";
 import {
   getSymbol,
@@ -295,7 +296,14 @@ export function PricingView({
         )}
       </div>
 
-      <div>
+      {/*
+        * DonationsSection ships as body-only (no outer card) precisely so it
+        * can drop into different chrome — the create wizard's modal via
+        * DonationsField, and this bordered card here. Unlike the variant
+        * list above, donations is ONE settings block, not a list of
+        * card-like objects, so there's no card-in-a-card problem to avoid.
+        */}
+      <SectionCard title="Donations">
         <DonationsSection
           donation={donation}
           onUpdate={updateDonation}
@@ -316,7 +324,7 @@ export function PricingView({
             </button>
           </div>
         )}
-      </div>
+      </SectionCard>
 
       {editingTier && (
         <PriceEditModal

@@ -301,18 +301,6 @@ export function ProductCard({
               the exception because nobody had given them a row, not because
               they needed the form. Adding them is what lets the drawer go.
             */}
-            {onEditTags && (
-              <InfoRow onClick={onEditTags}
-                icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>}>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-zinc-400">Tags</p>
-                  <p className={`text-sm truncate ${tagNames ? "font-medium text-zinc-900" : "text-zinc-500"}`}>
-                    {tagNames || "Add tags"}
-                  </p>
-                </div>
-              </InfoRow>
-            )}
-
             {onEditCategory && (
               <InfoRow onClick={onEditCategory}
                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>}>
@@ -320,6 +308,18 @@ export function ProductCard({
                   <p className="text-xs text-zinc-400">Category</p>
                   <p className={`text-sm truncate ${categoryLabel ? "font-medium text-zinc-900" : "text-zinc-500"}`}>
                     {categoryLabel || "Uncategorised"}
+                  </p>
+                </div>
+              </InfoRow>
+            )}
+
+            {onEditTags && (
+              <InfoRow onClick={onEditTags}
+                icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-zinc-400">Tags</p>
+                  <p className={`text-sm truncate ${tagNames ? "font-medium text-zinc-900" : "text-zinc-500"}`}>
+                    {tagNames || "Add tags"}
                   </p>
                 </div>
               </InfoRow>
