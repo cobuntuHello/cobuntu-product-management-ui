@@ -297,13 +297,24 @@ export function PricingView({
       </div>
 
       {/*
+        * Title OUTSIDE the card, same placement as "Variants" above — a
+        * SectionCard title renders inside its own bordered header row,
+        * which reads as the card's OWN heading rather than this page's
+        * section heading sitting consistently above each block the way
+        * "Variants" already does.
+        */}
+      <div>
+        <h2 className="text-[15px] font-semibold text-zinc-900">Donations</h2>
+      </div>
+
+      {/*
         * DonationsSection ships as body-only (no outer card) precisely so it
         * can drop into different chrome — the create wizard's modal via
         * DonationsField, and this bordered card here. Unlike the variant
         * list above, donations is ONE settings block, not a list of
         * card-like objects, so there's no card-in-a-card problem to avoid.
         */}
-      <SectionCard title="Donations">
+      <SectionCard>
         <DonationsSection
           donation={donation}
           onUpdate={updateDonation}
