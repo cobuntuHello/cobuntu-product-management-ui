@@ -278,6 +278,21 @@ describe("customers", () => {
 
             expect((await screen.findAllByText("Could not load this customer's download detail."))[0]).toBeInTheDocument();
         });
+
+        it("shows the purchase amount and date, same weight as a ledger drawer", async () => {
+            const user = userEvent.setup();
+            renderWithCustomers(
+                [{ id: "s1", grossAmount: 2400, currency: "EUR", createdAt: "2026-08-12T10:00:00.000Z", guestEmail: null,
+                   user: { id: "u-ana", name: "Ana Neto", usertag: "ana-neto", profileImage: null } }],
+                PRODUCT,
+                [{ method: "GET", url: /\/customers\/s1$/, body: { licenseTerms: null, downloads: [], linkOpens: [] } }],
+            );
+
+            await user.click((await screen.findAllByText("Ana Neto"))[0]);
+
+            expect((await screen.findAllByText(/24\.00/))[0]).toBeInTheDocument();
+            expect((await screen.findAllByText(/12 Aug 2026/))[0]).toBeInTheDocument();
+        });
     });
 });
 
