@@ -103,14 +103,15 @@ describe("customers", () => {
         return fetchMock;
     }
 
-    it("shows a FREE acquisition — the reported bug", async () => {
+    it("shows a FREE acquisition as a real currency amount, never the word Free — the reported bug", async () => {
         renderWithCustomers([
             { id: "s1", grossAmount: 0, currency: "EUR", createdAt: "2026-01-01T00:00:00Z", guestEmail: null,
               user: { id: "u-ana", name: "Ana Neto", usertag: "ana-neto", profileImage: null } },
         ]);
 
         expect(await screen.findByText("Ana Neto")).toBeInTheDocument();
-        expect(await screen.findByText("Free")).toBeInTheDocument();
+        expect(await screen.findByText(/0\.00/)).toBeInTheDocument();
+        expect(screen.queryByText("Free")).not.toBeInTheDocument();
     });
 
     it("shows a PAID acquisition with the amount — this tab had neither before", async () => {
@@ -132,7 +133,7 @@ describe("customers", () => {
         ]);
 
         expect(await screen.findByText("guest@example.com")).toBeInTheDocument();
-        expect(await screen.findByText("Free")).toBeInTheDocument();
+        expect(await screen.findByText(/0\.00/)).toBeInTheDocument();
     });
 
     it("says so when nobody has bought it yet", async () => {
@@ -161,7 +162,7 @@ describe("customers", () => {
      * `findByText("Give access")`-style queries — fixed by dropping the
      * inline action entirely rather than by giving it a different label.
      */
-    it("does not repeat the header actions inside the empty rows", async () => {
+    it("shows exactly one Give access and one Invite to buy button, each beside its own section", async () => {
         renderWithCustomers([]);
         await screen.findByText("Nobody has bought this yet");
         expect(screen.getAllByText("Give access")).toHaveLength(1);
