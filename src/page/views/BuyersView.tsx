@@ -439,27 +439,48 @@ export function BuyersView({
 
             {error && <p className="mt-3 text-[12px] text-red-600">{error}</p>}
 
+            {/*
+              * The identity (avatar, name, @usertag) is composed entirely
+              * inside `title` rather than split across title/subtitle/
+              * headerExtra. ResponsiveDrawer's generic slots give a plain
+              * text line each; a buyer deserves the same avatar+name
+              * treatment every other row in this tab already gets, which
+              * needs them laid out together, not stacked in three separate
+              * blocks.
+              */}
             <ResponsiveDrawer
                 open={!!detailCustomer}
                 onClose={() => setDetailCustomer(null)}
-                title={detailCustomer?.user?.name || detailCustomer?.guestEmail || "Customer"}
-                subtitle={detailCustomer ? formatCustomerAmount(detailCustomer.grossAmount, detailCustomer.currency) : undefined}
-                headerExtra={
-                    detailCustomer?.user?.usertag ? (
-                        <span className="text-[11px] text-zinc-400">@{detailCustomer.user.usertag}</span>
+                title={
+                    detailCustomer ? (
+                        <div className="flex items-center gap-3">
+                            <UserAvatar
+                                user={detailCustomer.user ?? { id: detailCustomer.guestEmail ?? detailCustomer.id }}
+                                className="w-10 h-10 shrink-0"
+                            />
+                            <div className="min-w-0">
+                                <p className="truncate text-[15px] font-semibold text-zinc-900">
+                                    {detailCustomer.user?.name || detailCustomer.guestEmail || "Customer"}
+                                </p>
+                                {detailCustomer.user?.usertag && (
+                                    <p className="truncate text-[11px] font-normal text-zinc-400">@{detailCustomer.user.usertag}</p>
+                                )}
+                            </div>
+                        </div>
                     ) : undefined
                 }
             >
                 {(() => {
                     if (!detailCustomer) return null;
                     const detail = customerDetails[detailCustomer.id];
-                    if (detail === "loading" || detail === undefined) {
-                        return <p className="text-[12px] text-zinc-400">Loading…</p>;
-                    }
-                    if (detail === "error") {
-                        return <p className="text-[12px] text-red-600">Could not load this customer's download detail.</p>;
-                    }
-                    return <CustomerDownloadDetailPanel detail={detail} />;
+                    return (
+                        <CustomerDownloadDetailPanel
+                            customer={detailCustomer}
+                            detail={detail === "loading" || detail === undefined || detail === "error" ? undefined : detail}
+                            loading={detail === "loading" || detail === undefined}
+                            failed={detail === "error"}
+                        />
+                    );
                 })()}
             </ResponsiveDrawer>
 
@@ -744,38 +765,96 @@ function ChevronRightIcon({ className = "" }: { className?: string }) {
 }
 
 /**
- * A customer's download usage vs. cap, and the tier's licence text if it
- * carries one. "How many downloads from how many possible, and the licence
- * if applicable" was the exact ask — this is where that renders.
+ * A customer's purchase amount/date, their download usage vs. cap, and the
+ * tier's licence text if it carries one. "How many downloads from how many
+ * possible, and the licence if applicable" was the exact ask; the amount and
+ * date are added here so the drawer carries the same purchase-identity
+ * weight the ledger's own sale drawer does, rather than opening straight
+ * into a bare download list with no record of what was bought or when.
  */
-function CustomerDownloadDetailPanel({ detail }: { detail: CustomerDetail }) {
-    const nothing = detail.downloads.length === 0 && detail.linkOpens.length === 0 && !detail.licenseTerms;
-    if (nothing) {
-        return <p className="text-[12px] text-zinc-400">No downloadable content on this sale.</p>;
-    }
+function CustomerDownloadDetailPanel({
+    customer, detail, loading, failed,
+}: { customer: Customer; detail?: CustomerDetail; loading: boolean; failed: boolean }) {
+    const purchasedAt = new Date(customer.createdAt).toLocaleDateString("en-GB", {
+        day: "numeric", month: "short", year: "numeric",
+    });
+    const nothing = !!detail && detail.downloads.length === 0 && detail.linkOpens.length === 0 && !detail.licenseTerms;
+
     return (
-        <div className="space-y-2.5">
-            {detail.downloads.map((d, i) => (
-                <div key={`dl-${i}`} className="flex items-baseline justify-between gap-3 text-[12.5px]">
-                    <span className="text-zinc-600 truncate">{d.name}</span>
-                    <span className="shrink-0 font-medium text-zinc-900 tabular-nums">
-                        {d.max != null ? `${d.used} of ${d.max} downloads` : `${d.used} ${d.used === 1 ? "download" : "downloads"}`}
-                    </span>
-                </div>
-            ))}
-            {detail.linkOpens.map((l, i) => (
-                <div key={`lo-${i}`} className="flex items-baseline justify-between gap-3 text-[12.5px]">
-                    <span className="text-zinc-600 truncate">{l.name}</span>
-                    <span className="shrink-0 font-medium text-zinc-900 tabular-nums">
-                        opened {l.opens} {l.opens === 1 ? "time" : "times"}
-                    </span>
-                </div>
-            ))}
-            {detail.licenseTerms && (
-                <p className="mt-1 rounded-lg bg-zinc-50 px-3 py-2 text-[11.5px] leading-relaxed text-zinc-500">
+        <div className="space-y-6">
+            {/* Amount + date — the same purchase-identity weight the ledger's
+                own sale drawer gives a movement, so this doesn't read as a
+                bare download list with no record of what was bought. */}
+            <div>
+                <p className="text-3xl font-semibold tabular-nums text-zinc-900">
+                    {formatCustomerAmount(customer.grossAmount, customer.currency)}
+                </p>
+                <p className="mt-1 text-[13px] text-zinc-400">{purchasedAt}</p>
+            </div>
+
+            <div>
+                <h4 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-zinc-400">Downloads</h4>
+
+                {loading ? (
+                    <div className="h-20 animate-pulse rounded-lg bg-zinc-50" />
+                ) : failed ? (
+                    <p className="text-[12.5px] text-red-600">Could not load this customer's download detail.</p>
+                ) : nothing ? (
+                    <p className="text-[12.5px] text-zinc-400">No downloadable content on this sale.</p>
+                ) : (
+                    <div className="overflow-hidden rounded-lg border border-zinc-100 bg-zinc-50/50">
+                        {detail!.downloads.map((d, i) => (
+                            <div
+                                key={`dl-${i}`}
+                                className={`flex items-center gap-3 px-4 py-2.5 text-[12.5px] ${i > 0 ? "border-t border-zinc-100" : ""}`}
+                            >
+                                <DownloadIcon />
+                                <span className="min-w-0 flex-1 truncate text-zinc-700">{d.name}</span>
+                                <span className="shrink-0 font-medium tabular-nums text-zinc-900">
+                                    {d.max != null ? `${d.used} of ${d.max} downloads` : `${d.used} ${d.used === 1 ? "download" : "downloads"}`}
+                                </span>
+                            </div>
+                        ))}
+                        {detail!.linkOpens.map((l, i) => (
+                            <div
+                                key={`lo-${i}`}
+                                className={`flex items-center gap-3 px-4 py-2.5 text-[12.5px] ${(detail!.downloads.length > 0 || i > 0) ? "border-t border-zinc-100" : ""}`}
+                            >
+                                <LinkIcon />
+                                <span className="min-w-0 flex-1 truncate text-zinc-700">{l.name}</span>
+                                <span className="shrink-0 font-medium tabular-nums text-zinc-900">
+                                    opened {l.opens} {l.opens === 1 ? "time" : "times"}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {detail?.licenseTerms && (
+                <p className="rounded-lg bg-zinc-50 px-3 py-2 text-[11.5px] leading-relaxed text-zinc-500">
                     <span className="font-medium text-zinc-600">Licence: </span>{detail.licenseTerms}
                 </p>
             )}
         </div>
+    );
+}
+
+function DownloadIcon() {
+    return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-zinc-400">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+    );
+}
+
+function LinkIcon() {
+    return (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-zinc-400">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+        </svg>
     );
 }
