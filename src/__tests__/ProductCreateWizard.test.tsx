@@ -27,12 +27,17 @@ vi.mock("../components/ProductForm", async () => {
 import { ProductCreateWizard } from "../create-wizard/ProductCreateWizard";
 import type { ProductCreateWizardTransport, ProductCreateWizardProps } from "../create-wizard/types";
 import { createWizardTranslator, formatMessage } from "../create-wizard/i18n";
+import { blankTier } from "../components/PriceEditModal/helpers";
 
 function fake(over: any = {}) {
   return {
     name: "Handmade candle", description: "", isPaid: false, price: "", currency: "USD", ctaText: "",
     isRecurring: false, recurringInterval: "monthly",
-    tiers: [], tags: [], categoryId: null, subCategoryId: null, mediaItems: [], productFiles: [],
+    // Hard requirement (2026-10-31): a product needs at least one variant
+    // to leave the Pricing step or submit. Default fixture carries one, so
+    // tests not specifically exercising that gate aren't tripped by it.
+    tiers: [blankTier({ indexHint: 1 })],
+    tags: [], categoryId: null, subCategoryId: null, mediaItems: [], productFiles: [],
     links: [], donation: { enabled: false }, condition: null, parcelClass: null,
     viewability: "PUBLIC", accessibility: "PUBLIC", viewTierIds: [], buyTierIds: [],
     ...over,
@@ -210,6 +215,48 @@ describe("transport", () => {
     await waitFor(() => expect(h.props.at(-1).showErrors).toBe(true));
     // Still blocked from advancing.
     expect(screen.getByTestId("product-form")).toHaveAttribute("data-page", "listing");
+  });
+});
+
+describe("at least one variant (2026-10-31 hard requirement)", () => {
+  it("blocks leaving Pricing with zero tiers, free or paid", async () => {
+    renderWizard({ initialDrafts: [], canCreateForCommunity: false });
+    await screen.findByTestId("product-form");
+    press("Next"); // details -> commerce
+    h.props.at(-1).onChange(fake({ tiers: [] }));
+    press("Next"); // commerce -> settings, should be refused
+    expect(screen.getByRole("alert").textContent).toContain("Add at least one variant to continue");
+    // Still on the Pricing step.
+    expect(screen.getByTestId("product-form")).toHaveAttribute("data-page", "commerce");
+  });
+
+  it("does not block leaving Details before Pricing has been configured at all", async () => {
+    // formDataRef starts out with whatever the host's initial/default data
+    // is, which may have zero tiers before the seller ever opens Pricing.
+    // The gate only applies once Pricing has been seen (commerce -> next).
+    renderWizard({ initialDrafts: [], canCreateForCommunity: false, transport: transport({}) });
+    await screen.findByTestId("product-form");
+    h.props.at(-1).onChange(fake({ tiers: [] }));
+    press("Next"); // details -> commerce, must NOT be blocked by the tier gate
+    expect(screen.getByTestId("product-form")).toHaveAttribute("data-page", "commerce");
+  });
+
+  it("blocks final submit with zero tiers even if a caller skips straight to it", async () => {
+    const { tr } = renderWizard({ initialDrafts: [], canCreateForCommunity: false });
+    await screen.findByTestId("product-form");
+    walk();
+    h.props.at(-1).onChange(fake({ tiers: [] }));
+    press("Create & Request Listing");
+    expect(screen.getByRole("alert").textContent).toContain("Add at least one variant to continue");
+    expect(tr.createProduct).not.toHaveBeenCalled();
+  });
+
+  it("allows a FREE product through once it has one named variant", async () => {
+    const { tr } = renderWizard({ initialDrafts: [], canCreateForCommunity: false });
+    await screen.findByTestId("product-form");
+    walk();
+    press("Create & Request Listing");
+    await waitFor(() => expect(tr.createProduct).toHaveBeenCalledTimes(1));
   });
 });
 
