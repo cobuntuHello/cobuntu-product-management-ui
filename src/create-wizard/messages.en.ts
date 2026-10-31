@@ -18,6 +18,7 @@ export const PRODUCT_WIZARD_MESSAGES_EN = {
       "errAddName": "Give your product a name",
       "errPaidTier": "Set a price (or pay-what-you-want) on at least one variant",
       "errSetPrice": "Set a price",
+      "errNeedTier": "Add at least one variant to continue",
       "errDraftNeedsName": "Give it a name first, so you can find it again.",
       "errFailedCreate": "Failed to create product",
       "errUploadFailed": "Upload failed",

@@ -423,18 +423,31 @@ function WizardInner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function validationMessage(): string | null {
+  /*
+   * `requireTiers` scopes the hard "at least one variant" check (2026-10-31)
+   * to the places it can actually be answered: leaving the Pricing
+   * ("commerce") step, and final submit. `goNext()` also runs this function
+   * when LEAVING the "details" step, before the Pricing step has ever been
+   * shown — at that point `d.tiers` is still the form's untouched initial
+   * state, so checking it there would trap every new product on step one.
+   */
+  function validationMessage(requireTiers = true): string | null {
     const d = formDataRef.current;
     if (!d || !d.name.trim()) return t("errAddName");
-    if (d.isPaid) {
-      if (d.tiers && d.tiers.length > 0) {
-        const anyValid = d.tiers.some(
-          (tier) => tier.name.trim() && (tier.priceMode === "pwyw" || (tier.price && parseFloat(tier.price) > 0)),
-        );
-        if (!anyValid) return t("errPaidTier");
-      } else if (!d.price || parseFloat(d.price) <= 0) {
-        return t("errSetPrice");
-      }
+    /*
+     * A product needs at least one variant to be listed — something a buyer
+     * can actually add to cart. This used to be checked only for a paid
+     * product (`d.isPaid`), which let a FREE product through with a blank,
+     * unnamed tier and zero actually configured, matching the backend gap
+     * assertListable now closes. Both paths route through the same tier
+     * count now.
+     */
+    if (requireTiers && (!d.tiers || d.tiers.length === 0)) return t("errNeedTier");
+    if (d.isPaid && d.tiers && d.tiers.length > 0) {
+      const anyValid = d.tiers.some(
+        (tier) => tier.name.trim() && (tier.priceMode === "pwyw" || (tier.price && parseFloat(tier.price) > 0)),
+      );
+      if (!anyValid) return t("errPaidTier");
     }
     return null;
   }
@@ -465,7 +478,7 @@ function WizardInner({
 
   function goNext() {
     if (step === "details" || step === "commerce") {
-      const invalid = validationMessage();
+      const invalid = validationMessage(step === "commerce");
       if (invalid) { setShowErrors(true); setError(nameErrorIsAlreadyInline() ? "" : invalid); return; }
     }
     if (onContentStep) {
