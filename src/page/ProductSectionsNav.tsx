@@ -60,8 +60,8 @@ const SECTIONS: Array<{ key: ProductViewKey; label: string }> = [
    * thing", but "arrange what is inside it".
    *
    * Straight after Details because it is the other half of describing the
-   * product, and before Ledger because arranging it is what an author does
-   * repeatedly while money is something they check.
+   * product, and ahead of the people and money tabs because arranging it is
+   * what an author does repeatedly while money is something they check.
    *
    * It appears only when the host passes `syllabusSlot` - see `hasSyllabus` in
    * visibleProductViews. A product page on any pin, old or new, shows exactly
@@ -69,15 +69,21 @@ const SECTIONS: Array<{ key: ProductViewKey; label: string }> = [
    */
   { key: "syllabus", label: "Syllabus" },
   /*
-   * LEDGER SITS AFTER DETAILS, always.
+   * Collaborators, THEN Ledger.
+   *
+   * This used to read "LEDGER SITS AFTER DETAILS, always" and put Ledger
+   * first. Changed deliberately on 2026-11-01: the tabs now run from
+   * describing the thing (Overview, Details, Pricing, Syllabus) through the
+   * people attached to it (Collaborators, then Buyers) with the money in
+   * between, rather than interrupting the description with a financial view.
    *
    * THIS list is the one that orders the tabs -- SectionsNav renders
    * SECTIONS.filter(visible), so the allowed-views array decides WHETHER a tab
    * shows and this decides WHERE. A position pinned only in the other list is
    * pinned in the wrong place.
    */
-  { key: "ledger", label: "Ledger" },
   { key: "collaborators", label: "Collaborators" },
+  { key: "ledger", label: "Ledger" },
   /*
    * Who HAS this product, and who was asked to buy it.
    *
