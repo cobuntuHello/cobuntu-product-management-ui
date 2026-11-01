@@ -809,7 +809,14 @@ function CustomerDownloadDetailPanel({
             </div>
 
             <div>
-                <h4 className="mb-3 text-[11px] font-medium uppercase tracking-wider text-zinc-400">Downloads</h4>
+                <div className="mb-3 flex items-baseline gap-1.5">
+                    <h4 className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Downloads</h4>
+                    {detail && (detail.downloads.length + detail.linkOpens.length) > 0 && (
+                        <span className="text-[11px] font-medium tabular-nums text-zinc-300">
+                            · {detail.downloads.length + detail.linkOpens.length}
+                        </span>
+                    )}
+                </div>
 
                 {loading ? (
                     <div className="h-20 animate-pulse rounded-lg bg-zinc-50" />
@@ -818,30 +825,30 @@ function CustomerDownloadDetailPanel({
                 ) : nothing ? (
                     <p className="text-[12.5px] text-zinc-400">No downloadable content on this sale.</p>
                 ) : (
-                    <div className="overflow-hidden rounded-lg border border-zinc-100 bg-zinc-50/50">
+                    <div className="flex flex-col gap-2">
                         {detail!.downloads.map((d, i) => (
-                            <div
+                            <AssetRow
                                 key={`dl-${i}`}
-                                className={`flex items-center gap-3 px-4 py-2.5 text-[12.5px] ${i > 0 ? "border-t border-zinc-100" : ""}`}
-                            >
-                                <DownloadIcon />
-                                <span className="min-w-0 flex-1 truncate text-zinc-700">{d.name}</span>
-                                <span className="shrink-0 font-medium tabular-nums text-zinc-900">
-                                    {d.max != null ? `${d.used} of ${d.max} downloads` : `${d.used} ${d.used === 1 ? "download" : "downloads"}`}
-                                </span>
-                            </div>
+                                icon={<DownloadIcon />}
+                                name={d.name}
+                                used={d.used}
+                                max={d.max}
+                                countLabel={
+                                    d.max != null
+                                        ? `${d.used} of ${d.max}`
+                                        : `${d.used} ${d.used === 1 ? "download" : "downloads"}`
+                                }
+                            />
                         ))}
                         {detail!.linkOpens.map((l, i) => (
-                            <div
+                            <AssetRow
                                 key={`lo-${i}`}
-                                className={`flex items-center gap-3 px-4 py-2.5 text-[12.5px] ${(detail!.downloads.length > 0 || i > 0) ? "border-t border-zinc-100" : ""}`}
-                            >
-                                <LinkIcon />
-                                <span className="min-w-0 flex-1 truncate text-zinc-700">{l.name}</span>
-                                <span className="shrink-0 font-medium tabular-nums text-zinc-900">
-                                    opened {l.opens} {l.opens === 1 ? "time" : "times"}
-                                </span>
-                            </div>
+                                icon={<LinkIcon />}
+                                name={l.name}
+                                used={l.opens}
+                                max={null}
+                                countLabel={`opened ${l.opens} ${l.opens === 1 ? "time" : "times"}`}
+                            />
                         ))}
                     </div>
                 )}
@@ -851,6 +858,72 @@ function CustomerDownloadDetailPanel({
                 <p className="rounded-lg bg-zinc-50 px-3 py-2 text-[11.5px] leading-relaxed text-zinc-500">
                     <span className="font-medium text-zinc-600">Licence: </span>{detail.licenseTerms}
                 </p>
+            )}
+        </div>
+    );
+}
+
+/**
+ * One downloadable file or shared link.
+ *
+ * A card per asset rather than rows inside one grey block: each asset is a
+ * separate thing with its own usage, and the divided-block version made two
+ * files read as one record split in half.
+ *
+ * The icon sits in a tinted tile because "file" vs "link" is the first thing
+ * being scanned for, and a 14px grey glyph against grey text is not a
+ * distinction anybody makes at a glance.
+ *
+ * ── The bar, and why it only sometimes appears ──────────────────────────
+ *
+ * A CAP is the only case where the count has a denominator, and then the
+ * useful question is not "how many" but "how close to the end" -- which a
+ * number answers slowly and a bar answers instantly. Without a cap there is
+ * nothing to be proportional to, so no bar is drawn rather than an
+ * arbitrary one.
+ *
+ * EXHAUSTED is called out because it is the one state with a consequence:
+ * the buyer is locked out of a file they paid for and has to ask the seller,
+ * which is exactly what download.limit_reached notifies about. Before this
+ * the drawer said "6 of 6" and left the reader to notice.
+ */
+function AssetRow({
+    icon, name, used, max, countLabel,
+}: { icon: React.ReactNode; name: string; used: number; max: number | null; countLabel: string }) {
+    const exhausted = max != null && used >= max;
+    const pct = max != null && max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
+
+    return (
+        <div className="rounded-xl border border-zinc-100 bg-white px-3.5 py-3">
+            <div className="flex items-center gap-3">
+                <span
+                    aria-hidden
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                        exhausted ? "bg-amber-50 text-amber-600" : "bg-zinc-100 text-zinc-500"
+                    }`}
+                >
+                    {icon}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[12.5px] text-zinc-700">{name}</span>
+                <span className={`shrink-0 text-[12.5px] font-medium tabular-nums ${exhausted ? "text-amber-700" : "text-zinc-900"}`}>
+                    {countLabel}
+                </span>
+            </div>
+
+            {max != null && (
+                <div className="mt-2.5 flex items-center gap-2">
+                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-zinc-100">
+                        <div
+                            className={`h-full rounded-full ${exhausted ? "bg-amber-500" : "bg-zinc-800"}`}
+                            style={{ width: `${pct}%` }}
+                        />
+                    </div>
+                    {exhausted && (
+                        <span className="shrink-0 text-[10.5px] font-medium uppercase tracking-wide text-amber-700">
+                            Limit reached
+                        </span>
+                    )}
+                </div>
             )}
         </div>
     );
