@@ -766,40 +766,43 @@ function WizardInner({
             <span className="mt-0.5 block text-[12.5px] opacity-60">{t("stepListingSubtitle", { community: communityName })}</span>
           </div>
 
-          {packages.length === 0 && (
-            <p className="text-[13.5px] leading-relaxed opacity-65">
-              {t("noPackagesNote", { community: communityName })}
-            </p>
-          )}
-          {packages.length > 0 && (
-            <div>
-              <PackagePicker
-                packages={packages}
-                value={packageId}
-                onChange={setPackageId}
-                communityName={communityName}
-                /*
-                 * `platformFeeRate` is Cobuntu's NET cut, 0..1, 0 for a
-                 * premium community (the host resolves that, same contract
-                 * as OwnershipToggle's own use of this prop above). But
-                 * `PackagePicker.platformFee.rate` wants the ALL-IN gross —
-                 * its own doc comment: "Cobuntu pays Stripe out of it rather
-                 * than deducting separately" — so processing rides ON TOP of
-                 * the net rate here, never replaces it. At platformFeeRate=0
-                 * the all-in rate still equals processing's own rate/fixed
-                 * exactly: Cobuntu takes nothing, Stripe still has to be
-                 * paid. Falls back to 2.5% net (4% all-in, this call's
-                 * previous hardcoded total) only when an un-updated host
-                 * never supplies a real rate.
-                 */
-                platformFee={{
-                  rate: (platformFeeRate ?? 0.025) * 100 + 1.5,
-                  fixedCents: 30,
-                  processing: { rate: 1.5, fixedCents: 25 },
-                }}
-              />
-            </div>
-          )}
+          {/*
+            Always rendered, packages or not: PackagePicker itself shows the
+            Cobuntu+Stripe fee breakdown even with an empty `packages` array
+            (its own zero-packages branch + `emptyLabel`) -- a seller on a
+            tier with no published community terms still pays Cobuntu's and
+            Stripe's cut, and used to see NOTHING about it because this step
+            took a separate branch that rendered only the "hasn't published"
+            note and never reached PackagePicker at all.
+          */}
+          <div>
+            <PackagePicker
+              packages={packages}
+              value={packageId}
+              onChange={setPackageId}
+              communityName={communityName}
+              emptyLabel={t("noPackagesNote", { community: communityName })}
+              /*
+               * `platformFeeRate` is Cobuntu's NET cut, 0..1, 0 for a
+               * premium community (the host resolves that, same contract
+               * as OwnershipToggle's own use of this prop above). But
+               * `PackagePicker.platformFee.rate` wants the ALL-IN gross —
+               * its own doc comment: "Cobuntu pays Stripe out of it rather
+               * than deducting separately" — so processing rides ON TOP of
+               * the net rate here, never replaces it. At platformFeeRate=0
+               * the all-in rate still equals processing's own rate/fixed
+               * exactly: Cobuntu takes nothing, Stripe still has to be
+               * paid. Falls back to 2.5% net (4% all-in, this call's
+               * previous hardcoded total) only when an un-updated host
+               * never supplies a real rate.
+               */
+              platformFee={{
+                rate: (platformFeeRate ?? 0.025) * 100 + 1.5,
+                fixedCents: 30,
+                processing: { rate: 1.5, fixedCents: 25 },
+              }}
+            />
+          </div>
         </div>
       </StepPane>
 
