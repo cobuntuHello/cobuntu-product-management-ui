@@ -26,6 +26,7 @@ vi.mock("../components/ProductForm", async () => {
 
 import { ProductCreateWizard } from "../create-wizard/ProductCreateWizard";
 import type { ProductCreateWizardTransport, ProductCreateWizardProps } from "../create-wizard/types";
+import type { ProductCreateType } from "../lib/productCreatePayload";
 import { createWizardTranslator, formatMessage } from "../create-wizard/i18n";
 import { blankTier } from "../components/PriceEditModal/helpers";
 
@@ -306,7 +307,7 @@ describe("extra steps", () => {
   it("appear on the rail after the last Cobuntu step, block Next until valid, and reach onDone", async () => {
     const { tr, onDone } = renderWizard({ initialDrafts: [], canCreateForCommunity: false, extraSteps });
     await screen.findByTestId("product-form");
-    expect(walk()).toEqual(["Details", "Deliverable Variants & Pricing", "Policies & access", "Arrangement", "About you"]);
+    expect(walk()).toEqual(["Details", "Deliverable Variants & Pricing", "Policies & access", "Commission", "About you"]);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Tell us about you");
 
     press("Create & Request Listing");
@@ -327,13 +328,13 @@ describe("course vs product steps", () => {
   it("a plain product gets no content step even for a non-leader", async () => {
     renderWizard({ initialDrafts: [], canCreateForCommunity: false, productType: "DIGITAL" });
     await screen.findByTestId("product-form");
-    expect(walk()).toEqual(["Details", "Deliverable Variants & Pricing", "Policies & access", "Arrangement"]);
+    expect(walk()).toEqual(["Details", "Deliverable Variants & Pricing", "Policies & access", "Commission"]);
   });
 
   it("productType COURSE with no renderContentStep still gets no content step", async () => {
     renderWizard({ initialDrafts: [], canCreateForCommunity: false, productType: "COURSE" });
     await screen.findByTestId("product-form");
-    expect(walk()).toEqual(["Details", "Pricing", "Policies & access", "Arrangement"]);
+    expect(walk()).toEqual(["Details", "Pricing", "Policies & access", "Commission"]);
   });
 
   it("productType COURSE with renderContentStep gets a content step after commerce, and the form hides repeat-purchase", async () => {
@@ -363,7 +364,7 @@ describe("course vs product steps", () => {
     press("Next"); // content -> settings
     expect(railLabel()).toBe("Policies & access");
     press("Next"); // settings -> listing
-    expect(railLabel()).toBe("Arrangement");
+    expect(railLabel()).toBe("Commission");
 
     press("Create & Request Listing");
     await waitFor(() => expect(tr.createProduct).toHaveBeenCalledTimes(1));
@@ -459,6 +460,60 @@ describe("theme and portals", () => {
   });
 });
 
+describe("the commission step", () => {
+  async function toCommissionStep(over: Partial<ProductCreateWizardProps> = {}) {
+    const utils = renderWizard({ initialDrafts: [], canCreateForCommunity: false, ...over });
+    await screen.findByTestId("product-form");
+    for (let i = 0; i < 10 && railLabel() !== "Commission"; i++) press("Next");
+    return utils;
+  }
+
+  it("has no toggle — the commission is always shown, never a decision", async () => {
+    await toCommissionStep({
+      transport: transport({ myPackages: vi.fn(async (_type: ProductCreateType) => [{ id: "pk1", name: "Standard", description: null, rate: 10 }]) }),
+    });
+    await screen.findByText("Standard");
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+  });
+
+  // Multiple packages, so PackagePicker takes its split-breakdown path
+  // rather than the single-package combined sentence.
+  const twoPackages = vi.fn(async (_type: ProductCreateType) => [
+    { id: "pk1", name: "Standard", description: null, rate: 10 },
+    { id: "pk2", name: "Featured", description: null, rate: 15 },
+  ]);
+
+  it("shows every community package, plus Cobuntu's and Stripe's cuts split apart", async () => {
+    await toCommissionStep({
+      transport: transport({ myPackages: twoPackages }),
+      community: { tag: "orbis", id: "c1", name: "Orbis", memberFeeModel: "FLAT", memberRequireApproval: true, platformFeeRate: 0.025 },
+    });
+    await screen.findByText("Standard");
+    expect(screen.getByText("Featured")).toBeInTheDocument();
+    expect(screen.getByText("10%")).toBeInTheDocument();
+    expect(screen.getByText("15%")).toBeInTheDocument();
+    expect(screen.getByText("Card processing")).toBeInTheDocument();
+    expect(screen.getByText("Cobuntu")).toBeInTheDocument();
+    // 2.5% platform rate, same 1.5%/€0.25 processing split PackagePicker always uses.
+    expect(screen.getByText("1.5% + €0.25")).toBeInTheDocument();
+    expect(screen.getByText("2.5% + €0.05")).toBeInTheDocument();
+  });
+
+  it("zeroes Cobuntu's cut when the host reports a premium community (platformFeeRate 0)", async () => {
+    await toCommissionStep({
+      transport: transport({ myPackages: twoPackages }),
+      community: { tag: "orbis", id: "c1", name: "Orbis", memberFeeModel: "FLAT", memberRequireApproval: true, platformFeeRate: 0 },
+    });
+    await screen.findByText("Standard");
+    expect(screen.getByText("0% + €0.05")).toBeInTheDocument();
+  });
+
+  it("still shows the no-packages note when the community has published none", async () => {
+    await toCommissionStep();
+    expect(screen.getByText(/has not published terms for your tier/)).toBeInTheDocument();
+  });
+});
+
 describe("package hygiene", () => {
   it("the wizard and its parts import nothing from next/*", () => {
     const dir = join(__dirname, "../create-wizard");
@@ -468,3 +523,5 @@ describe("package hygiene", () => {
     }
   });
 });
+
+
