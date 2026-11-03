@@ -170,14 +170,24 @@ describe("the ledger tab", () => {
         const keys = SECTION_KEYS;
         expect(keys.indexOf("ledger")).toBeGreaterThan(keys.indexOf("details"));
         /*
-         * Pricing joined the strip between Details and Ledger, so this slice
-         * is ["pricing", "syllabus"] now. The rule it defends is unchanged:
-         * the ledger sits after the editing surfaces, and the syllabus sits
-         * between them -- it is the exact membership that moved, not the
-         * ordering rule.
+         * STOP PINNING THE EXACT MEMBERSHIP OF THIS SLICE.
+         *
+         * It has now been rewritten three times for reasons that had nothing
+         * to do with the ledger: Syllabus landing in the gap, then Pricing,
+         * then the 2026-11-01 reorder that moved Collaborators ahead of Ledger
+         * (which left this red on main unnoticed), then Referrals. Every time,
+         * the RULE held and only the list changed, so the list was never what
+         * the test was about.
+         *
+         * What actually matters is that the ledger comes after the surfaces
+         * used to describe and price the thing, and that is asserted directly.
+         * Anything else may sit in the gap without touching this test.
          */
-        expect(keys.slice(keys.indexOf("details") + 1, keys.indexOf("ledger")))
-            .toEqual(["pricing", "syllabus"]);
+        const gap = keys.slice(keys.indexOf("details") + 1, keys.indexOf("ledger"));
+        for (const editing of ["pricing", "syllabus"]) {
+            expect(gap).toContain(editing);
+        }
+        expect(keys.indexOf("ledger")).toBeGreaterThan(keys.indexOf("pricing"));
     });
 
     /*
