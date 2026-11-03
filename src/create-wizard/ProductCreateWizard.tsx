@@ -798,6 +798,7 @@ function WizardInner({
                   ? t("packagesLoadError")
                   : t("noPackagesNote", { community: communityName })
               }
+              approval={{ requiresApproval: memberRequireApproval, reviewerLabel: communityName }}
               /*
                * `platformFeeRate` is Cobuntu's NET cut, 0..1, 0 for a
                * premium community (the host resolves that, same contract
