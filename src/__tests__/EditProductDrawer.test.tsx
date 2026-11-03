@@ -54,7 +54,14 @@ describe("EditProductDrawer", () => {
 
     await waitFor(() => expect(screen.getByText(/edit product/i)).toBeInTheDocument());
 
-    await user.click(screen.getByRole("button", { name: /cancel/i }));
+    /*
+     * EXACT name, not /cancel/i. The drawer now also carries the refund-policy
+     * control, whose "Cancellation schedule" option is itself a button -- so
+     * the loose matcher found two and threw. The component was never wrong;
+     * the query was simply no longer specific enough to name the one control
+     * this test is about.
+     */
+    await user.click(screen.getByRole("button", { name: /^cancel$/i }));
 
     await waitFor(() => expect(props.onClose).toHaveBeenCalled(), { timeout: 1000 });
   });

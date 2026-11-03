@@ -834,8 +834,17 @@ function CustomerDownloadDetailPanel({
                                 used={d.used}
                                 max={d.max}
                                 countLabel={
+                                    /*
+                                     * The NOUN stays on both shapes. The drawer
+                                     * redesign dropped it from the capped one,
+                                     * leaving a bare "2 of 5" beside an icon --
+                                     * which reads as 2 of 5 of something, and
+                                     * the row sits next to link-open counts that
+                                     * are also bare numbers. "2 of 5 downloads"
+                                     * is the figure the owner was asking for.
+                                     */
                                     d.max != null
-                                        ? `${d.used} of ${d.max}`
+                                        ? `${d.used} of ${d.max} ${d.max === 1 ? "download" : "downloads"}`
                                         : `${d.used} ${d.used === 1 ? "download" : "downloads"}`
                                 }
                             />
