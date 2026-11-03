@@ -12,10 +12,19 @@ import { blankTier } from "../components/PriceEditModal/helpers";
  * configurable and unsavable — and silently so, because the tier looked
  * perfectly fine in the Pricing card right up to the moment it was dropped.
  *
- * The split these tests protect: `isPaid` stays strictly PRICE-derived, since
- * it gates Stripe and the Submit button, while whether to SEND tiers depends
- * on whether the seller configured anything. Collapsing the two back together
- * is what caused the bug, and it would be an easy thing to "tidy up".
+ * `isPaid` stays strictly PRICE-derived, since it gates Stripe and the Submit
+ * button: a free-but-configured tier must never flip it true, or a seller
+ * with no Stripe account loses the ability to publish a free product.
+ *
+ * `tiers:` used to additionally filter out a tier nobody had touched beyond
+ * its auto-seeded name ("Standard", price "0") — fine while zero tiers was a
+ * legitimate product, dead wrong once at least one tier became a hard
+ * requirement to publish (2026-10-31): the untouched seed is exactly what
+ * satisfies that requirement for a plain free product, and dropping it at
+ * emit made "Add at least one variant" fail against a tier the wizard was
+ * looking straight at on screen. Every named tier is sent now, touched or
+ * not — the same bar `configuredTiers` already uses for what counts as a
+ * tier card in the UI.
  */
 
 const tier = (o: Record<string, unknown> = {}) => ({
@@ -67,11 +76,11 @@ describe("ProductForm — free tiers that carry configuration", () => {
     expect(d.tiers[0].name).toBe("Members");
   });
 
-  it("does NOT submit an untouched seed tier", () => {
-    // A plain free product must stay exactly as it was: price 0, no tiers.
+  it("DOES submit an untouched seed tier — it's what satisfies the min-one-tier requirement", () => {
     const d = emit([tier({ price: "0" })]);
 
-    expect(d.tiers).toEqual([]);
+    expect(d.tiers).toHaveLength(1);
+    expect(d.tiers[0].name).toBe("Standard");
   });
 
   it("keeps isPaid false for every free tier, however configured", () => {
