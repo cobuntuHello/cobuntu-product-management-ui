@@ -12,7 +12,7 @@ import * as React from "react";
  * of its own. This is view-state, like events, so tabs are cheap to add.
  */
 
-export type ProductViewKey = "overview" | "details" | "pricing" | "syllabus" | "collaborators" | "buyers" | "listings" | "ledger" | "activity";
+export type ProductViewKey = "overview" | "details" | "pricing" | "syllabus" | "collaborators" | "referrals" | "buyers" | "listings" | "ledger" | "activity";
 
 /**
  * The tab strip, IN ORDER.
@@ -83,6 +83,20 @@ const SECTIONS: Array<{ key: ProductViewKey; label: string }> = [
    * pinned in the wrong place.
    */
   { key: "collaborators", label: "Collaborators" },
+  /*
+   * Referrals sits between Collaborators and Ledger.
+   *
+   * The run goes from describing the thing, through the PEOPLE attached to it,
+   * to the money. Collaborators is who SELLS it, Referrals is who PROMOTES it,
+   * Buyers is who GOT it -- so the three people tabs stay together rather than
+   * being split by a financial view.
+   *
+   * Like Ledger and Syllabus this is a host SLOT, so it appears only where the
+   * host passes one. And like every key here it must ALSO be listed in
+   * visibleProductViews: the nav renders the intersection, so a key in one and
+   * not the other is silently dropped.
+   */
+  { key: "referrals", label: "Referrals" },
   { key: "ledger", label: "Ledger" },
   /*
    * Who HAS this product, and who was asked to buy it.

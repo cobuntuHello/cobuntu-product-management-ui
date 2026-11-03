@@ -77,6 +77,8 @@ export function visibleProductViews(opts: {
    * rather than an eighth that opens onto nothing.
    */
   hasSyllabus?: boolean;
+  /** The host passed a Referrals slot, so the tab can appear. */
+  hasReferrals?: boolean;
 }): ProductViewKey[] {
   const ownerId = opts.product?.ownerId ?? opts.product?.owner?.id ?? null;
   const collaborators: any[] = opts.product?.collaborators ?? [];
@@ -146,6 +148,9 @@ export function visibleProductViews(opts: {
     ...(opts.hasSyllabus ? (["syllabus"] as ProductViewKey[]) : []),
     ...(opts.hasLedger ? (["ledger"] as ProductViewKey[]) : []),
     "collaborators",
+    // Host slot, same rule as ledger and syllabus: listed HERE as well as in
+    // SECTIONS, because the nav renders the intersection.
+    ...(opts.hasReferrals ? (["referrals"] as ProductViewKey[]) : []),
     // Listed HERE as well as in SECTIONS. The nav renders the intersection of
     // the two, so a tab added to one and not the other is silently dropped —
     // which is exactly how Details became unreachable once before.
@@ -255,6 +260,8 @@ export interface ProductManagePageProps {
    * an older pin should show one tab fewer, not a blank one.
    */
   ledgerSlot?: React.ReactNode;
+  /** The Referrals tab. A slot like the ledger: the host fetches and renders it. */
+  referralsSlot?: React.ReactNode;
   /**
    * The Syllabus panel, for a product that has an ordered body of lessons.
    *
@@ -301,6 +308,7 @@ export function ProductManagePage({
   overviewExtras,
   overviewSlot,
   ledgerSlot,
+  referralsSlot,
   syllabusSlot,
   publicUrlBase,
   // Defaults true: every consumer that has not been taught about this renders
@@ -313,8 +321,8 @@ export function ProductManagePage({
   getProductManagementConfig();
 
   const allowed = React.useMemo(
-    () => visibleProductViews({ product, viewerUserId, forceModerator, hasLedger: !!ledgerSlot, hasSyllabus: !!syllabusSlot }),
-    [product, viewerUserId, forceModerator, ledgerSlot, syllabusSlot],
+    () => visibleProductViews({ product, viewerUserId, forceModerator, hasLedger: !!ledgerSlot, hasSyllabus: !!syllabusSlot, hasReferrals: !!referralsSlot }),
+    [product, viewerUserId, forceModerator, ledgerSlot, syllabusSlot, referralsSlot],
   );
 
   // A `view` this viewer may not use falls back rather than rendering an
@@ -436,6 +444,12 @@ export function ProductManagePage({
     case "ledger":
       /* A slot, like the Overview -- the host fetches it. */
       content = ledgerSlot ?? null;
+      break;
+
+    case "referrals":
+      /* A slot too: who promotes this item lives in the host, which owns the
+       * API client and the clipboard. */
+      content = referralsSlot ?? null;
       break;
 
     case "syllabus":
