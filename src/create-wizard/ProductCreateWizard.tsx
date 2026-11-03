@@ -385,10 +385,20 @@ function WizardInner({
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
 
+  // True only when the fetch itself failed (thrown, e.g. a 401 from an
+  // expired session) -- never for a seller who genuinely has no published
+  // packages, which is `packages.length === 0` with this staying false.
+  // Conflating the two used to show "{community} has not published terms
+  // for your tier" for a transient auth hiccup: a confident, wrong
+  // statement about the community's configuration when the real story was
+  // "could not check right now."
+  const [packagesLoadFailed, setPackagesLoadFailed] = useState(false);
+
   useEffect(() => {
     // Gated on OWNERSHIP, not the role — mirrors EventCreateWizard.
     if (effectiveOwnership !== "personal") return;
     let cancelled = false;
+    setPackagesLoadFailed(false);
     (async () => {
       try {
         const list = await transport.myPackages(productType);
@@ -397,7 +407,9 @@ function WizardInner({
         setPackages(arr);
         if (arr.length === 1) setPackageId(arr[0].id);
       } catch {
-        if (!cancelled) setPackages([]);
+        if (cancelled) return;
+        setPackages([]);
+        setPackagesLoadFailed(true);
       }
     })();
     return () => { cancelled = true; };
@@ -781,7 +793,11 @@ function WizardInner({
               value={packageId}
               onChange={setPackageId}
               communityName={communityName}
-              emptyLabel={t("noPackagesNote", { community: communityName })}
+              emptyLabel={
+                packagesLoadFailed
+                  ? t("packagesLoadError")
+                  : t("noPackagesNote", { community: communityName })
+              }
               /*
                * `platformFeeRate` is Cobuntu's NET cut, 0..1, 0 for a
                * premium community (the host resolves that, same contract

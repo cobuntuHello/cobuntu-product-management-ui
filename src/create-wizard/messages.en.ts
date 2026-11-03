@@ -62,6 +62,7 @@ export const PRODUCT_WIZARD_MESSAGES_EN = {
       "freeToList": "Free to list · Create keeps it to yourself; a request asks a leader to carry it.",
       "unlistedNote": "This stays unlisted — just yours — until you ask a community to carry it.",
       "noPackagesNote": "{community} has not published terms for your tier, so there is nothing to pick. Your request goes in without one and they will propose the commission when they review it.",
+      "packagesLoadError": "Couldn't check your commission terms just now — this is likely a connection or sign-in hiccup, not a configuration problem. Reload the page before submitting.",
       "notePickArrangement": "Pick an arrangement above to list it, or turn off listing to keep it to yourself.",
       "draftJustNow": "just now",
       "draftMinutesAgo": "{count, plural, one {# minute ago} other {# minutes ago}}",

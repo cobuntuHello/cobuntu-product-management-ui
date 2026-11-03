@@ -526,6 +526,20 @@ describe("the commission step", () => {
     expect(screen.getByText("1.5% + €0.25")).toBeInTheDocument();
     expect(screen.getByText("2.5% + €0.05")).toBeInTheDocument();
   });
+
+  it("never claims the community hasn't published terms when the fetch simply failed", async () => {
+    // Regression: `transport.myPackages` throwing (e.g. a 401 from an
+    // expired session) used to render identically to a genuinely empty
+    // packages list -- "{community} has not published terms for your
+    // tier" -- a wrong, confident statement about configuration for what
+    // was actually just a failed request.
+    await toCommissionStep({
+      transport: transport({ myPackages: vi.fn(async () => { throw new Error("401"); }) }),
+      community: { tag: "orbis", id: "c1", name: "Orbis", memberFeeModel: "FLAT", memberRequireApproval: true, platformFeeRate: 0.025 },
+    });
+    expect(screen.queryByText(/has not published terms for your tier/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Couldn't check your commission terms/)).toBeInTheDocument();
+  });
 });
 
 describe("package hygiene", () => {
