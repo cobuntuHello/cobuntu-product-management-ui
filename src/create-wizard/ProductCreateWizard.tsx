@@ -869,11 +869,6 @@ function WizardInner({
                 {t("draftStartNewProduct")}
               </WizardButton>
             )}
-            {step !== "resume" && (
-              <WizardButton onClick={() => handleCreate(undefined, true)} disabled={creating}>
-                {t("saveDraft")}
-              </WizardButton>
-            )}
             {!onFinalStep && step !== "resume" && (
               <WizardButton primary onClick={goNext} disabled={creating}>Next</WizardButton>
             )}
@@ -918,11 +913,6 @@ function WizardInner({
             <WizardButton onClick={goBack} disabled={creating}>Back</WizardButton>
           ) : (
             <WizardButton onClick={cancel} disabled={creating}>Cancel</WizardButton>
-          )}
-          {step !== "resume" && (
-            <WizardButton onClick={() => handleCreate(undefined, true)} disabled={creating}>
-              {t("saveDraft")}
-            </WizardButton>
           )}
         </div>
       </div>

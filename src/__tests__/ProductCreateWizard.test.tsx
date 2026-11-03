@@ -181,30 +181,18 @@ describe("transport", () => {
     vi.useRealTimers();
   });
 
+  it("never shows a manual Save Draft control — autosave is the only save path", async () => {
+    renderWizard({ initialDrafts: [], canCreateForCommunity: false });
+    await screen.findByTestId("product-form");
+    expect(buttons()).not.toContain("Save Draft");
+  });
+
   it("Cancel calls onCancel, else navigates to the marketplace href", async () => {
     const onCancel = vi.fn();
     renderWizard({ initialDrafts: [], canCreateForCommunity: false, navigation: { hrefs, onCancel } });
     await screen.findByTestId("product-form");
     press("Cancel");
     expect(onCancel).toHaveBeenCalled();
-  });
-
-  it("Save Draft with an empty name, on the details step, relies on ProductForm's own inline warning instead of repeating it in the top banner", async () => {
-    // Regression test for the duplicate "give it a name" messages bug: the
-    // top FormErrorBanner and ProductForm's inline warning under the Product
-    // Name field used to both fire off the same missing-name check. On the
-    // "details" step (the step that mounts ProductForm with the name field
-    // on screen), the banner must stay silent and let `showErrors` alone
-    // drive the inline warning.
-    const { tr } = renderWizard({ initialDrafts: [], canCreateForCommunity: false, transport: transport({}) });
-    await screen.findByTestId("product-form");
-    h.props.at(-1).onChange(fake({ name: "" }));
-    press("Save Draft");
-    expect(screen.queryByRole("alert")).toBeNull();
-    // showErrors still flips true — that's what turns on ProductForm's own
-    // inline "Give your product a name" warning.
-    await waitFor(() => expect(h.props.at(-1).showErrors).toBe(true));
-    expect(tr.createProduct).not.toHaveBeenCalled();
   });
 
   it("Next with an empty name, on the details step, also stays silent on the top banner", async () => {
@@ -371,38 +359,6 @@ describe("course vs product steps", () => {
     const body = (tr.createProduct as any).mock.calls[0][0] as FormData;
     expect(body.get("productType")).toBe("COURSE");
     await waitFor(() => expect(onDone).toHaveBeenCalled());
-  });
-});
-
-describe("Save Draft and onDone", () => {
-  // Regression coverage for the bug where Save Draft never called onDone: a
-  // COURSE host (dddimo-entry) relies on onDone to transition into its
-  // syllabus-builder phase after the base product exists. The early
-  // navigate(hrefs.drafts) exit skipped that call entirely, so a drafted
-  // course had zero syllabus with no way back in.
-  it("COURSE + Save Draft calls onDone with the new product id, not navigate(hrefs.drafts)", async () => {
-    const { tr, onDone, navigate } = renderWizard({
-      initialDrafts: [], canCreateForCommunity: true, productType: "COURSE",
-    });
-    await screen.findByTestId("product-form");
-    press("Save Draft");
-    await waitFor(() => expect(tr.createProduct).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(onDone).toHaveBeenCalledWith(expect.objectContaining({
-      product: { id: "p-1", name: "Handmade candle" },
-      outcome: "saved",
-    })));
-    expect(navigate).not.toHaveBeenCalledWith("/profile");
-  });
-
-  it("DIGITAL + Save Draft still navigates to hrefs.drafts and never calls onDone", async () => {
-    const { tr, onDone, navigate } = renderWizard({
-      initialDrafts: [], canCreateForCommunity: false, productType: "DIGITAL",
-    });
-    await screen.findByTestId("product-form");
-    press("Save Draft");
-    await waitFor(() => expect(tr.createProduct).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/profile"));
-    expect(onDone).not.toHaveBeenCalled();
   });
 });
 
