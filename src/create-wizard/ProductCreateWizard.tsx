@@ -180,12 +180,14 @@ function WizardInner({
   const [packageId, setPackageId] = useState<string | null>(null);
 
   /*
-   * Whether to ask a community to carry this. Defaults TRUE: asking is the
-   * common intent. Mirrors CreateProductClient's `wantsListing`, which here
-   * becomes `resolveSubmitActions`'s input rather than a separate UI
-   * component — see the Listing StepPane below.
+   * Whether to ask a community to carry this. Always TRUE now: the listing
+   * step used to offer an on/off toggle here, but asking a community to
+   * carry what you just built is the only reason to run this wizard, and
+   * the toggle was the one thing standing between "informational" and
+   * "a decision nobody needed to make." The step still renders the terms
+   * — now unconditionally, not gated behind a toggle that no longer exists.
    */
-  const [wantsListing, setWantsListing] = useState(true);
+  const wantsListing = true;
 
   const [dismissedResume, setDismissedResume] = useState(false);
   const [discarded, setDiscarded] = useState<string[]>([]);
@@ -749,31 +751,19 @@ function WizardInner({
         </StepPane>
       )}
 
-      {/* The arrangement: the only part of the flow that decides what the
-          seller is PAID. */}
+      {/* The commission: informational only. Asking a community to carry
+          this is the point of the wizard, not a decision made here — see
+          the comment on `wantsListing` above for why there is no longer a
+          toggle. What WAS a switch is now a plain header; the breakdown
+          below it always renders once there is something to show. */}
       <StepPane active={step === "listing"} direction={direction}>
         <div className="max-w-[560px]">
           <div
-            onClick={() => setWantsListing(!wantsListing)}
-            role="switch"
-            aria-checked={wantsListing}
-            className="mb-5 flex cursor-pointer items-center justify-between gap-3 rounded-[var(--button-radius,0.75rem)] border px-4 py-3.5"
+            className="mb-5 rounded-[var(--button-radius,0.75rem)] border px-4 py-3.5"
             style={{ borderColor: "color-mix(in srgb, currentColor 14%, transparent)" }}
           >
-            <span className="min-w-0">
-              <span className="block text-[14px] font-medium">{t("stepListingTitle")}</span>
-              <span className="mt-0.5 block text-[12.5px] opacity-60">{t("stepListingSubtitle", { community: communityName })}</span>
-            </span>
-            <span
-              aria-hidden
-              className="relative h-6 w-10 shrink-0 rounded-full transition-colors"
-              style={{ background: wantsListing ? "var(--brand-color, #18181b)" : "color-mix(in srgb, currentColor 20%, transparent)" }}
-            >
-              <span
-                className="absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform"
-                style={{ transform: wantsListing ? "translateX(1.125rem)" : "translateX(0.125rem)" }}
-              />
-            </span>
+            <span className="block text-[14px] font-medium">{t("stepListingTitle")}</span>
+            <span className="mt-0.5 block text-[12.5px] opacity-60">{t("stepListingSubtitle", { community: communityName })}</span>
           </div>
 
           {packages.length === 0 && (
@@ -781,14 +771,32 @@ function WizardInner({
               {t("noPackagesNote", { community: communityName })}
             </p>
           )}
-          {wantsListing && packages.length > 0 && (
+          {packages.length > 0 && (
             <div>
               <PackagePicker
                 packages={packages}
                 value={packageId}
                 onChange={setPackageId}
                 communityName={communityName}
-                platformFee={{ rate: 4, fixedCents: 30, processing: { rate: 1.5, fixedCents: 25 } }}
+                /*
+                 * `platformFeeRate` is Cobuntu's NET cut, 0..1, 0 for a
+                 * premium community (the host resolves that, same contract
+                 * as OwnershipToggle's own use of this prop above). But
+                 * `PackagePicker.platformFee.rate` wants the ALL-IN gross —
+                 * its own doc comment: "Cobuntu pays Stripe out of it rather
+                 * than deducting separately" — so processing rides ON TOP of
+                 * the net rate here, never replaces it. At platformFeeRate=0
+                 * the all-in rate still equals processing's own rate/fixed
+                 * exactly: Cobuntu takes nothing, Stripe still has to be
+                 * paid. Falls back to 2.5% net (4% all-in, this call's
+                 * previous hardcoded total) only when an un-updated host
+                 * never supplies a real rate.
+                 */
+                platformFee={{
+                  rate: (platformFeeRate ?? 0.025) * 100 + 1.5,
+                  fixedCents: 30,
+                  processing: { rate: 1.5, fixedCents: 25 },
+                }}
               />
             </div>
           )}
