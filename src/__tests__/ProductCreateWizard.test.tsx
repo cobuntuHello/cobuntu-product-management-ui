@@ -540,6 +540,31 @@ describe("the commission step", () => {
     expect(screen.queryByText(/has not published terms for your tier/)).not.toBeInTheDocument();
     expect(screen.getByText(/Couldn't check your commission terms/)).toBeInTheDocument();
   });
+
+  it("names the community as reviewer when the community requires approval", async () => {
+    await toCommissionStep({
+      transport: transport({ myPackages: twoPackages }),
+      community: { tag: "orbis", id: "c1", name: "Orbis", memberFeeModel: "FLAT", memberRequireApproval: true, platformFeeRate: 0.025 },
+    });
+    expect(await screen.findByText("Orbis reviews this before it goes live.")).toBeInTheDocument();
+  });
+
+  it("says it goes live immediately when the community does not require approval", async () => {
+    await toCommissionStep({
+      transport: transport({ myPackages: twoPackages }),
+      community: { tag: "orbis", id: "c1", name: "Orbis", memberFeeModel: "FLAT", memberRequireApproval: false, platformFeeRate: 0.025 },
+    });
+    expect(await screen.findByText(/Goes live the moment you submit/)).toBeInTheDocument();
+  });
+
+  it("totals the selected package's rate and Cobuntu's cut into a 'you keep' line", async () => {
+    await toCommissionStep({
+      transport: transport({ myPackages: vi.fn(async () => [{ id: "pk1", name: "Standard", description: null, rate: 10 }]) }),
+      community: { tag: "orbis", id: "c1", name: "Orbis", memberFeeModel: "FLAT", memberRequireApproval: true, platformFeeRate: 0.025 },
+    });
+    // 100 - 10 (package) - 4 (Cobuntu all-in: 2.5% net + 1.5% processing) = 86.
+    expect(await screen.findByText("You keep about 86% of each sale")).toBeInTheDocument();
+  });
 });
 
 describe("package hygiene", () => {
