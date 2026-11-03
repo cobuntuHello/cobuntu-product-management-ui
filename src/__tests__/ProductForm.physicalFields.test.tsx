@@ -131,12 +131,19 @@ describe("what the form emits", () => {
  * the buyer a download the seller thought they had removed.
  */
 describe("stock", () => {
-  it("emits no tier at all when nothing seeded one", () => {
+  it("still emits the auto-seeded tier, capacity blank (unlimited)", () => {
     // Blank means unlimited, which is the honest reading of "no capacity row".
     // The form no longer writes capacity itself - the variant editor does.
+    //
+    // The tier itself IS still emitted, touched or not (2026-11-03): at least
+    // one tier is a hard requirement to publish, and the untouched seed is
+    // what satisfies it for a plain product nobody has customized the pricing
+    // of yet. See ProductForm.freeTierConfig.test.tsx for the full history.
     const onChange = vi.fn();
     renderWithConfig(<ProductForm {...base} onChange={onChange} productType="PHYSICAL" />);
-    expect(lastEmit(onChange).tiers).toEqual([]);
+    const tiers = lastEmit(onChange).tiers;
+    expect(tiers).toHaveLength(1);
+    expect(tiers[0].capacity).toBe("");
   });
 });
 

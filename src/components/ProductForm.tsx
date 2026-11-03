@@ -424,13 +424,6 @@ export interface ProductFormProps {
   showMemberPricing?: boolean;
 }
 
-/**
- * Names blankTier assigns by position ("Standard", "Tier 2", …). A tier still
- * carrying one of these is one the seller never renamed, so the name alone is
- * not evidence they configured anything.
- */
-const AUTO_SEED_NAME = /^(Standard|Tier \d+)$/;
-
 // ─── Component ─────────────────────────────────────────────────
 
 export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, hideRepeatPurchase, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false, labels, stripeStatusOverride, ownership = "community" }: ProductFormProps) {
@@ -822,18 +815,6 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
 
     const named = tiers.filter(t => !t.deleted && t.name.trim());
     const paid = named.some(t => t.priceMode === "pwyw" || (!!t.price && parseFloat(t.price) > 0));
-    const configured = named.filter(t =>
-        (!!t.price && parseFloat(t.price) > 0)
-        || t.priceMode === "pwyw"
-        || !!t.capacity?.trim()
-        || !!t.draftForm?.fields?.length
-        // License terms / a download cap are real configuration too — without
-        // this, setting only a license on the free default tier would drop the
-        // tier at emit and lose the license (feat/…-license-surfacing).
-        || !!t.licenseTerms?.trim()
-        || !!t.maxDownloads?.trim()
-        || !AUTO_SEED_NAME.test(t.name.trim()),
-    );
     onChange?.({
       name, description, tags, categoryId, subCategoryId, mediaItems,
       /*
@@ -888,7 +869,21 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       condition: isPhysical ? condition : null,
       parcelClass: isPhysical ? parcelClass : null,
       /*
-       * Every configured tier, free or paid — not only the paid ones.
+       * Every named tier, free or paid, touched or not — not only the "real"
+       * ones.
+       *
+       * This used to emit `[]` for a tier nobody had customized beyond its
+       * auto-seeded name ("Standard", price "0"), on the theory that an
+       * entirely untouched tier wasn't worth sending. That was fine while a
+       * product could legitimately have zero tiers. It stopped being fine the
+       * day at least one tier became a hard requirement to publish
+       * (2026-10-31): the untouched "Standard" seed is exactly what satisfies
+       * that requirement for a plain free product, and dropping it at emit
+       * made the wizard's own "Add at least one variant" check fail against a
+       * tier it was looking straight at on screen — a free product with one
+       * never-edited tier could be seen, but never submitted. `named` is the
+       * same bar `configuredTiers` already uses for what the UI even shows as
+       * a tier card, so emit now agrees with what's on screen.
        *
        * `withoutDigitalDelivery` when the product is physical: the deliverables
        * that used to hang off the product now hang off each VARIANT, and the
@@ -905,7 +900,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
        * Emptied on EMIT, not cleared from state, exactly as the product-level
        * rule did: switch back to Digital and the deliverables are still there.
        */
-      tiers: configured.length > 0 ? named.map(withoutDigitalDelivery) : [],
+      tiers: named.map(withoutDigitalDelivery),
       donation,
     });
   }, [name, description, tags, categoryId, subCategoryId, mediaItems, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, refundPolicy, allowRepeatPurchase, hideRepeatPurchase, tiers, donation, condition, parcelClass, isPhysical]); // eslint-disable-line react-hooks/exhaustive-deps
