@@ -769,17 +769,23 @@ function WizardInner({
           toggle. What WAS a switch is now a plain header; the breakdown
           below it always renders once there is something to show. */}
       <StepPane active={step === "listing"} direction={direction}>
-        <div className="max-w-[560px]">
+        <div>
           {/*
             No repeated title/subtitle box here -- it used to render
             t("stepListingTitle")/t("stepListingSubtitle") in a bordered box
             right below a page header that ALREADY shows those same two
             strings (stepHeaderKeys("listing") resolves to the identical
             keys). The step read as "Your commission" twice in a row,
-            verbatim, before anything useful appeared. ApprovalBanner inside
-            PackagePicker now carries the one thing a page header can't say
-            -- what happens to THIS submission -- so there is nothing left
-            for a redundant box to add.
+            verbatim, before anything useful appeared. The flow-explainer
+            cards inside PackagePicker now carry the one thing a page header
+            can't say -- what happens to THIS submission -- so there is
+            nothing left for a redundant box to add.
+
+            No local max-w either (used to be 560px): every sibling step
+            (ProductForm, OwnershipToggle, ResumeDraftStep) fills the same
+            width the wizard's own page frame provides -- this was the only
+            step narrower than its neighbors, for no reason tied to its
+            content.
           */}
 
           {/*
