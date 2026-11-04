@@ -770,13 +770,17 @@ function WizardInner({
           below it always renders once there is something to show. */}
       <StepPane active={step === "listing"} direction={direction}>
         <div className="max-w-[560px]">
-          <div
-            className="mb-5 rounded-[var(--button-radius,0.75rem)] border px-4 py-3.5"
-            style={{ borderColor: "color-mix(in srgb, currentColor 14%, transparent)" }}
-          >
-            <span className="block text-[14px] font-medium">{t("stepListingTitle")}</span>
-            <span className="mt-0.5 block text-[12.5px] opacity-60">{t("stepListingSubtitle", { community: communityName })}</span>
-          </div>
+          {/*
+            No repeated title/subtitle box here -- it used to render
+            t("stepListingTitle")/t("stepListingSubtitle") in a bordered box
+            right below a page header that ALREADY shows those same two
+            strings (stepHeaderKeys("listing") resolves to the identical
+            keys). The step read as "Your commission" twice in a row,
+            verbatim, before anything useful appeared. ApprovalBanner inside
+            PackagePicker now carries the one thing a page header can't say
+            -- what happens to THIS submission -- so there is nothing left
+            for a redundant box to add.
+          */}
 
           {/*
             Always rendered, packages or not: PackagePicker itself shows the
