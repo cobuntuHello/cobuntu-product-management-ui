@@ -107,7 +107,7 @@ export function BasicsStep({
       {/* Price + Currency */}
       <div className="grid grid-cols-[1fr_120px] gap-2.5">
         <div>
-          <Eyebrow>{t.priceMode === "pwyw" ? "Suggested price" : "Price"}</Eyebrow>
+          <Eyebrow>{t.priceMode === "pwyw" ? "Suggested price" : t.vatCategory && t.vatCategory !== "EXEMPT" ? "Price before VAT" : "Price"}</Eyebrow>
           <div className="mt-1">
             <StepInput
               type="number" min="0" step="0.01" value={t.price}

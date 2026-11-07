@@ -10,6 +10,8 @@ import {
   Eyebrow, StepInput, StepTextarea, Stepper, Switch,
 } from "./_primitives";
 import { BasicsStep } from "./steps/BasicsStep";
+import { VatSection } from "./VatSection";
+import type { VatOptions } from "./types";
 import {
   TIER_NAME_MAX, TIER_DESCRIPTION_MAX, TIER_LICENSE_TERMS_MAX,
   VARIANT_CONDITIONS, VARIANT_PARCELS, VARIANT_ATTR_KEYS,
@@ -85,6 +87,8 @@ export interface VariantEditViewProps {
    * the step body via StepView and owns the header/footer navigation.
    */
   onOpenStep: (step: "config" | "form") => void;
+  /** Seller VAT options for this product: undefined = loading, null = not offered. */
+  vatOptions?: VatOptions | null;
 }
 
 /** Sentinel for a Radix Select option that maps to a stored empty string —
@@ -102,6 +106,7 @@ export function VariantEditView({
   onMemberPricingRowChange,
   showToast,
   onTogglePublish,
+  vatOptions,
   publishToggling,
   onOpenStep,
 }: VariantEditViewProps) {
@@ -252,6 +257,9 @@ export function VariantEditView({
           />
         </div>
       </div>
+
+      {/* Seller VAT — renders nothing until the product's options are known. */}
+      <VatSection t={t} onUpdate={onUpdate} options={vatOptions} locked={isTierLocked(t)} />
 
       {/* 7 · Advanced — drill-in rows. Each opens as a sub-screen INSIDE the
           modal (ConfigStep / FormStep via StepView), with a breadcrumb + Back,

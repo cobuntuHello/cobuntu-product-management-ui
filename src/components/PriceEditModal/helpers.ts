@@ -368,6 +368,9 @@ export function buildTierBody(
     ...scheduleBody,
     ...(t.sourceTierId && !t.id ? { copyFormFromTierId: t.sourceTierId } : {}),
     ...(extras.notifyAttendees ? { notifyAttendees: true } : {}),
+    // Seller VAT: only a change is sent, because the server re-validates a VAT
+    // setting it receives and an unrelated edit must never be refused over it.
+    ...((t.vatCategory ?? null) !== (t.originalVatCategory ?? null) ? { vatCategory: t.vatCategory ?? null } : {}),
   };
 }
 

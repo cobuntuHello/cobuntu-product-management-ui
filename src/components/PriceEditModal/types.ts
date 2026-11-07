@@ -57,6 +57,8 @@ export interface Tier {
     installmentCount?: number | null;
     installmentIntervalMonths?: number | null;
     accessDurationMonths?: number | null;
+    /** Seller VAT rate category (backend docs/features/seller-vat.md). */
+    vatCategory?: VatCategory | null;
     /** Shape + physical fields on the tier's backing product
      *  (feat/product-variants). Digital tiers carry null condition/parcelClass. */
     productType?: string;
@@ -170,6 +172,10 @@ export interface DraftTier {
   /** Integer string (e.g. "12" = 12 months of access). Product-only —
    *  events bound access by the event date instead. */
   installmentAccessMonths: string;
+  /** Seller VAT. The price is always before VAT; checkout adds it. */
+  vatCategory?: VatCategory | null;
+  /** The category as loaded, so only a change is sent (an unrelated edit is never refused over VAT). */
+  originalVatCategory?: VatCategory | null;
   expanded: boolean;
   deleted?: boolean;
   /**
@@ -318,3 +324,15 @@ export const SUPPORTED_CURRENCIES: ReadonlyArray<SupportedCurrency> = [
  *  constant on the original PriceEditModal.tsx surface. Some consumers
  *  (the admin app's tier-details page) import this directly. */
 export const CURRENCIES = SUPPORTED_CURRENCIES;
+
+/** Seller VAT rate categories (backend @cobuntu/vat-rules). */
+export type VatCategory = "STANDARD" | "INTERMEDIATE" | "REDUCED" | "SUPER_REDUCED" | "EXEMPT";
+
+/** GET /communities/:tag/products/:productId/vat-options */
+export interface VatOptions {
+  available: boolean;
+  reason: string | null;
+  reasonText: string | null;
+  jurisdiction: { key: string; name: string; label: string } | null;
+  options: Array<{ category: VatCategory; rate: number }>;
+}
