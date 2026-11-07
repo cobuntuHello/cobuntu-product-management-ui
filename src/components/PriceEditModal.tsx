@@ -32,6 +32,7 @@ import {
   type DonationDraft,
   type DraftTier,
   type Tier,
+  type VatOptions,
 } from "./PriceEditModal/types";
 import {
   blankTier,
@@ -211,6 +212,9 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   const jsonHeaders = useJsonHeaders();
   const [loading, setLoading] = useState(true);
   const [drafts, setDrafts] = useState<DraftTier[]>([]);
+  // Seller VAT options for this product (manage only; a product being created
+  // has no id yet, so VAT is set afterwards from the manage page).
+  const [vatOptions, setVatOptions] = useState<VatOptions | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
   /**
    * Why the modal keeps its own error state instead of relying on showToast:
@@ -334,6 +338,10 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
     }
     (async () => {
       try {
+        // A failure only hides the VAT section; it never blocks editing.
+        fetch(`${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/vat-options`, { headers: authHeaders() })
+          .then(async (r) => setVatOptions(r.ok ? await r.json().catch(() => null) : null))
+          .catch(() => setVatOptions(null));
         const res = await fetch(`${apiBaseUrl}/api/communities/${communityTag}/products/${productId}/tiers`, { headers: authHeaders() });
         const tiers: Tier[] = res.ok ? await res.json() : [];
         if (tiers.length === 0) {
@@ -382,6 +390,8 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               installmentCount: t.products.installmentCount != null ? String(t.products.installmentCount) : "",
               installmentInterval: t.products.installmentIntervalMonths != null ? String(t.products.installmentIntervalMonths) : "1",
               installmentAccessMonths: t.products.accessDurationMonths != null ? String(t.products.accessDurationMonths) : "",
+              vatCategory: t.products.vatCategory ?? null,
+              originalVatCategory: t.products.vatCategory ?? null,
               hasForm: fields.length > 0,
               formFieldCount: fields.length,
               expanded: false,
@@ -1119,6 +1129,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               : undefined
           }
           showToast={showToast}
+          vatOptions={draftMode ? null : vatOptions}
           onTogglePublish={() => {
             const idx = activeIdx();
             if (idx != null) togglePublish(idx);
