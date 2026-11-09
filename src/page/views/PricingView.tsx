@@ -14,6 +14,7 @@ import { DonationsSection } from "../../components/PriceEditModal/DonationsSecti
 import type { DonationDraft } from "../../components/PriceEditModal/types";
 import { useProductManagementConfig, useJsonHeaders } from "../../config";
 import { useCanEdit } from "../../lib/manageAccess";
+import type { MemberPricingScope } from "../../components/MemberPricingSection";
 
 /**
  * PRICING TAB — the variant list, as the create wizard shows it.
@@ -67,8 +68,10 @@ export interface PricingViewProps {
   /** Refetch after a write so the cards reflect what was saved. */
   onUpdate: () => void;
   showToast: (msg: string) => void;
-  /** Community-owned products only; segments are community-scoped. */
+  /** Community-owned products, or a seller's product listed in this community. */
   showMemberPricing?: boolean;
+  /** See PriceEditModal's memberPricingScope. */
+  memberPricingScope?: MemberPricingScope;
 }
 
 /** One fact-strip cell, matching the wizard's. */
@@ -114,6 +117,7 @@ export function PricingView({
   onUpdate,
   showToast,
   showMemberPricing,
+  memberPricingScope,
 }: PricingViewProps) {
   /** A tier id, "__new__", or null. */
   const [editingTier, setEditingTier] = useState<string | null>(null);
@@ -352,6 +356,7 @@ export function PricingView({
           openTierLocalId={editingTier === "__new__" ? undefined : editingTier}
           openNewTier={editingTier === "__new__"}
           showMemberPricing={showMemberPricing}
+          memberPricingScope={memberPricingScope}
         />
       )}
     </div>
