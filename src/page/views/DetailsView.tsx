@@ -16,6 +16,7 @@ import { DescriptionSection } from "../sections/DescriptionSection";
 import { ProductMediaModal } from "../../components/ProductMediaModal";
 import { TagsEditModal } from "../../components/TagsEditModal";
 import { CategoryEditModal } from "../../components/CategoryEditModal";
+import { ValueLinesModal } from "@cobuntu/management-ui-shared";
 import type { CategoryOption } from "../../components/CategoryPickerRow";
 import { useCanEdit } from "../../lib/manageAccess";
 
@@ -56,7 +57,8 @@ import { useCanEdit } from "../../lib/manageAccess";
  */
 export type ProductModal = "name" | "share" | "distribution" | "delete" | "cta" | "media" | null
   | "tags"
-  | "category";
+  | "category"
+  | "valueLines";
 
 export interface DetailsViewProps {
   /** Where the product's PUBLIC page lives; forwarded to ProductCard. */
@@ -270,6 +272,7 @@ export function DetailsView({
         onEditCta={() => setModal("cta")}
         onEditTags={() => setModal("tags")}
         onEditCategory={categories?.length ? () => setModal("category") : undefined}
+        onEditValueLines={() => setModal("valueLines")}
       />
 
       {/*
@@ -303,6 +306,19 @@ export function DetailsView({
           onClose={() => setModal(null)}
           onSaved={() => { setModal(null); void onUpdate(); }}
           showToast={showToast}
+        />
+      )}
+
+      {modal === "valueLines" && (
+        <ValueLinesModal
+          initial={Array.isArray((product as any).valueLines) ? (product as any).valueLines : []}
+          currency={(product as any).currency || "EUR"}
+          onSave={async (lines) => {
+            // PATCH /users/me/products/:id (the controller names valueLines).
+            await quickUpdate({ valueLines: lines });
+            setModal(null);
+          }}
+          onClose={() => setModal(null)}
         />
       )}
 

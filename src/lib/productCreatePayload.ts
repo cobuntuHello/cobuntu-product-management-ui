@@ -200,6 +200,11 @@ export function buildProductCreateFormData(input: ProductCreatePayloadInput): Fo
     if (data.refundPolicy) {
         formData.append("refundPolicy", JSON.stringify(data.refundPolicy));
     }
+    // What buyers get, each with a value in cents (PBN feedback L2). Only
+    // sent when there are lines; absent stores none.
+    if (data.valueLines && data.valueLines.length > 0) {
+        formData.append("valueLines", JSON.stringify(data.valueLines));
+    }
     /*
      * "Can be bought more than once". Never appended before, so no product
      * ever stored the seller's answer. The form emits it only once touched
