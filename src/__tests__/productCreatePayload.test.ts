@@ -261,3 +261,21 @@ describe("optional fields are omitted, not blanked", () => {
         expect(buildProductCreateFormData(input({ packageId: null })).get("packageId")).toBeNull();
     });
 });
+
+describe("the refund policy", () => {
+    /*
+     * It was never appended, so "No self-service refunds" and every schedule
+     * reached the server as Standard, and buyers could refund themselves anyway.
+     */
+    it("sends the seller's choice JSON-encoded", () => {
+        const policy = { mode: "default", customBuyerWindowDays: 0 };
+        const fd = buildProductCreateFormData(input({ data: formData({ refundPolicy: policy } as any) }));
+        expect(all(fd, "refundPolicy")).toHaveLength(1);
+        expect(JSON.parse(fd.get("refundPolicy") as string)).toEqual(policy);
+    });
+
+    it("omits Standard, which is what an absent field already means", () => {
+        expect(buildProductCreateFormData(input({ data: formData({ refundPolicy: null } as any) })).get("refundPolicy")).toBeNull();
+        expect(buildProductCreateFormData(input()).get("refundPolicy")).toBeNull();
+    });
+});

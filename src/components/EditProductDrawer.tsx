@@ -157,6 +157,8 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       viewability: product.viewability || "PUBLIC",
       accessibility: product.accessibility || "PUBLIC",
       requiresApproval: product.requiresApproval || false,
+      // Seeded so the picker opens on the saved answer, not on Standard.
+      refundPolicy: (product as any).refundPolicy ?? null,
       /*
        * Physical-only, seeded so reopening this drawer shows what the listing
        * actually says rather than an empty postage row. ProductForm nulls both
@@ -208,6 +210,15 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       // Buyer-approval gate — comprehensive update coerces the "true"/"false"
       // string; propagated to tier sub-products backend-side.
       formData.append("requiresApproval", String(!!data.requiresApproval));
+      /*
+       * The picker was on screen and its answer never sent. Only on a change:
+       * the server re-stamps who set the policy on every write, so re-sending
+       * an untouched one would credit whoever renamed the product. "null" is
+       * how a seller goes back to Standard.
+       */
+      if (JSON.stringify(data.refundPolicy ?? null) !== JSON.stringify(initialFormData.refundPolicy ?? null)) {
+        formData.append("refundPolicy", JSON.stringify(data.refundPolicy ?? null));
+      }
 
       formData.append("tags", JSON.stringify(data.tags.map(t => t.id)));
       // Always sent, unlike create: on an EDIT an absent field means "leave

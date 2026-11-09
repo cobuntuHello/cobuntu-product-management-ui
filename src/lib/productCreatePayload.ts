@@ -191,6 +191,15 @@ export function buildProductCreateFormData(input: ProductCreatePayloadInput): Fo
         formData.append("buyTierIds", JSON.stringify(access.buy.tierIds));
     }
     formData.append("requiresApproval", String(!!data.requiresApproval));
+    /*
+     * The seller's refund choice. It was never appended, so "No self-service
+     * refunds" and every schedule saved as Standard, and buyers could refund
+     * themselves anyway. Absent means Standard on the server, so only a real
+     * choice is sent.
+     */
+    if (data.refundPolicy) {
+        formData.append("refundPolicy", JSON.stringify(data.refundPolicy));
+    }
 
     /*
      * Finishing a draft must finish THAT row, not open a second one beside it.
