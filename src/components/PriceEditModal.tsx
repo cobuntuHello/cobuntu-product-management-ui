@@ -745,7 +745,15 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
       // isolation (PriceEditModal.helpers.test.ts).
       for (const t of drafts.filter(x => !x.deleted)) {
         const err = validateTier(t);
-        if (err) throw new Error(err);
+        if (err) {
+          // Open the tier that failed: opened straight onto another variant,
+          // the failing one is not on screen and the error points at nothing
+          // the seller can reach. Same fix as the events package (PBN Bug 1,
+          // 2026-11-05: "Price required for Standard, but there is no
+          // Standard").
+          setActiveTier(t.localId);
+          throw new Error(err);
+        }
       }
       const donationErr = validateDonation(donation);
       if (donationErr) throw new Error(donationErr);

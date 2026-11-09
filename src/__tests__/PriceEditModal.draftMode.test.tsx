@@ -337,3 +337,23 @@ describe("PriceEditModal — draftMode registration form", () => {
     expect(committed.tiers[0].draftForm.fields).toHaveLength(1);
   });
 });
+
+describe("PriceEditModal — a failing tier that is not on screen gets opened (PBN Bug 1 parity)", () => {
+  it("Save on one variant with another variant's price blank opens that variant and says why", async () => {
+    mockFetch([]);
+    const user = userEvent.setup();
+    const standard = { ...blankTier(), localId: "std", name: "Standard", price: "" };
+    const vip = { ...blankTier(), localId: "vip", name: "VIP+ Experience", price: "65" };
+    const props = baseProps({ initialDraftTiers: [standard, vip], openTierLocalId: "vip" });
+    renderWithConfig(<PriceEditModal {...props} />);
+
+    expect(await screen.findByDisplayValue("VIP+ Experience")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() =>
+      expect(props.showToast).toHaveBeenCalledWith(expect.stringMatching(/Price required/i)),
+    );
+    expect(await screen.findByDisplayValue("Standard")).toBeInTheDocument();
+    expect(props.onDraftCommit).not.toHaveBeenCalled();
+  });
+});

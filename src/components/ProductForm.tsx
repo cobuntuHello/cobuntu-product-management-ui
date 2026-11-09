@@ -93,8 +93,12 @@ function getCurrencySymbol(code: string): string {
  */
 function variantPriceLabel(t: DraftTier): string {
   if (t.priceMode === "pwyw") return "Pay what you want";
+  // A BLANK price is not free: it is unfinished, and Save refuses it ("Price
+  // required for ..."). Reading "Free" hid the one variant that needed a
+  // price (PBN Bug 1, 2026-11-05).
+  if ((t.price ?? "").trim() === "") return "Price needed";
   const p = parseFloat(t.price);
-  if (!t.price || Number.isNaN(p) || p <= 0) return "Free";
+  if (Number.isNaN(p) || p <= 0) return "Free";
   const base = `${getCurrencySymbol(t.currency)}${t.price}`;
   return t.isRecurring ? `${base}/${t.recurringInterval || "mo"}` : base;
 }
