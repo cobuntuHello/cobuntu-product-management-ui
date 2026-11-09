@@ -248,3 +248,63 @@ describe("EditProductDrawer", () => {
     expect(l2Retries.length).toBe(2); // L2 tried on both saves
   }, 15000);
 });
+
+/*
+ * The refund picker was on screen and its answer never sent, so the drawer
+ * saved every policy as Standard. Seeded from the product, and sent only on a
+ * change, because the server re-stamps who set it on every write.
+ */
+describe("EditProductDrawer: refund policy", () => {
+  const NONE = { mode: "default", customBuyerWindowDays: 0 };
+
+  async function saveAndGetBody(props: ReturnType<typeof baseProps>, fetchMock: ReturnType<typeof mockFetch>) {
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+    await waitFor(() => expect(props.onSaved).toHaveBeenCalled(), { timeout: 8000 });
+    const putCall = fetchMock.mock.calls.find(c => (c[1] as RequestInit | undefined)?.method === "PUT");
+    return putCall![1]!.body as FormData;
+  }
+
+  const routes = () => mockFetch([
+    { method: "PUT", url: "/products/p-1/comprehensive", body: { jobId: "j-1" } },
+    { method: "GET", url: "/products/update/status/j-1", body: { status: "completed" } },
+  ]);
+
+  it("sends the seller's new choice", async () => {
+    const fetchMock = routes();
+    const user = userEvent.setup();
+    const props = baseProps();
+    renderWithConfig(<EditProductDrawer {...props} />);
+    await waitFor(() => expect(screen.getByDisplayValue("Cool product")).toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: /no self-service refunds/i }));
+    const body = await saveAndGetBody(props, fetchMock);
+
+    expect(JSON.parse(body.get("refundPolicy") as string)).toEqual(NONE);
+  }, 10000);
+
+  it("opens on the saved policy and does not re-send it when untouched", async () => {
+    const fetchMock = routes();
+    const props = baseProps({ product: { ...product, refundPolicy: { ...NONE, updatedByUserId: "seller-1" } } });
+    renderWithConfig(<EditProductDrawer {...props} />);
+    await waitFor(() => expect(screen.getByDisplayValue("Cool product")).toBeInTheDocument());
+
+    expect(screen.getByRole("button", { name: /no self-service refunds/i })).toHaveAttribute("aria-pressed", "true");
+    const body = await saveAndGetBody(props, fetchMock);
+
+    expect(body.get("refundPolicy")).toBeNull();
+  }, 10000);
+
+  it("sends null when a seller goes back to Standard", async () => {
+    const fetchMock = routes();
+    const user = userEvent.setup();
+    const props = baseProps({ product: { ...product, refundPolicy: NONE } });
+    renderWithConfig(<EditProductDrawer {...props} />);
+    await waitFor(() => expect(screen.getByDisplayValue("Cool product")).toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: /standard refunds/i }));
+    const body = await saveAndGetBody(props, fetchMock);
+
+    expect(body.get("refundPolicy")).toBe("null");
+  }, 10000);
+});
