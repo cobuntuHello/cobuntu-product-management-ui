@@ -275,3 +275,27 @@ describe("the pricing tab", () => {
         expect(visibleProductViews({ product: owner, forceModerator: true })).toContain("pricing");
     });
 });
+
+/*
+ * Reviews (unified reviews, backend docs/features/unified-reviews.md): a host
+ * slot like Ledger and Referrals. Listed in BOTH lists, because the nav renders
+ * their intersection.
+ */
+describe("the reviews tab", () => {
+    const owner = { ownerId: "u1", collaborators: [] };
+
+    it("is absent when the host passes no panel", () => {
+        expect(visibleProductViews({ product: owner, viewerUserId: "u1" })).not.toContain("reviews");
+    });
+
+    it("appears when it does, right after buyers", () => {
+        const views = visibleProductViews({ product: owner, viewerUserId: "u1", hasReviews: true });
+        expect(views).toContain("reviews");
+        expect(SECTION_KEYS).toContain("reviews");
+        expect(SECTION_KEYS.indexOf("reviews")).toBe(SECTION_KEYS.indexOf("buyers") + 1);
+    });
+
+    it("is offered to a moderator too, like every other tab", () => {
+        expect(visibleProductViews({ product: owner, forceModerator: true, hasReviews: true })).toContain("reviews");
+    });
+});
