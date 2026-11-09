@@ -17,6 +17,7 @@ import { BannerCropModal, type BannerCropResult } from "../ui/banner-crop-modal"
 import { type UploadedFile } from "../ui/file-upload-zone";
 import { cn } from "../ui/utils";
 import { PriceEditModal } from "./PriceEditModal";
+import type { MemberPricingScope } from "./MemberPricingSection";
 import { ProductManagementConfigProvider } from "../config";
 import { type DraftTier, type DonationDraft } from "./PriceEditModal/types";
 import { blankTier, blankDonation } from "./PriceEditModal/helpers";
@@ -420,13 +421,23 @@ export interface ProductFormProps {
    * owned products only — the consumer passes its own ownership signal
    * (e.g. `isCommunityOwned`). Off → the section is not rendered, matching a
    * member selling their own product. Default false.
+   *
+   * Since 2026-11-09 a member's own product can carry member prices too, for
+   * the members of the community it is created in; pass
+   * `memberPricingScope="seller"` with it.
    */
   showMemberPricing?: boolean;
+  /**
+   * Whose member prices the tier editor sets; see PriceEditModal's prop of
+   * the same name. Defaults from `ownership` ("personal" → "seller"), which
+   * hosts that don't pass `ownership` should not rely on: pass it explicitly.
+   */
+  memberPricingScope?: MemberPricingScope;
 }
 
 // ─── Component ─────────────────────────────────────────────────
 
-export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, hideRepeatPurchase, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false, labels, stripeStatusOverride, ownership = "community" }: ProductFormProps) {
+export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, hideRepeatPurchase, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false, memberPricingScope, labels, stripeStatusOverride, ownership = "community" }: ProductFormProps) {
   /* Merged once rather than at each use, so a partial override cannot leave
    * one string reading "course" beside another still reading "product". */
   const L = { ...DEFAULT_LABELS, ...(labels ?? {}) };
@@ -1665,7 +1676,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             showMemberPricing={showMemberPricing}
             // A personal product priced in the create flow is the seller's
             // own: its tiers come from the community's public list.
-            memberPricingScope={ownership === "personal" ? "seller" : "community"}
+            memberPricingScope={memberPricingScope ?? (ownership === "personal" ? "seller" : "community")}
           />
         </ProductManagementConfigProvider>
       )}
