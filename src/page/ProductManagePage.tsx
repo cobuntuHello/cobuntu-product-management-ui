@@ -12,6 +12,7 @@ import { ProductActivityTab } from "../components/activity/ProductActivityTab";
 import { getProductManagementConfig } from "../config";
 import { ProductManageHeader, type ProductManageHeaderProps } from "./ProductManageHeader";
 import { ManageAccessProvider } from "../lib/manageAccess";
+import type { MemberPricingScope } from "../components/MemberPricingSection";
 
 /**
  * THE product manage page. One implementation, both apps.
@@ -224,6 +225,12 @@ export interface ProductManagePageProps {
   viewerUserId?: string | null;
   forceModerator?: boolean;
   showMemberPricing?: boolean;
+  /**
+   * "seller" when this is the seller's own product or course priced for the
+   * members of `communityTag` (the community it is listed in). See
+   * PriceEditModal's prop of the same name. Default "community".
+   */
+  memberPricingScope?: MemberPricingScope;
 
   /**
    * Whether this product can have community-scoped settings at all. False for
@@ -300,6 +307,7 @@ export function ProductManagePage({
   viewerUserId,
   forceModerator,
   showMemberPricing,
+  memberPricingScope,
   canConfigureSettings,
   canConfigureAfterCheckout,
   requiresApproval,
@@ -437,6 +445,7 @@ export function ProductManagePage({
           onUpdate={onUpdate}
           showToast={showToast}
           showMemberPricing={showMemberPricing}
+          memberPricingScope={memberPricingScope}
         />
       );
       break;

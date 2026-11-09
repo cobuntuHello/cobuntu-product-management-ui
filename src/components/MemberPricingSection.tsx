@@ -1,5 +1,6 @@
 "use client";
 
+import { createContext, useContext } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import {
   rowIsDirty,
@@ -28,6 +29,17 @@ import {
  * longer tied to the tier card's expand/collapse state).
  */
 
+/**
+ * Whose member prices the section edits. "community" for a community-owned
+ * item (the default, unchanged); "seller" for a seller's own product or course
+ * priced for the community it is listed in, where the community approves the
+ * prices with the listing. Provided by PriceEditModal (its
+ * `memberPricingScope` prop) as context so the steps in between need no new
+ * props; it only changes the copy here.
+ */
+export type MemberPricingScope = "community" | "seller";
+export const MemberPricingScopeContext = createContext<MemberPricingScope>("community");
+
 export interface MemberPricingSectionProps {
   /** The per-tier slot from PriceEditModal's modal-level state map. */
   state: MemberPricingTierState;
@@ -45,6 +57,7 @@ export function MemberPricingSection({
   currencySymbol,
   isRecurringTier,
 }: MemberPricingSectionProps) {
+  const scope = useContext(MemberPricingScopeContext);
   if (state.loading) {
     return (
       <div className="pt-2 border-t border-zinc-100">
@@ -69,7 +82,9 @@ export function MemberPricingSection({
       <div className="pt-2 border-t border-zinc-100">
         <p className="text-[12px] font-medium text-zinc-700">Member pricing</p>
         <p className="text-[11px] text-zinc-500 mt-1">
-          No segments configured yet. Create a community segment first to offer member-only pricing on this tier.
+          {scope === "seller"
+            ? "This community hasn't published any membership tiers yet, so there is no member price to set."
+            : "No segments configured yet. Create a community segment first to offer member-only pricing on this tier."}
         </p>
       </div>
     );
@@ -81,7 +96,9 @@ export function MemberPricingSection({
         <div>
           <p className="text-[12px] font-medium text-zinc-700">Member pricing</p>
           <p className="text-[11px] text-zinc-500 mt-0.5">
-            Discount this tier for buyers in specific community segments.
+            {scope === "seller"
+              ? "Your own discount for this community's members. The community approves it with your listing, and changing it later sends the listing back to them for review."
+              : "Discount this tier for buyers in specific community segments."}
           </p>
         </div>
         {dirtyCount > 0 && (

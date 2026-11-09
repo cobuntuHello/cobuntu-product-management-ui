@@ -1663,6 +1663,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
              */
             showToast={() => {}}
             showMemberPricing={showMemberPricing}
+            // A personal product priced in the create flow is the seller's
+            // own: its tiers come from the community's public list.
+            memberPricingScope={ownership === "personal" ? "seller" : "community"}
           />
         </ProductManagementConfigProvider>
       )}

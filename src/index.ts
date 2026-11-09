@@ -201,3 +201,4 @@ export { OverviewActionCards as ProductOverviewActionCards } from "./page/sectio
 export { AfterCheckoutCard } from "./page/sections/AfterCheckoutCard";
 export { getProductManagementConfig } from "./config";
 export { UserAvatarFallback } from "./ui/user-avatar-fallback";
+export type { MemberPricingScope } from "./components/MemberPricingSection";

@@ -18,6 +18,7 @@ import { useProductManagementConfig, useJsonHeaders } from "../config";
 // function) IS used, from the new SAVE-time gate further down, which re-runs
 // the check on every Save rather than once when the modal opens.
 import { fetchStripeStatus, type StripeOwnerType } from "../lib/useStripeStatus";
+import { MemberPricingScopeContext, type MemberPricingScope } from "./MemberPricingSection";
 import {
   buildRowsFromOverrides,
   buildUpsertBody,
@@ -123,6 +124,23 @@ export interface PriceEditModalProps {
    */
   showMemberPricing?: boolean;
   /**
+   * Whose member prices these are (2026-11-09, user-owned member pricing):
+   *
+   *   "community" (default): a community-owned item; the leaders' segment
+   *               list (GET /segments, COMMUNITY_MANAGE_TIERS), prices apply
+   *               directly. Unchanged.
+   *   "seller":   the seller's own product or course, priced for the members
+   *               of `communityTag`, the community it is listed or created in.
+   *               Tiers come from GET /member-pricing/segments (that
+   *               community's public tiers; a member gets 403 on the leaders'
+   *               list). The prices apply once the community approves the
+   *               listing, and a change to a live listing sends it back for
+   *               review, which the save reports in its toast.
+   *
+   * Backend: docs/features/user-owned-member-pricing.md in the backend repo.
+   */
+  memberPricingScope?: MemberPricingScope;
+  /**
    * Draft mode — no fetches on mount, no backend writes on Save. Used by
    * the create-product flow where the product doesn't exist yet, so the
    * parent (ProductForm) owns the draft state and posts it as part of the
@@ -206,7 +224,7 @@ function stripeNotConnectedMessage(e: unknown): string | null {
   return null;
 }
 
-export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing, draftMode, initialDraftTiers, initialDraftDonation, onDraftCommit, openTierLocalId, openNewTier, productType = "DIGITAL", ownerType = "community" }: PriceEditModalProps) {
+export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing, memberPricingScope = "community", draftMode, initialDraftTiers, initialDraftDonation, onDraftCommit, openTierLocalId, openNewTier, productType = "DIGITAL", ownerType = "community" }: PriceEditModalProps) {
   const isDigital = productType !== "PHYSICAL";
   const { apiBaseUrl, authHeaders } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
@@ -452,8 +470,11 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
     let cancelled = false;
     (async () => {
       try {
+        // A seller can't read the leaders' list (COMMUNITY_MANAGE_TIERS), so
+        // their tiers come from the public-tiers route. See memberPricingScope.
+        const path = memberPricingScope === "seller" ? "member-pricing/segments" : "segments";
         const res = await fetch(
-          `${apiBaseUrl}/api/communities/${communityTag}/segments`,
+          `${apiBaseUrl}/api/communities/${communityTag}/${path}`,
           { headers: authHeaders() },
         );
         if (cancelled || !res.ok) return;
@@ -463,7 +484,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showMemberPricing, communityTag, apiBaseUrl, draftMode]);
+  }, [showMemberPricing, memberPricingScope, communityTag, apiBaseUrl, draftMode]);
 
   // Lazy per-tier override fetch once segments are loaded.
   useEffect(() => {
@@ -875,6 +896,9 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
       // appear in the map). Product-specific delta vs events: the
       // upsert body carries recurringScope for subscription tiers.
       const memberPricingResets: Array<[string, MemberPricingRow[]]> = [];
+      // Seller scope: the backend answers sentForReview when a change sent
+      // the live listing back to the community's review queue.
+      let sentForReview = false;
       for (const [tierId, tierState] of memberPricingByTier) {
         if (tierState.loading || tierState.error) continue;
         const valErr = findFirstValidationError(tierState.rows);
@@ -895,6 +919,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               const e = await res.json().catch(() => ({}));
               throw new Error(e.error || `Failed to remove override for ${r.segmentName}`);
             }
+            if ((await res.json().catch(() => null))?.sentForReview) sentForReview = true;
             continue;
           }
           if (r.enabled) {
@@ -907,6 +932,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               const e = await res.json().catch(() => ({}));
               throw new Error(e.error || `Failed to save override for ${r.segmentName}`);
             }
+            if ((await res.json().catch(() => null))?.sentForReview) sentForReview = true;
           }
         }
         memberPricingResets.push([tierId, resetRowsBaseline(tierState.rows)]);
@@ -936,7 +962,9 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         }
       }
 
-      showToast("Pricing updated");
+      showToast(sentForReview
+        ? "Pricing updated. Your listing is back with the community for review, and goes live again once they approve it."
+        : "Pricing updated");
       onSaved();
     } catch (e: any) {
       const msg = e?.message || "Failed to save";
@@ -1042,6 +1070,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
 
   return (
     <ModalShell onClose={onClose} width="w-[600px]">
+      <MemberPricingScopeContext.Provider value={memberPricingScope}>
       <FooterSlotContext.Provider value={footerSlot}>
       <div className="relative flex flex-col max-h-[78vh]">
       {/* Circular close — muted bg, top-right of the modal. */}
@@ -1317,6 +1346,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
       )}
       </div>
       </FooterSlotContext.Provider>
+      </MemberPricingScopeContext.Provider>
     </ModalShell>
   );
 }
