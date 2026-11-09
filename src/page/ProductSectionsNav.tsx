@@ -12,7 +12,7 @@ import * as React from "react";
  * of its own. This is view-state, like events, so tabs are cheap to add.
  */
 
-export type ProductViewKey = "overview" | "details" | "pricing" | "syllabus" | "collaborators" | "referrals" | "buyers" | "listings" | "ledger" | "activity";
+export type ProductViewKey = "overview" | "details" | "pricing" | "syllabus" | "collaborators" | "referrals" | "buyers" | "reviews" | "listings" | "ledger" | "activity";
 
 /**
  * The tab strip, IN ORDER.
@@ -108,6 +108,13 @@ const SECTIONS: Array<{ key: ProductViewKey; label: string }> = [
    * is who GETS it.
    */
   { key: "buyers", label: "Buyers" },
+  /*
+   * Reviews (unified reviews, backend docs/features/unified-reviews.md): what
+   * buyers said, with the seller's reply and hide-the-comment controls. Right
+   * after Buyers because it is what those buyers said. A host slot, like
+   * Ledger and Referrals, so the tab exists only when the host passes a panel.
+   */
+  { key: "reviews", label: "Reviews" },
   /*
    * "listings" is still a valid KEY -- a link or a saved URL may carry it, and
    * the host may still render that view -- but it is no longer a TAB.
