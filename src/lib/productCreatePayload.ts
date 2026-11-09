@@ -200,6 +200,15 @@ export function buildProductCreateFormData(input: ProductCreatePayloadInput): Fo
     if (data.refundPolicy) {
         formData.append("refundPolicy", JSON.stringify(data.refundPolicy));
     }
+    /*
+     * "Can be bought more than once". Never appended before, so no product
+     * ever stored the seller's answer. The form emits it only once touched
+     * (or false for a course); untouched stays absent, which the server
+     * keeps NULL and derives from the listing.
+     */
+    if (data.allowRepeatPurchase !== undefined) {
+        formData.append("allowRepeatPurchase", String(data.allowRepeatPurchase));
+    }
 
     /*
      * Finishing a draft must finish THAT row, not open a second one beside it.

@@ -279,3 +279,15 @@ describe("the refund policy", () => {
         expect(buildProductCreateFormData(input()).get("refundPolicy")).toBeNull();
     });
 });
+
+describe("can be bought more than once", () => {
+    // Never appended before: no product ever stored the seller's answer.
+    it("sends the seller's answer, either way", () => {
+        expect(buildProductCreateFormData(input({ data: formData({ allowRepeatPurchase: true }) })).get("allowRepeatPurchase")).toBe("true");
+        expect(buildProductCreateFormData(input({ data: formData({ allowRepeatPurchase: false }) })).get("allowRepeatPurchase")).toBe("false");
+    });
+
+    it("omits it when untouched, so the server keeps deriving it", () => {
+        expect(buildProductCreateFormData(input()).get("allowRepeatPurchase")).toBeNull();
+    });
+});

@@ -159,6 +159,10 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       requiresApproval: product.requiresApproval || false,
       // Seeded so the picker opens on the saved answer, not on Standard.
       refundPolicy: (product as any).refundPolicy ?? null,
+      // The saved answer (undefined = never given) and the server's resolved
+      // value, which the switch shows until the seller answers.
+      allowRepeatPurchase: (product as any).allowRepeatPurchase ?? undefined,
+      canRepeatPurchase: (product as any).canRepeatPurchase,
       /*
        * Physical-only, seeded so reopening this drawer shows what the listing
        * actually says rather than an empty postage row. ProductForm nulls both
@@ -218,6 +222,11 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
        */
       if (JSON.stringify(data.refundPolicy ?? null) !== JSON.stringify(initialFormData.refundPolicy ?? null)) {
         formData.append("refundPolicy", JSON.stringify(data.refundPolicy ?? null));
+      }
+      // Never sent before, so an edit to the switch saved nothing. Only on a
+      // change: an untouched switch must leave the column NULL (derived).
+      if (data.allowRepeatPurchase !== undefined && data.allowRepeatPurchase !== initialFormData.allowRepeatPurchase) {
+        formData.append("allowRepeatPurchase", String(data.allowRepeatPurchase));
       }
 
       formData.append("tags", JSON.stringify(data.tags.map(t => t.id)));
