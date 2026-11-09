@@ -308,3 +308,42 @@ describe("EditProductDrawer: refund policy", () => {
     expect(body.get("refundPolicy")).toBe("null");
   }, 10000);
 });
+
+/* Never sent before, so flipping the switch in the drawer saved nothing. */
+describe("EditProductDrawer: can be bought more than once", () => {
+  const routes = () => mockFetch([
+    { method: "PUT", url: "/products/p-1/comprehensive", body: { jobId: "j-1" } },
+    { method: "GET", url: "/products/update/status/j-1", body: { status: "completed" } },
+  ]);
+  async function save(props: ReturnType<typeof baseProps>, fetchMock: ReturnType<typeof mockFetch>) {
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+    await waitFor(() => expect(props.onSaved).toHaveBeenCalled(), { timeout: 8000 });
+    const putCall = fetchMock.mock.calls.find(c => (c[1] as RequestInit | undefined)?.method === "PUT");
+    return putCall![1]!.body as FormData;
+  }
+
+  it("sends the switch once the seller flips it", async () => {
+    const fetchMock = routes();
+    const user = userEvent.setup();
+    const props = baseProps();
+    renderWithConfig(<EditProductDrawer {...props} />);
+    await waitFor(() => expect(screen.getByDisplayValue("Cool product")).toBeInTheDocument());
+
+    await user.click(screen.getByText("Can be bought more than once"));
+    const body = await save(props, fetchMock);
+
+    expect(body.get("allowRepeatPurchase")).toBe("false");
+  }, 10000);
+
+  it("does not send it when untouched, so the column stays derived", async () => {
+    const fetchMock = routes();
+    const props = baseProps();
+    renderWithConfig(<EditProductDrawer {...props} />);
+    await waitFor(() => expect(screen.getByDisplayValue("Cool product")).toBeInTheDocument());
+
+    const body = await save(props, fetchMock);
+
+    expect(body.get("allowRepeatPurchase")).toBeNull();
+  }, 10000);
+});
