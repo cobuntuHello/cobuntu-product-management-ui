@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { formatMoney } from "@cobuntu/management-ui-shared";
 import { useState } from "react";
 import { PencilIcon } from "../helpers";
 import { useProductManagementConfig } from "../../config";
@@ -20,6 +21,8 @@ interface Props {
   onEditTags?: () => void;
   /** Opens the category picker. Omit to hide the row. */
   onEditCategory?: () => void;
+  /** What buyers get (value lines, PBN feedback L2). */
+  onEditValueLines?: () => void;
   /**
    * Where this product's PUBLIC page lives, e.g. "/learning/".
    *
@@ -34,7 +37,7 @@ interface Props {
 export function ProductCard({
   publicUrlBase = "/marketplace/",
   product, communityTag, listingId,
-  onEditName, onEditMedia, onEditCta, onEditTags, onEditCategory,
+  onEditName, onEditMedia, onEditCta, onEditTags, onEditCategory, onEditValueLines,
 }: Props) {
   // Injected by the host app; the package ships its own fallback so no host
   // is forced to supply one.
@@ -324,6 +327,24 @@ export function ProductCard({
                 </div>
               </InfoRow>
             )}
+
+            {onEditValueLines && (() => {
+              const lines: { label: string; value: number }[] = Array.isArray((product as any).valueLines) ? (product as any).valueLines : [];
+              const total = lines.reduce((sum, l) => sum + l.value, 0);
+              return (
+                <InfoRow onClick={onEditValueLines}
+                  icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M3 6h.01M3 12h.01M3 18h.01M8 6h13M8 12h13M8 18h13"/></svg>}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-zinc-400">What buyers get</p>
+                    <p className={`text-sm truncate ${lines.length ? "font-medium text-zinc-900" : "text-zinc-500"}`}>
+                      {lines.length
+                        ? `${lines.length} ${lines.length === 1 ? "line" : "lines"} · ${formatMoney(total, (product as any).currency || "EUR")} total value`
+                        : "Add what buyers get"}
+                    </p>
+                  </div>
+                </InfoRow>
+              );
+            })()}
 
             {/* Owner */}
             {(product.owner || product.user) && (() => {

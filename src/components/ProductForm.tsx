@@ -51,8 +51,9 @@ import {
   Layers, MousePointerClick, ChevronRight,
   Eye, EyeOff, UserCheck, Shield, ShieldCheck, Repeat,
   Image as ImageIcon, Plus, Check, X,
-  PenLine, Wallet, Gift, CreditCard, AlertCircle,
+  PenLine, Wallet, Gift, CreditCard, AlertCircle, ListChecks,
 } from "lucide-react";
+import { ValueLinesModal, sumValueLines, formatMoney, type ValueLine } from "@cobuntu/management-ui-shared";
 
 // draftMode makes ZERO API calls (mount fetch, member-pricing fetch, and
 // FormStep's load/persist are all gated on `!draftMode` or a saved tier id),
@@ -262,6 +263,13 @@ export interface ProductFormData {
    * create DTO + comprehensive update both accept it.
    */
   refundPolicy?: RefundPolicyValue;
+  /**
+   * What the buyer gets, each line with a value in cents (PBN feedback L2).
+   * The page shows them as a value stack ending with the member discount,
+   * which comes from member pricing, so only the lines are edited here.
+   * Always emitted; create sends it only when non-empty, edit only on change.
+   */
+  valueLines?: ValueLine[];
   /**
    * The RESOLVED answer as the backend currently sees it, seeding the switch.
    * Read-only: the form never emits this. It exists so the switch can show the
@@ -672,6 +680,8 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const [categoryId, setCategoryId] = useState<string | null>(initialData?.categoryId ?? null);
   const [subCategoryId, setSubCategoryId] = useState<string | null>(initialData?.subCategoryId ?? null);
   const [isTagsOpen, setIsTagsOpen] = useState(false);
+  const [valueLines, setValueLines] = useState<ValueLine[]>(initialData?.valueLines ?? []);
+  const [isValueLinesOpen, setIsValueLinesOpen] = useState(false);
   const [isCtaOpen, setIsCtaOpen] = useState(false);
 
   /*
@@ -860,6 +870,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       // Seeded from initialData, so an untouched edit re-emits the same value and
       // a create emits null (= platform default / Standard).
       refundPolicy,
+      valueLines,
       // Spread, not a key: an untouched switch must not put the field in the
       // payload at all, or the backend records an answer nobody gave. A course
       // (hideRepeatPurchase) always stamps false — it is bought once, and the
@@ -918,7 +929,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       tiers: named.map(withoutDigitalDelivery),
       donation,
     });
-  }, [name, description, tags, categoryId, subCategoryId, mediaItems, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, refundPolicy, allowRepeatPurchase, hideRepeatPurchase, tiers, donation, condition, parcelClass, isPhysical]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [name, description, tags, categoryId, subCategoryId, mediaItems, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, refundPolicy, valueLines, allowRepeatPurchase, hideRepeatPurchase, tiers, donation, condition, parcelClass, isPhysical]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Configured tiers drive the Pricing row summary + tier cards. A blank
   // seed tier ("Standard") counts once the user has named it.
@@ -1103,6 +1114,27 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             <span className={`block text-sm truncate ${tags.length > 0 ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{tags.length > 0 ? "Tags" : "Add tags"}</span>
             <span className={`block text-[12.5px] truncate ${tags.length > 0 ? "text-zinc-500" : "text-zinc-400"}`}>
               {tags.length > 0 ? tags.map(t => t.name).join(" · ") : L.tagsHint}
+            </span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
+        </button>
+
+        {/* What buyers get, each with a value (PBN feedback L2). Shown on the
+            product page and the order summary as a value stack: total value,
+            then the member discount from this product's member pricing. */}
+        <button type="button" onClick={() => setIsValueLinesOpen(true)}
+          className="group w-full flex items-center gap-3 rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 px-4 py-3 text-left transition-all duration-150 hover:-translate-y-0.5 hover:ring-zinc-200 hover:shadow-[0_10px_22px_-16px_rgba(60,40,30,0.5)] active:translate-y-0 cursor-pointer">
+          {valueLines.length > 0 ? (
+            <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-4 w-4" strokeWidth={3.5} /></span>
+          ) : (
+            <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full bg-emerald-100 text-emerald-600 shrink-0"><ListChecks className="h-4 w-4" /></span>
+          )}
+          <span className="flex-1 min-w-0">
+            <span className={`block text-sm truncate ${valueLines.length > 0 ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{valueLines.length > 0 ? "What buyers get" : "Add what buyers get"}</span>
+            <span className={`block text-[12.5px] truncate ${valueLines.length > 0 ? "text-zinc-500" : "text-zinc-400"}`}>
+              {valueLines.length > 0
+                ? `${valueLines.length} ${valueLines.length === 1 ? "line" : "lines"} · ${formatMoney(sumValueLines(valueLines), currency)} total value`
+                : "List what's included and what each part is worth."}
             </span>
           </span>
           <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
@@ -1595,6 +1627,15 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
 
       {/* Postage & condition are inline now (see the commerce group above), so
           there is no dialog here. */}
+
+      {isValueLinesOpen && (
+        <ValueLinesModal
+          initial={valueLines}
+          currency={currency}
+          onSave={(lines) => { setValueLines(lines); setIsValueLinesOpen(false); }}
+          onClose={() => setIsValueLinesOpen(false)}
+        />
+      )}
 
       {/* ─── Tags Modal ─── (matches the event Tags tap-row → modal) */}
       <Dialog open={isTagsOpen} onOpenChange={setIsTagsOpen}>

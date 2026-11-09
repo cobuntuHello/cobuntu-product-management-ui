@@ -8,6 +8,7 @@ import { ProductForm, type ProductFormData } from "./ProductForm";
 import type { MediaItem } from "../ui/sortable-media-gallery";
 import type { UploadedFile } from "../ui/file-upload-zone";
 import { uploadNewGalleryItems } from "../lib/productMediaUpload";
+import { sameValueLines } from "@cobuntu/management-ui-shared";
 
 interface Props {
   /**
@@ -159,6 +160,7 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       requiresApproval: product.requiresApproval || false,
       // Seeded so the picker opens on the saved answer, not on Standard.
       refundPolicy: (product as any).refundPolicy ?? null,
+      valueLines: Array.isArray((product as any).valueLines) ? (product as any).valueLines : [],
       // The saved answer (undefined = never given) and the server's resolved
       // value, which the switch shows until the seller answers.
       allowRepeatPurchase: (product as any).allowRepeatPurchase ?? undefined,
@@ -220,6 +222,11 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
        * an untouched one would credit whoever renamed the product. "null" is
        * how a seller goes back to Standard.
        */
+      // Value lines: only on change, so an untouched edit never rewrites them.
+      // "[]" clears them on the server.
+      if (!sameValueLines(data.valueLines, initialFormData.valueLines)) {
+        formData.append("valueLines", JSON.stringify(data.valueLines ?? []));
+      }
       if (JSON.stringify(data.refundPolicy ?? null) !== JSON.stringify(initialFormData.refundPolicy ?? null)) {
         formData.append("refundPolicy", JSON.stringify(data.refundPolicy ?? null));
       }

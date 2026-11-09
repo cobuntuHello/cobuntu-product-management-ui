@@ -290,4 +290,12 @@ describe("can be bought more than once", () => {
     it("omits it when untouched, so the server keeps deriving it", () => {
         expect(buildProductCreateFormData(input()).get("allowRepeatPurchase")).toBeNull();
     });
+
+    // PBN feedback L2: what buyers get, each with a value in cents.
+    it("sends value lines as JSON only when there are some", () => {
+        const lines = [{ label: "Keynotes", value: 12000 }, { label: "Brunch", value: 6000 }];
+        expect(JSON.parse(String(buildProductCreateFormData(input({ valueLines: lines } as any)).get("valueLines")))).toEqual(lines);
+        expect(buildProductCreateFormData(input({ valueLines: [] } as any)).get("valueLines")).toBeNull();
+        expect(buildProductCreateFormData(input()).get("valueLines")).toBeNull();
+    });
 });
