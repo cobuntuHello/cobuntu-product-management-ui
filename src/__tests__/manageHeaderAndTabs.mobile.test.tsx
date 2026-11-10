@@ -187,3 +187,24 @@ describe("ProductSectionsNav tab strip", () => {
     expect(scroller.scrollLeft).toBeGreaterThan(0);
   });
 });
+
+/*
+ * The status as a control (2026-11-10): the host app renders "On sale in PBN"
+ * as a menu under the title, so taking a product off the shelf is not three
+ * steps deep. The header only places it.
+ */
+describe("ProductManageHeader statusControl", () => {
+  it("renders the host's control under the title, beside the subtitle", () => {
+    renderHeader({ statusControl: <button>On sale in PBN</button>, subtitle: "Digital product · €275.00" });
+    const control = screen.getByRole("button", { name: "On sale in PBN" });
+    expect(control).toBeTruthy();
+    expect(screen.getByText("Digital product · €275.00").tagName).toBe("SPAN");
+    // Same row as the subtitle, below the h1.
+    expect(control.parentElement).toBe(screen.getByText("Digital product · €275.00").parentElement);
+  });
+
+  it("without a control, the subtitle is the plain line it always was", () => {
+    renderHeader();
+    expect(screen.getByText("Published · 3 sold").tagName).toBe("P");
+  });
+});

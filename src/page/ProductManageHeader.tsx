@@ -30,6 +30,15 @@ export interface ProductManageHeaderProps {
   backLabel: string;
   onPreview: () => void;
   previewLabel: string;
+  /**
+   * The listing's status AS A CONTROL, under the title (2026-11-10): "On sale
+   * in PBN", tappable to take it off the shelf, put it back, open the listing
+   * or withdraw. The host app renders it, because the listing calls, copy and
+   * confirmations are its own. Taking a product off the shelf used to be three
+   * steps deep (Overview, Manage listing, a bottom bar) and PBN could not find
+   * it. When set, the host leaves the state out of `subtitle`.
+   */
+  statusControl?: React.ReactNode;
 }
 
 const TagIcon = () => (
@@ -47,6 +56,7 @@ export function ProductManageHeader({
   backLabel,
   onPreview,
   previewLabel,
+  statusControl,
 }: ProductManageHeaderProps) {
   const mobileActionsMoved = breadcrumbs.length > 0;
   return (
@@ -126,7 +136,14 @@ export function ProductManageHeader({
             * the same row and the space is genuinely contested.
             */}
           <h1 className="text-xl font-semibold text-zinc-900 md:truncate">{title}</h1>
-          {subtitle && <p className="text-sm text-zinc-500">{subtitle}</p>}
+          {statusControl ? (
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              {statusControl}
+              {subtitle && <span className="text-sm text-zinc-500">{subtitle}</span>}
+            </div>
+          ) : (
+            subtitle && <p className="text-sm text-zinc-500">{subtitle}</p>
+          )}
         </div>
         </div>
 
