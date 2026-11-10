@@ -51,9 +51,11 @@ import {
   Layers, MousePointerClick, ChevronRight,
   Eye, EyeOff, UserCheck, Shield, ShieldCheck, Repeat,
   Image as ImageIcon, Plus, Check, X,
-  PenLine, Wallet, Gift, CreditCard, AlertCircle, ListChecks,
+  PenLine, Wallet, Gift, CreditCard, AlertCircle, ListChecks, BadgePercent,
 } from "lucide-react";
 import { ValueLinesModal, sumValueLines, formatMoney, type ValueLine } from "@cobuntu/management-ui-shared";
+import { memberPricingSummary, variantTakesMemberPricing } from "./memberPricesRow";
+import type { CommunitySegment } from "./PriceEditModal/member-pricing";
 
 // draftMode makes ZERO API calls (mount fetch, member-pricing fetch, and
 // FormStep's load/persist are all gated on `!draftMode` or a saved tier id),
@@ -780,7 +782,36 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   // blank). The tier LIST lives inline in this form now, so the modal jumps
   // straight to the per-tier edit screen.
   const [editTierLocalId, setEditTierLocalId] = useState<string | undefined>(undefined);
-  const openTierEditor = (localId: string) => { setMultiTier(true); setEditTierLocalId(localId); setShowTierModal(true); };
+  // Open the editor scrolled to its Member pricing section (the pricing
+  // step's "Member prices" row) rather than at the top.
+  const [focusMemberPricing, setFocusMemberPricing] = useState(false);
+  const openTierEditor = (localId: string, atMemberPricing = false) => {
+    setMultiTier(true);
+    setEditTierLocalId(localId);
+    setFocusMemberPricing(atMemberPricing);
+    setShowTierModal(true);
+  };
+
+  /*
+   * The community's tiers, for the "Member prices" row: it shows only when
+   * there is a tier to price for, and names them in its summary. The same
+   * same-origin read the tier editor makes in draft mode (a seller reads the
+   * community's public tiers, a leader its own list).
+   */
+  const effectiveMemberPricingScope: MemberPricingScope =
+    memberPricingScope ?? (ownership === "personal" ? "seller" : "community");
+  const [pricingSegments, setPricingSegments] = useState<CommunitySegment[]>([]);
+  useEffect(() => {
+    if (!showMemberPricing || !showTiers || !communityTag) return;
+    if (!(page === "all" || page === "commerce")) return;
+    let cancelled = false;
+    const path = effectiveMemberPricingScope === "seller" ? "member-pricing/segments" : "segments";
+    fetch(`/api/communities/${encodeURIComponent(communityTag)}/${path}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => { if (!cancelled && Array.isArray(d)) setPricingSegments(d); })
+      .catch(() => { /* no row is the safe fallback: the editor still has the section */ });
+    return () => { cancelled = true; };
+  }, [showMemberPricing, showTiers, communityTag, page, effectiveMemberPricingScope]);
 
   /**
    * A tier being added but not yet committed.
@@ -809,6 +840,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
     setShowTierModal(false);
     setPendingNewTier(null);
     setEditTierLocalId(undefined);
+    setFocusMemberPricing(false);
   };
 
   // Notify parent
@@ -934,6 +966,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   // Configured tiers drive the Pricing row summary + tier cards. A blank
   // seed tier ("Standard") counts once the user has named it.
   const configuredTiers = tiers.filter(t => !t.deleted && t.name.trim());
+  // The variants a member price applies to (see variantTakesMemberPricing).
+  const memberPricedTiers = configuredTiers.filter(variantTakesMemberPricing);
+  const showMemberPricesRow = showMemberPricing && pricingSegments.length > 0 && memberPricedTiers.length > 0;
 
   /*
    * Name length. The counter stays hidden until the last fifth of the budget,
@@ -1333,6 +1368,42 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Add variant
               </button>
+
+              {/* ── Member prices ── on the step itself (reported 2026-11-10:
+                  sellers creating a product never found member pricing at the
+                  bottom of each variant's editor). One row per variant that
+                  charges; each opens that variant's editor AT its Member
+                  pricing section. Paid variants only, and only when the
+                  community has a tier to price for. */}
+              {showMemberPricesRow && (
+                <div className="rounded-2xl bg-zinc-50 overflow-hidden divide-y divide-zinc-100">
+                  {memberPricedTiers.map((t) => {
+                    const summary = memberPricingSummary(t, pricingSegments);
+                    const title = memberPricedTiers.length > 1
+                      ? `Member prices · ${t.name.trim()}`
+                      : summary ? "Member prices" : "Add member prices";
+                    return (
+                      <button key={t.localId} type="button" onClick={() => openTierEditor(t.localId, true)}
+                        className="group w-full flex items-center gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-zinc-100 cursor-pointer">
+                        {summary ? (
+                          <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full text-white shrink-0" style={{ background: "var(--brand-color, #18181b)" }}><Check className="h-4 w-4" strokeWidth={3.5} /></span>
+                        ) : (
+                          <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full bg-amber-100 text-amber-600 shrink-0"><BadgePercent className="h-4 w-4" /></span>
+                        )}
+                        <span className="flex-1 min-w-0">
+                          <span className={`block text-sm truncate ${summary ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{title}</span>
+                          <span className={`block text-[12.5px] truncate ${summary ? "text-zinc-500" : "text-zinc-400"}`}>
+                            {summary ?? (effectiveMemberPricingScope === "seller"
+                              ? "Optional. A lower price for this community's members, approved with your listing."
+                              : "Optional. A lower price for members of your tiers.")}
+                          </span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -1699,6 +1770,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             initialDraftDonation={donation}
             productType={productType}
             openTierLocalId={editTierLocalId}
+            focusMemberPricing={focusMemberPricing}
             onDraftCommit={({ tiers: nextTiers, donation: nextDonation }) => {
               setTiers(nextTiers);
               setDonation(nextDonation);
@@ -1721,7 +1793,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             showMemberPricing={showMemberPricing}
             // A personal product priced in the create flow is the seller's
             // own: its tiers come from the community's public list.
-            memberPricingScope={memberPricingScope ?? (ownership === "personal" ? "seller" : "community")}
+            memberPricingScope={effectiveMemberPricingScope}
           />
         </ProductManagementConfigProvider>
       )}
