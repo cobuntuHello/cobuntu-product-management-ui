@@ -189,6 +189,13 @@ export interface PriceEditModalProps {
    */
   openNewTier?: boolean;
   /**
+   * With `openTierLocalId`: open that variant's editor scrolled to its Member
+   * pricing section instead of the top. The create wizard's "Member prices"
+   * row uses it; the section sits below files, links, licence, attributes,
+   * price and billing mode, which is where sellers never found it.
+   */
+  focusMemberPricing?: boolean;
+  /**
    * Product shape — selects the variant editor's shape-specific core
    * (feat/product-variants-editor). PHYSICAL → condition / parcel / stock;
    * anything else (DIGITAL, COURSE) → files / links / licence / downloads.
@@ -224,7 +231,7 @@ function stripeNotConnectedMessage(e: unknown): string | null {
   return null;
 }
 
-export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing, memberPricingScope = "community", draftMode, initialDraftTiers, initialDraftDonation, onDraftCommit, openTierLocalId, openNewTier, productType = "DIGITAL", ownerType = "community" }: PriceEditModalProps) {
+export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing, memberPricingScope = "community", draftMode, initialDraftTiers, initialDraftDonation, onDraftCommit, openTierLocalId, openNewTier, focusMemberPricing, productType = "DIGITAL", ownerType = "community" }: PriceEditModalProps) {
   const isDigital = productType !== "PHYSICAL";
   const { apiBaseUrl, authHeaders } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
@@ -310,6 +317,26 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   // map below keyed by tier id.
   const [memberPricingSegments, setMemberPricingSegments] = useState<CommunitySegment[]>([]);
   const [memberPricingByTier, setMemberPricingByTier] = useState<Map<string, MemberPricingTierState>>(new Map());
+
+  /*
+   * focusMemberPricing: once the variant's edit screen is up AND its Member
+   * pricing section has rendered (it needs the community's tiers and the
+   * variant's rows), scroll it to the top of the modal. Once per opening; the
+   * effect re-runs as those arrive and stops as soon as the section is found.
+   */
+  const focusedMemberPricingRef = useRef(false);
+  useEffect(() => {
+    if (!focusMemberPricing || focusedMemberPricingRef.current) return;
+    if (!activeTier || memberPricingSegments.length === 0) return;
+    const timer = window.setTimeout(() => {
+      const section = document.querySelector("[data-member-pricing-anchor]");
+      if (section) {
+        focusedMemberPricingRef.current = true;
+        section.scrollIntoView({ block: "start", behavior: "smooth" });
+      }
+    }, 60);
+    return () => window.clearTimeout(timer);
+  }, [focusMemberPricing, activeTier, memberPricingSegments.length, memberPricingByTier]);
 
   // Key the per-tier member-pricing map by the tier's server id on the manage
   // page, but by its localId in draftMode — a draft tier has no server id yet,
