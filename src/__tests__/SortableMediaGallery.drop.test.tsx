@@ -83,8 +83,9 @@ describe("dropping files into the gallery", () => {
     const { container } = render(<SortableMediaGallery items={existing(2)} onChange={onChange} maxItems={5} />);
 
     fireEvent.click(container.querySelector('[title^="Click to crop"]')!);
-    const upload = await screen.findByRole("button", { name: /Upload new image/ });
-    fireEvent.drop(upload, { dataTransfer: { files: [png()] } });
+    // The tile opens straight on the cropper (see SortableMediaGallery.recrop).
+    const cropper = await screen.findByTestId("cropper");
+    fireEvent.drop(cropper, { dataTransfer: { files: [png()] } });
 
     expect(onChange).not.toHaveBeenCalled();
   });

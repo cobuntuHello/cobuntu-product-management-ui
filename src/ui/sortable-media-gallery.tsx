@@ -9,7 +9,7 @@ import { SortableContext, useSortable, rectSortingStrategy, arrayMove } from "@d
 import { CSS } from "@dnd-kit/utilities";
 import { Upload, X, Video, Crosshair } from "lucide-react";
 import { BannerCropModal, type BannerCropResult } from "./banner-crop-modal";
-import { dataUrlToFile } from "../lib/dataUrlToFile";
+import { replaceWithCrop } from "../lib/replaceWithCrop";
 import { FocalPointModal, type FocalPoint } from "./focal-point-modal";
 import { COVER_SIZE_HINT } from "../lib/coverFormat";
 
@@ -291,21 +291,35 @@ export function SortableMediaGallery({ items, onChange, maxItems = 5 }: Sortable
     setCropOpen(true);
   }
 
+  /*
+   * The photo being cropped, handed to the cropper as `directCropSrc` so the
+   * tile opens straight on THAT photo.
+   *
+   * It used to pass `initialImageSrc`, which only decides whether a "Remove"
+   * choice is offered: the tile said "Click to crop" and opened a popup whose
+   * one real option was to upload a different photo. A saved photo could not
+   * be reframed at all, which mattered once covers went 4:3 and every
+   * existing one needed refitting.
+   */
+  const cropSrc = cropOpen && cropIndex !== null && items[cropIndex]
+    ? items[cropIndex].preview || items[cropIndex].url || null
+    : null;
+
   function handleCropSave(result: BannerCropResult) {
-    if (cropIndex === null || !result.base64) return;
-    const updated = [...items];
-    if (!updated[cropIndex]) return;
+    if (cropIndex === null || !items[cropIndex]) return;
     /*
-     * Replace the FILE as well as the preview. Updating only `preview` left
-     * the item carrying its pre-crop file (or, for a photo added through the
-     * cropper, none at all) — so the upload sent something different from
-     * what the seller was looking at, or nothing.
+     * A null result is the cropper's Remove. It was ignored here, so Remove
+     * closed the dialog and left the photo where it was.
      */
-    updated[cropIndex] = {
-      ...updated[cropIndex],
-      preview: result.base64,
-      file: dataUrlToFile(result.base64, `photo-${Date.now()}`),
-    };
+    if (!result.base64) {
+      handleRemove(cropIndex);
+      return;
+    }
+    const updated = [...items];
+    const old = updated[cropIndex];
+    // The crop's own data URL replaces a blob: preview; free the blob.
+    if (!old.isExisting && old.preview?.startsWith("blob:")) URL.revokeObjectURL(old.preview);
+    updated[cropIndex] = replaceWithCrop(old, result.base64);
     onChange(updated);
   }
 
@@ -378,7 +392,7 @@ export function SortableMediaGallery({ items, onChange, maxItems = 5 }: Sortable
       <BannerCropModal
         open={cropOpen}
         onOpenChange={setCropOpen}
-        initialImageSrc={cropIndex !== null && items[cropIndex] ? items[cropIndex].preview || items[cropIndex].url || null : null}
+        directCropSrc={cropSrc}
         onSave={handleCropSave}
         title="Crop Image"
         hideStockPhotos

@@ -47,9 +47,12 @@ export function BannerCropModal({
   const [isSaving, setIsSaving] = React.useState(false);
   /** A file is being dragged over a drop target (see dropHandlers). */
   const [dragging, setDragging] = React.useState(false);
+  /** Why the last Save did not go through, shown above the actions. */
+  const [saveError, setSaveError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setDragging(false);
+    setSaveError(null);
     if (open) {
       setCrop({ x: 0, y: 0 });
       setZoom(1);
@@ -100,7 +103,7 @@ export function BannerCropModal({
     // blank frame with no explanation.
     if (!file.type.startsWith("image/")) return;
     const reader = new FileReader();
-    reader.onload = () => { setImageSrc(reader.result as string); setOptionsOpen(false); };
+    reader.onload = () => { setImageSrc(reader.result as string); setOptionsOpen(false); setSaveError(null); };
     reader.readAsDataURL(file);
   };
 
@@ -143,13 +146,30 @@ export function BannerCropModal({
   const onCropComplete = React.useCallback((_: any, pixels: CroppedAreaPixels) => { setCroppedAreaPixels(pixels); }, []);
 
   const getCroppedBase64 = async (src: string, area: CroppedAreaPixels): Promise<string> => {
+    /*
+     * A saved photo (an https URL) is fetched FRESH into a local blob before
+     * it is drawn.
+     *
+     * Drawing a cross-origin image and then reading the canvas back needs the
+     * image loaded with CORS. The bucket allows that, but the same URL is
+     * already in the HTTP cache from the gallery tile, fetched WITHOUT CORS,
+     * and a crossOrigin load can be answered from that cached copy, which
+     * carries no CORS header: the canvas is tainted and toDataURL throws. Not
+     * reachable before, because the gallery never cropped a saved photo.
+     * `no-store` skips the cache; a blob URL is same-origin to the canvas.
+     */
+    let blobUrl: string | null = null;
+    if (/^https?:/i.test(src)) {
+      const res = await fetch(src, { mode: "cors", cache: "no-store" });
+      if (!res.ok) throw new Error(`Failed to load image (${res.status})`);
+      blobUrl = URL.createObjectURL(await res.blob());
+    }
     const image = await new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();
-      if (!src.startsWith("data:") && !src.startsWith("blob:")) img.crossOrigin = "anonymous";
       img.onload = () => resolve(img);
       img.onerror = () => reject(new Error("Failed to load image"));
-      img.src = src;
-    });
+      img.src = blobUrl ?? src;
+    }).finally(() => { if (blobUrl) URL.revokeObjectURL(blobUrl); });
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Failed to get canvas context");
@@ -192,6 +212,12 @@ export function BannerCropModal({
       const base64 = await getCroppedBase64(imageSrc, croppedAreaPixels);
       await onSave({ base64 });
       onOpenChange(false);
+    } catch {
+      /*
+       * Said, not swallowed. A failed crop used to stop the spinner and leave
+       * the dialog exactly as it was, which reads as Save doing nothing.
+       */
+      setSaveError("This image could not be saved. Try Change image and pick it again from your device.");
     } finally { setIsSaving(false); }
   };
 
@@ -364,6 +390,9 @@ export function BannerCropModal({
             )}
           </div>
 
+          {saveError && (
+            <p role="alert" className="px-6 pb-3 text-sm text-red-600 flex-shrink-0">{saveError}</p>
+          )}
           {/* One row, four equal actions (2×2 on a narrow modal). All solid
               fills, no outlines: Remove = danger, Change/Cancel = muted,
               Save = primary. */}
