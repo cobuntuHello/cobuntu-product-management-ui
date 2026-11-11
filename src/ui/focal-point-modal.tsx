@@ -12,8 +12,10 @@ import { ModalShell } from "./modal-shell";
  * but it would be good to manually crop what is shown in the Academy because
  * now one of the girls' head is cut off".
  *
- * Two surfaces disagree. The crop tool beside this one produces SQUARES, so
- * the stored file really is a square. The cards then cover-crop it into a
+ * Two surfaces disagree. The crop tool beside this one produced SQUARES, so
+ * the stored file really was a square. (Since 2026-11-11 it frames at the
+ * cards' own 4:3, see lib/coverFormat, but covers made before that, and
+ * uncropped uploads of any shape, still meet a frame of a different shape.) The cards then cover-crop it into a
  * frame of a different shape, and a cover-crop takes its trim from the centre
  * outwards: a square losing its top and bottom loses the head.
  *

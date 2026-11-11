@@ -11,6 +11,7 @@ import { Upload, X, Video, Crosshair } from "lucide-react";
 import { BannerCropModal, type BannerCropResult } from "./banner-crop-modal";
 import { dataUrlToFile } from "../lib/dataUrlToFile";
 import { FocalPointModal, type FocalPoint } from "./focal-point-modal";
+import { COVER_SIZE_HINT } from "../lib/coverFormat";
 
 export interface MediaItem {
   id: string;
@@ -34,8 +35,11 @@ interface SortableMediaGalleryProps {
 }
 
 // Shared tile sizing: a fixed-width tile on the mobile horizontal strip, and
-// auto (fills the grid cell) on the desktop grid.
-const TILE = "shrink-0 w-[128px] sm:w-auto aspect-square";
+// auto (fills the grid cell) on the desktop grid. 4:3 is the cover's shape on
+// every card (see lib/coverFormat), so a cover made at the recommended size
+// fills its tile exactly and anything else shows its letterboxing here, before
+// a buyer's card trims it.
+const TILE = "shrink-0 w-[128px] sm:w-auto aspect-[4/3]";
 
 /** A filled media tile — draggable, croppable, removable. The first tile
  *  carries a "Cover" badge (it's the card thumbnail). */
@@ -76,7 +80,7 @@ function FilledTile({
           /*
            * CONTAIN, not cover.
            *
-           * The tile is square so the strip stays a tidy grid, and `cover`
+           * The tiles share one shape so the strip stays a tidy grid, and `cover`
            * filled it by trimming whatever did not fit. On a photo that is
            * harmless. On the slides and diagrams people put in a course it cut
            * the title off the top and the edges off the sides, so the tiles
@@ -115,7 +119,7 @@ function FilledTile({
 
       {/*
         * Setting the focus is its own control, not another meaning for the
-        * tile. The tile already opens the square crop; a press that did two
+        * tile. The tile already opens the crop; a press that did two
         * different things depending on where it landed is how the crop tool
         * and this one would get confused for each other.
         */}
@@ -143,21 +147,44 @@ function FilledTile({
   );
 }
 
-/** The single "add photos" tile at the end of the strip (shown until the cap
- *  is reached) — replaces the old wall of empty dashed slots. */
-function AddTile({ count, max, onClick }: { count: number; max: number; onClick: () => void }) {
+/**
+ * The one place photos are added: a full-width drag-and-drop section that
+ * also opens the picker on a click (shown until the cap is reached).
+ *
+ * It replaced an "add" tile at the end of the grid. Asked for by a course
+ * seller who designs covers elsewhere and has the folder open behind the
+ * browser: a fifth-of-a-row tile read as a button, not as somewhere to drop
+ * files, so nobody tried. A section the width of the gallery does. It is
+ * still one add affordance, not a tile plus a section offering the same thing
+ * twice.
+ */
+function DropSection({
+  count, max, dragging, onClick,
+}: { count: number; max: number; dragging: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`${TILE} rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-2 p-3 cursor-pointer transition-colors`}
-      style={{ borderColor: "color-mix(in srgb, currentColor 18%, transparent)", background: "color-mix(in srgb, currentColor 4%, transparent)" }}
+      data-dragging={dragging || undefined}
+      className="w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1.5 px-4 py-6 text-center cursor-pointer transition-colors"
+      style={{
+        borderColor: dragging
+          ? "var(--brand-color, #18181b)"
+          : "color-mix(in srgb, currentColor 18%, transparent)",
+        background: dragging
+          ? "color-mix(in srgb, var(--brand-color, #71717a) 8%, transparent)"
+          : "color-mix(in srgb, currentColor 4%, transparent)",
+      }}
     >
       <span className="h-8 w-8 rounded-full flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--brand-color, #71717a) 18%, transparent)", color: "var(--brand-color, #52525b)" }}>
         <Upload className="h-4 w-4" />
       </span>
-      <span className="text-[11.5px] font-medium opacity-80">Add photos</span>
-      <span className="text-[10px] opacity-50">{count}/{max}</span>
+      <span className="text-[13px] font-medium opacity-90">
+        {dragging ? "Drop to add" : "Drag photos here or click to choose"}
+      </span>
+      <span className="text-[11px] opacity-55">
+        Best at {COVER_SIZE_HINT} · {count}/{max}
+      </span>
     </button>
   );
 }
@@ -186,12 +213,17 @@ export function SortableMediaGallery({ items, onChange, maxItems = 5 }: Sortable
     onChange(arrayMove(items, oldIndex, newIndex));
   }
 
-  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  /*
+   * One path for new files, whatever chose them: the picker and a drop both
+   * land here so the cap and the image/video split cannot drift apart.
+   */
+  function addFiles(files: File[]) {
+    // A drop can carry anything (a PDF, a folder). The picker's `accept`
+    // already limits it to these two, so this only ever filters drops.
+    const media = files.filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
     const remaining = maxItems - filledCount;
-    if (remaining <= 0) return;
-    const toAdd = files.slice(0, remaining);
+    if (remaining <= 0 || media.length === 0) return;
+    const toAdd = media.slice(0, remaining);
     const newItems: MediaItem[] = toAdd.map(file => ({
       id: crypto.randomUUID(),
       file,
@@ -200,6 +232,47 @@ export function SortableMediaGallery({ items, onChange, maxItems = 5 }: Sortable
     }));
     onChange([...items, ...newItems]);
   }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    addFiles(files);
+  }
+
+  /*
+   * The whole gallery accepts a drop, not only the section: a file let go
+   * over the tiles is aimed at this gallery just the same. Reordering is
+   * dnd-kit on POINTER events, so it never sees these HTML drag events and
+   * the two cannot be confused.
+   *
+   * dragOver must preventDefault or the browser opens the dropped file in the
+   * tab and the unsaved changes go with it. That holds at the cap too, which
+   * is why the full case refuses the drop (dropEffect "none") rather than
+   * skipping preventDefault: there is nothing to add into, and saying "Drop
+   * to add" over a full gallery would be a promise this cannot keep.
+   */
+  const [dragging, setDragging] = React.useState(false);
+  const canAdd = filledCount < maxItems;
+  const dropHandlers = {
+    onDragOver: (e: React.DragEvent) => {
+      e.preventDefault();
+      if (!canAdd) {
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "none";
+        return;
+      }
+      setDragging(true);
+    },
+    // Moving onto one of the gallery's own children is not leaving it;
+    // without this check the highlight flickers across every tile.
+    onDragLeave: (e: React.DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragging(false);
+      addFiles(Array.from(e.dataTransfer?.files || []));
+    },
+  };
 
   function handleRemove(index: number) {
     if (index >= filledCount) return;
@@ -237,37 +310,56 @@ export function SortableMediaGallery({ items, onChange, maxItems = 5 }: Sortable
   }
 
   return (
-    <div className="space-y-2">
-      {/* Horizontal thumbnail strip on mobile; the desktop 5-up grid is kept.
-          Only real photos + a single "add" tile render — no wall of empty
-          dashed slots. */}
-      <div className="flex gap-2.5 overflow-x-auto pb-1 sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
-            {filled.map((item, i) => (
-              <FilledTile
-                key={item.id}
-                item={item}
-                isCover={i === 0}
-                onRemove={() => handleRemove(i)}
-                onFilledClick={() => handleFilledClick(i)}
-                onSetFocus={() => setFocusIndex(i)}
-              />
-            ))}
-          </SortableContext>
-        </DndContext>
-        {filledCount < maxItems && (
-          <AddTile count={filledCount} max={maxItems} onClick={() => fileInputRef.current?.click()} />
+    <div>
+      {/*
+        * The drop target wraps the gallery only, NOT the two dialogs below.
+        * They portal out visually, but React events still bubble through the
+        * component tree: with the dialogs inside, an image dropped on the crop
+        * dialog would replace the photo being cropped AND land here as a new
+        * gallery item.
+        */}
+      <div className="space-y-2" {...dropHandlers}>
+        {/* Horizontal thumbnail strip on mobile; the desktop 5-up grid is kept.
+            Only real photos render — no wall of empty dashed slots. Adding is
+            the drop section below. */}
+        {filledCount > 0 && (
+          <div className="flex gap-2.5 overflow-x-auto pb-1 sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0">
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={sortableIds} strategy={rectSortingStrategy}>
+                {filled.map((item, i) => (
+                  <FilledTile
+                    key={item.id}
+                    item={item}
+                    isCover={i === 0}
+                    onRemove={() => handleRemove(i)}
+                    onFilledClick={() => handleFilledClick(i)}
+                    onSetFocus={() => setFocusIndex(i)}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          </div>
         )}
+
+        {canAdd && (
+          <DropSection
+            count={filledCount}
+            max={maxItems}
+            dragging={dragging}
+            onClick={() => fileInputRef.current?.click()}
+          />
+        )}
+
+        <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelect} />
+
+        <p className="text-[11px] text-zinc-400">
+          {filledCount === 0
+            ? `Add up to ${maxItems} photos · the first is the cover`
+            : canAdd
+              ? "First photo is the cover · drag to reorder"
+              : `${filledCount}/${maxItems} · remove one to add another · drag to reorder`}
+        </p>
       </div>
-
-      <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelect} />
-
-      <p className="text-[11px] text-zinc-400">
-        {filledCount > 0
-          ? `${filledCount}/${maxItems} · First photo is the cover · drag to reorder`
-          : `Add up to ${maxItems} photos · the first is the cover`}
-      </p>
 
       {/* The focus dialog, which previews the CARD rather than the file. */}
       {focusIndex !== null && items[focusIndex] && (
