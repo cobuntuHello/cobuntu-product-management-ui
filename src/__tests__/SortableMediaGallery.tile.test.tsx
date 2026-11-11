@@ -39,11 +39,14 @@ describe("media tiles", () => {
         }
     });
 
-    it("keeps the square tile, so the strip stays a grid", () => {
+    it("keeps one tile shape, the cover's 4:3, so the strip stays a grid", () => {
         // The fix is about what the image does INSIDE the tile, not about
         // letting each tile take its own shape and making the row ragged.
+        // The shape is 4:3 (was square) since every cover is shown at 4:3:
+        // a cover made at the recommended size fills its tile exactly.
         const { container } = renderGallery();
-        expect(container.innerHTML).toContain("aspect-square");
+        expect(container.innerHTML).toContain("aspect-[4/3]");
+        expect(container.innerHTML).not.toContain("aspect-square");
     });
 
     it("still offers cropping, which is now the only thing that crops", () => {

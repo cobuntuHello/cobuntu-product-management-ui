@@ -9,6 +9,7 @@ import { StockPhotoPicker } from "./stock-photo-picker";
 import { Image as ImageIcon, Trash2, Loader2 } from "lucide-react";
 import { cn } from "./utils";
 import { drawFitted, fitWithin, IMAGE_QUALITY } from "@cobuntu/management-ui-shared";
+import { COVER_ASPECT, COVER_SIZE_HINT } from "../lib/coverFormat";
 
 type CroppedAreaPixels = { width: number; height: number; x: number; y: number };
 
@@ -44,8 +45,11 @@ export function BannerCropModal({
   const [zoom, setZoom] = React.useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = React.useState<CroppedAreaPixels | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
+  /** A file is being dragged over a drop target (see dropHandlers). */
+  const [dragging, setDragging] = React.useState(false);
 
   React.useEffect(() => {
+    setDragging(false);
     if (open) {
       setCrop({ x: 0, y: 0 });
       setZoom(1);
@@ -84,13 +88,56 @@ export function BannerCropModal({
     img.src = imageUrl;
   };
 
-  const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  /*
+   * One path for a chosen file, whatever chose it. The picker and the drop
+   * targets both land here so they cannot drift (same move as the event
+   * banner modal in @cobuntu/event-management-ui).
+   */
+  const loadImageFile = (file: File | null | undefined) => {
     if (!file) return;
+    // A drop can carry anything: a PDF, a folder, a dragged link. Reading a
+    // non-image would hand the cropper a data URL it cannot draw, leaving a
+    // blank frame with no explanation.
+    if (!file.type.startsWith("image/")) return;
     const reader = new FileReader();
     reader.onload = () => { setImageSrc(reader.result as string); setOptionsOpen(false); };
     reader.readAsDataURL(file);
+  };
+
+  const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    loadImageFile(file);
+  };
+
+  /*
+   * Drop a file straight onto either step.
+   *
+   * Asked for by a course seller who designs her covers elsewhere and still
+   * has the folder open behind the browser: dragging the file over beats
+   * finding it again in a file dialog.
+   *
+   * dragOver must preventDefault or the browser navigates away to the dropped
+   * file and takes the unsaved product with it.
+   */
+  /*
+   * stopPropagation because this dialog is often rendered INSIDE another drop
+   * target (the media gallery), and React events bubble through portals: a
+   * drop handled here must not also reach the gallery and add the file twice.
+   */
+  const dropHandlers = {
+    onDragOver: (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setDragging(true); },
+    // Leaving for one of this target's own children is not leaving; without
+    // the check the highlight flickers the whole way across.
+    onDragLeave: (e: React.DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragging(false);
+      loadImageFile(e.dataTransfer?.files?.[0]);
+    },
   };
 
   const onCropComplete = React.useCallback((_: any, pixels: CroppedAreaPixels) => { setCroppedAreaPixels(pixels); }, []);
@@ -184,10 +231,22 @@ export function BannerCropModal({
           <DialogHeader className="px-6 py-5 text-center">
             <DialogTitle className="text-base font-semibold text-center">{title}</DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-2 px-4 pb-4">
+          {/*
+            * The upload button IS the drop section here: a dashed target that
+            * still opens the picker on a click, so the two ways of choosing a
+            * file sit in one place. The size hint lives inside it because this
+            * is the moment someone is about to go and make the image.
+            */}
+          <div className="flex flex-col gap-2 px-4 pb-4" {...dropHandlers}>
             <button type="button" onClick={triggerFilePicker}
-              className="flex min-h-[48px] items-center justify-center rounded-xl bg-zinc-100 px-6 py-3 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-200 cursor-pointer">
-              Upload new image
+              className={cn(
+                "flex min-h-[96px] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-6 py-4 text-sm font-medium text-zinc-800 transition-colors cursor-pointer",
+                dragging ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 bg-zinc-100 hover:bg-zinc-200",
+              )}>
+              <span>{dragging ? "Drop to use this image" : "Upload new image"}</span>
+              <span className="text-xs font-normal text-zinc-500">
+                {dragging ? COVER_SIZE_HINT : `or drag it here · best at ${COVER_SIZE_HINT}`}
+              </span>
             </button>
             {!hideStockPhotos && (
               <button type="button" onClick={() => { setOptionsOpen(false); setStockPhotoOpen(true); }}
@@ -216,29 +275,48 @@ export function BannerCropModal({
 
       {/* Crop Modal */}
       <Dialog open={open && showCropModal} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-lg max-h-[88vh] p-0 gap-0 overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-xl max-h-[88vh] p-0 gap-0 overflow-hidden flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-4 border-b border-zinc-100 flex-shrink-0">
             <DialogTitle className="text-xl font-semibold">{title}</DialogTitle>
-            <p className="text-sm mt-1" style={{ color: "color-mix(in srgb, var(--text-color, #18181b) 55%, transparent)" }}>Adjust the image to fit a square (1:1) format</p>
+            {/* The frame below is the card's own 4:3, so what is framed here is
+                what buyers see. The drop target is invisible until something
+                is dragged over it, so it is said once here or nobody finds it. */}
+            <p className="text-sm mt-1" style={{ color: "color-mix(in srgb, var(--text-color, #18181b) 55%, transparent)" }}>
+              {dragging
+                ? "Drop to use this image instead"
+                : `Frame it as cards show it. Best at ${COVER_SIZE_HINT}. You can also drop a new image here.`}
+            </p>
           </DialogHeader>
 
-          <div className="px-6 py-4 space-y-6 overflow-y-auto flex-1 min-h-0">
-            <div className="relative w-full max-w-[340px] mx-auto rounded-xl overflow-hidden aspect-square shadow-inner" style={{ background: "color-mix(in srgb, var(--text-color, #18181b) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--text-color, #18181b) 15%, transparent)" }}>
+          <div className="px-6 py-4 space-y-6 overflow-y-auto flex-1 min-h-0" {...dropHandlers}>
+            <div
+              data-dragging={dragging || undefined}
+              className="relative w-full max-w-[400px] mx-auto rounded-xl overflow-hidden aspect-[4/3] shadow-inner transition-colors"
+              style={{
+                background: "color-mix(in srgb, var(--text-color, #18181b) 8%, transparent)",
+                border: dragging
+                  ? "1px dashed var(--text-color, #18181b)"
+                  : "1px solid color-mix(in srgb, var(--text-color, #18181b) 15%, transparent)",
+              }}
+            >
               {imageSrc ? (
                 /*
                  * restrictPosition (the default) keeps the image covering the
                  * crop box. It was explicitly disabled, which let the photo be
-                 * dragged clear of the frame - so the square could sit partly
+                 * dragged clear of the frame - so the frame could sit partly
                  * OUTSIDE the image and the saved crop came back with blank
                  * edges. The feed's cropper never had this off.
                  *
                  * objectFit="cover" is the other half: the default "contain"
-                 * letterboxes a non-square photo inside a 1:1 frame, which is
-                 * why it opened off-centre with grey beside it. Cover fills
+                 * letterboxes a photo of another shape inside the frame, which
+                 * is why it opened off-centre with grey beside it. Cover fills
                  * the frame and centres, so the first thing you see is a valid
                  * crop you can nudge rather than one you must fix.
+                 *
+                 * COVER_ASPECT (4:3), not the square this used to be: the
+                 * square was the one shape no buyer ever saw. See coverFormat.
                  */
-                <Cropper image={imageSrc} crop={crop} zoom={zoom} aspect={1} showGrid={false} cropShape="rect"
+                <Cropper image={imageSrc} crop={crop} zoom={zoom} aspect={COVER_ASPECT} showGrid={false} cropShape="rect"
                   objectFit="cover"
                   onCropChange={setCrop} onCropComplete={onCropComplete} onZoomChange={setZoom} />
               ) : (
@@ -263,7 +341,7 @@ export function BannerCropModal({
                   * Floor of 100%, not 50%.
                   *
                   * This is not a cropper - nothing is clipped OUT of the photo.
-                  * It is a framer: the photo always fills the square window and
+                  * It is a framer: the photo always fills the window and
                   * the user pans and zooms to choose which part shows. Under
                   * that rule the photo can never be smaller than the window.
                   *

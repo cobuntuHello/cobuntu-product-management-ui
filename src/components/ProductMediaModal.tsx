@@ -5,6 +5,7 @@ import { ModalShell } from "../page/helpers";
 import { SortableMediaGallery, type MediaItem } from "../ui/sortable-media-gallery";
 import { useProductManagementConfig } from "../config";
 import { uploadNewGalleryItems } from "../lib/productMediaUpload";
+import { COVER_SIZE_HINT } from "../lib/coverFormat";
 
 /**
  * Manage a product's images in one place: reorder, add, remove.
@@ -142,8 +143,12 @@ export function ProductMediaModal({
   return (
     <ModalShell onClose={onClose} width="w-full sm:w-[640px]">
       <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">Images</h3>
+      {/* The size is said here, not only in the drop section: the section
+          goes away once the gallery is full, and a seller replacing a cover
+          then still needs to know what to make. */}
       <p className="text-[12px] text-zinc-500 mb-4">
-        Drag to reorder. The first image is the one shown on cards and at the top of the product page.
+        Drag to reorder. The first image is the cover, shown on cards and at the top of the product page.
+        Design covers at {COVER_SIZE_HINT}, the shape every card shows.
       </p>
 
       <div className="mb-4 max-h-[55vh] overflow-y-auto">

@@ -132,10 +132,17 @@ export function ProductCard({
         {/*
           MEDIA COLUMN — the events card's geometry, plus a gallery rail.
 
-          A 280 square with the pencil top-right and the copy bar along the
-          bottom edge, dropping to a full-width 16/9 on mobile. All of that is
+          A 280-wide frame with the pencil top-right and the copy bar along the
+          bottom edge, full width on mobile. The pencil and the copy bar are
           lifted from EventCard so the two manage pages stop looking like
           different products.
+
+          THE SHAPE IS NOT THE EVENTS CARD'S. This was a square to match it,
+          and that made it the one surface showing a cover in a shape no buyer
+          ever sees: a course seller (2026-11-11) could not design a cover that
+          looked right here AND on the 4:3 marketplace card. Every product and
+          course cover is now 4:3 everywhere (lib/coverFormat), this frame
+          included, at every width.
 
           THE ONE DELIBERATE DIFFERENCE: events size that square with a
           ResizeObserver reading the info column. Products cannot. The rail
@@ -146,7 +153,7 @@ export function ProductCard({
           run away from.
         */}
         <div className="shrink-0 w-[280px] max-sm:w-full">
-          <div className="overflow-hidden rounded-xl relative group w-[280px] h-[280px] max-sm:!w-full max-sm:!h-auto max-sm:aspect-[16/9]">
+          <div className="overflow-hidden rounded-xl relative group w-[280px] aspect-[4/3] max-sm:!w-full">
             <button
               onClick={onEditMedia}
               aria-label={bannerUrl ? "Manage images" : "Add images"}

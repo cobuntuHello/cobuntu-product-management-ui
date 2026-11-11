@@ -154,6 +154,8 @@ export { StockPhotoPicker } from "./ui/stock-photo-picker";
 export { BannerCropModal, type BannerCropResult } from "./ui/banner-crop-modal";
 export { FocalPointModal, type FocalPoint } from "./ui/focal-point-modal";
 export { SortableMediaGallery, type MediaItem } from "./ui/sortable-media-gallery";
+// The one shape + size a product/course cover is shown and designed at.
+export { COVER_ASPECT, COVER_SIZE, COVER_SIZE_HINT } from "./lib/coverFormat";
 export { cn } from "./ui/utils";
 
 // Category picker — the consumer loads the options and passes them to

@@ -14,6 +14,7 @@ import { dataUrlToFile } from "../lib/dataUrlToFile";
 import { MarkdownEditor } from "../ui/markdown-editor";
 import { type MediaItem } from "../ui/sortable-media-gallery";
 import { BannerCropModal, type BannerCropResult } from "../ui/banner-crop-modal";
+import { COVER_SIZE_HINT } from "../lib/coverFormat";
 import { type UploadedFile } from "../ui/file-upload-zone";
 import { cn } from "../ui/utils";
 import { PriceEditModal } from "./PriceEditModal";
@@ -712,7 +713,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const isPhysical = productType === "PHYSICAL";
 
   // ─── Inline photo upload ───
-  // Tap a slot → native device picker (our own hidden input) → the square
+  // Tap a slot → native device picker (our own hidden input) → the 4:3
   // cropper (the only popup) → the photo lands in the carousel. No separate
   // "Product Photos" gallery popup. cropEditIndex null = adding a new photo;
   // a number = re-cropping the photo at that index.
@@ -1035,14 +1036,15 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       </div>
 
       {/* ─── Photos ─── inline uploader. Tap the cover or any slot → the
-           device's own photo picker → the square cropper (the ONLY popup) →
-           the photo lands here. Cover (photo 1) is a capped 1:1 square that
-           matches the crop + the marketplace card. Tap a thumbnail to make it
+           device's own photo picker → the 4:3 cropper (the ONLY popup) →
+           the photo lands here. Cover (photo 1) is a capped 4:3 frame, the
+           shape every card shows it in (lib/coverFormat), so what is framed
+           here is what buyers see. Tap a thumbnail to make it
            the cover; tap the corner X to remove. Fully responsive: the cover
            is full-width up to 360px, thumbnails wrap. No gallery popup. */}
       <div>
         {mediaItems[0] ? (
-          <div className="group relative w-full max-w-[360px] aspect-square rounded-2xl overflow-hidden ring-1 ring-zinc-100">
+          <div className="group relative w-full max-w-[360px] aspect-[4/3] rounded-2xl overflow-hidden ring-1 ring-zinc-100">
             <button type="button" onClick={() => recropPhoto(0)} className="block w-full h-full cursor-pointer" aria-label="Recrop cover photo">
               <img src={mediaSrc(mediaItems[0])} alt="" className="w-full h-full object-cover" />
               <span className="absolute top-3 left-3 text-[11px] font-semibold tracking-wide bg-white/85 backdrop-blur-sm text-zinc-800 px-2.5 py-1 rounded-full">Cover</span>
@@ -1057,12 +1059,12 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           </div>
         ) : (
           <button type="button" onClick={pickPhoto}
-            className="group relative w-full max-w-[360px] aspect-square rounded-2xl bg-zinc-50 border-2 border-dashed border-zinc-200 hover:border-zinc-300 transition-colors cursor-pointer flex flex-col items-center justify-center gap-2.5 text-zinc-400 hover:text-zinc-500">
+            className="group relative w-full max-w-[360px] aspect-[4/3] rounded-2xl bg-zinc-50 border-2 border-dashed border-zinc-200 hover:border-zinc-300 transition-colors cursor-pointer flex flex-col items-center justify-center gap-2.5 text-zinc-400 hover:text-zinc-500">
             <span className="w-12 h-12 rounded-2xl bg-white ring-1 ring-zinc-100 flex items-center justify-center transition-transform duration-200 group-hover:scale-105">
               <ImageIcon className="h-6 w-6 text-zinc-300" />
             </span>
             <span className="text-[13px] font-medium">Add cover photo</span>
-            <span className="text-[11px] text-zinc-300">Up to 5 · the first is your cover</span>
+            <span className="text-[11px] text-zinc-300">Best at {COVER_SIZE_HINT} · up to 5</span>
           </button>
         )}
 
@@ -1723,7 +1725,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       </Dialog>
 
       {/* ─── Crop popup ─── the ONLY photo popup. The device picker feeds it
-           an image (directCropSrc); the user frames it to a 1:1 square and it
+           an image (directCropSrc); the user frames it to the 4:3 cover and it
            lands in the carousel. No gallery popup in between. */}
       <BannerCropModal
         open={cropOpen}

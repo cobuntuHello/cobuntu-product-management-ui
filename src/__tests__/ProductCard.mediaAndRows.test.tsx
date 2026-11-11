@@ -204,7 +204,7 @@ describe("the card has no self-referential sizing", () => {
     expect(container.querySelector(".w-\\[280px\\]")).toBeTruthy();
   });
 
-  it("frames the banner as a SQUARE, matching the events card", () => {
+  it("frames the banner at 4:3, the shape every card shows the cover in", () => {
     /*
      * REVERSED DELIBERATELY (direction A). A buyer meets this product at 4/3
      * twice — the /marketplace grid card and the detail carousel — and this
@@ -226,11 +226,19 @@ describe("the card has no self-referential sizing", () => {
      * The no-measured-height half of the original assertion is KEPT: that is
      * what stops the ResizeObserver loop.
      */
-    const banner = container.querySelector(".w-\\[280px\\].h-\\[280px\\]");
+    /*
+     * AND BACK TO 4/3, for good this time (2026-11-11). A course seller could
+     * not design a cover that looked right here and on the storefront: "it's
+     * very hard to design a course cover in the right dimensions because there
+     * are different ways how it is displayed". The answer was one shape for
+     * every product and course cover on every surface (lib/coverFormat), so
+     * this frame cannot be the exception, on desktop or mobile.
+     */
+    const banner = container.querySelector(".w-\\[280px\\].aspect-\\[4\\/3\\]");
     expect(banner).toBeTruthy();
     expect((banner as HTMLElement).style.height).toBe("");
-    // Mobile still drops to the events card's 16/9.
-    expect(banner!.className).toContain("max-sm:aspect-[16/9]");
+    expect(banner!.className).not.toContain("h-[280px]");
+    expect(banner!.className).not.toContain("16/9");
   });
 
   it("does not let the rows stretch the row box", () => {
