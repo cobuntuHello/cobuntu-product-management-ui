@@ -15,6 +15,7 @@ import { MarkdownEditor } from "../ui/markdown-editor";
 import { type MediaItem } from "../ui/sortable-media-gallery";
 import { BannerCropModal, type BannerCropResult } from "../ui/banner-crop-modal";
 import { COVER_SIZE_HINT } from "../lib/coverFormat";
+import { replaceWithCrop } from "../lib/replaceWithCrop";
 import { type UploadedFile } from "../ui/file-upload-zone";
 import { cn } from "../ui/utils";
 import { PriceEditModal } from "./PriceEditModal";
@@ -754,15 +755,16 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
      * silently dropped at submit: products saved with no images.
      * Reported 2026-08-09.
      */
-    const file = dataUrlToFile(result.base64, `photo-${Date.now()}`);
     if (cropEditIndex === null) {
+      const file = dataUrlToFile(result.base64, `photo-${Date.now()}`);
       setMediaItems([...mediaItems, { id: crypto.randomUUID(), preview: result.base64, type: "image" as const, file }].slice(0, 5));
     } else {
       const next = [...mediaItems];
-      // Re-cropping an EXISTING (already hosted) photo has to replace its file
-      // too, or the upload keeps the pre-crop image while the carousel shows
-      // the cropped one.
-      if (next[cropEditIndex]) next[cropEditIndex] = { ...next[cropEditIndex], preview: result.base64, file };
+      // Re-cropping a photo has to replace its file too, or the upload keeps
+      // the pre-crop image. For an already SAVED photo that is not enough on
+      // its own (saved photos are never re-uploaded), so replaceWithCrop
+      // turns it into a new photo in the same slot.
+      if (next[cropEditIndex]) next[cropEditIndex] = replaceWithCrop(next[cropEditIndex], result.base64);
       setMediaItems(next);
     }
   }
