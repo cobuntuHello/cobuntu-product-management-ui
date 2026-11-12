@@ -107,4 +107,63 @@ describe("uploadNewGalleryItems", () => {
         await expect(uploadNewGalleryItems(apiBase, authHeaders, "prod-1", items)).rejects.toThrow();
         expect(completeCalls).toEqual([]);
     });
+
+    /*
+     * 2026-11-12, Pathseekers: five completions sent at once collided on the
+     * gallery position server-side and 2-3 of them failed every Save. They now
+     * go one at a time, in gallery order, and each one that lands is reported
+     * so the modal can stop treating it as new.
+     */
+    it("finishes uploads one at a time, in gallery order, never overlapping", async () => {
+        let inFlight = 0;
+        let maxInFlight = 0;
+        const completedNames: string[] = [];
+        let n = 0;
+        vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+            if (/upload-session$/.test(url)) {
+                n += 1;
+                return new Response(JSON.stringify({ uploadUrl: `https://upload.example/s${n}`, objectPath: `p${n}`, maxBytes: 1e9 }), { status: 200 });
+            }
+            if (url.startsWith("https://upload.example/")) return new Response(null, { status: 200 });
+            if (/upload-complete$/.test(url)) {
+                inFlight += 1;
+                maxInFlight = Math.max(maxInFlight, inFlight);
+                await new Promise((r) => setTimeout(r, 5));
+                inFlight -= 1;
+                const body = JSON.parse(String(init?.body));
+                completedNames.push(body.originalName);
+                return new Response(JSON.stringify({ id: `srv-${body.originalName}` }), { status: 201 });
+            }
+            throw new Error(`Unmocked fetch: ${url}`);
+        }));
+
+        const items = [1, 2, 3, 4, 5].map((i) => newItem(`local-${i}`, `page-${i}.jpg`));
+        await uploadNewGalleryItems(apiBase, authHeaders, "prod-1", items);
+
+        expect(maxInFlight).toBe(1);
+        expect(completedNames).toEqual(["page-1.jpg", "page-2.jpg", "page-3.jpg", "page-4.jpg", "page-5.jpg"]);
+    });
+
+    it("reports each image as it lands, so a later failure does not re-attach it on retry", async () => {
+        let n = 0;
+        vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+            if (/upload-session$/.test(url)) {
+                n += 1;
+                return new Response(JSON.stringify({ uploadUrl: `https://upload.example/s${n}`, objectPath: `p${n}`, maxBytes: 1e9 }), { status: 200 });
+            }
+            if (url.startsWith("https://upload.example/")) return new Response(null, { status: 200 });
+            if (/upload-complete$/.test(url)) {
+                const body = JSON.parse(String(init?.body));
+                if (body.originalName === "page-2.jpg") return new Response(JSON.stringify({ error: "boom" }), { status: 500 });
+                return new Response(JSON.stringify({ id: `srv-${body.originalName}` }), { status: 201 });
+            }
+            throw new Error(`Unmocked fetch: ${url}`);
+        }));
+
+        const saved: Array<[string, string]> = [];
+        const items = [newItem("local-1", "page-1.jpg"), newItem("local-2", "page-2.jpg"), newItem("local-3", "page-3.jpg")];
+        await expect(uploadNewGalleryItems(apiBase, authHeaders, "prod-1", items, (l, m) => saved.push([l, m])))
+            .rejects.toThrow("boom");
+        expect(saved).toEqual([["local-1", "srv-page-1.jpg"]]);
+    });
 });

@@ -92,6 +92,15 @@ export async function uploadNewGalleryItems(
     authHeaders: () => Record<string, string>,
     productId: string,
     items: MediaItem[],
+    /**
+     * Called as each new item becomes a real `product_media` row, with its
+     * local id and its server id. A caller that keeps the gallery in state
+     * should mark that item as existing right away: if a LATER file then
+     * fails, the seller's next Save must not attach this one a second time.
+     * (Before this, a failed save left the landed images live AND still
+     * marked new, so every retry added another copy of each.)
+     */
+    onItemSaved?: (localId: string, mediaId: string) => void,
 ): Promise<MediaItem[]> {
     const pending = items.filter((item) => !item.isExisting && item.file);
     if (pending.length === 0) return items;
@@ -115,15 +124,24 @@ export async function uploadNewGalleryItems(
         }),
     );
 
-    const completed = await Promise.all(
-        transferred.map(async ({ item, session }) => {
-            const media = await completeMediaUpload(apiBaseUrl, authHeaders, productId, {
-                objectPath: session.objectPath,
-                originalName: item.file!.name,
-            });
-            return { itemId: item.id, mediaId: media.id };
-        }),
-    );
+    /*
+     * ONE AT A TIME, in gallery order. These are quick metadata calls (the
+     * bytes are already in the bucket), and running them all at once is what
+     * broke a Pathseekers seller's five-image save on 2026-11-12: each one
+     * picked the next free position before any had been written, so they
+     * collided and two or three of the five failed every time. The backend
+     * now serialises this too; doing it here as well keeps the gallery order
+     * the order the seller arranged, and works against any backend version.
+     */
+    const completed: Array<{ itemId: string; mediaId: string }> = [];
+    for (const { item, session } of transferred) {
+        const media = await completeMediaUpload(apiBaseUrl, authHeaders, productId, {
+            objectPath: session.objectPath,
+            originalName: item.file!.name,
+        });
+        completed.push({ itemId: item.id, mediaId: media.id });
+        onItemSaved?.(item.id, media.id);
+    }
 
     const resolvedId = new Map(completed.map(({ itemId, mediaId }) => [itemId, mediaId]));
     return items.map((item) =>
