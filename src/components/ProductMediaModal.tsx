@@ -81,7 +81,13 @@ export function ProductMediaModal({
        * place of the new items, so the save below only ever tells the backend
        * about media it already knows exists.
        */
-      const resolved = await uploadNewGalleryItems(apiBaseUrl, authHeaders, product.id, items);
+      // Each image that lands is marked saved in state immediately, so a
+      // retry after a failure further down never attaches it twice.
+      const resolved = await uploadNewGalleryItems(
+        apiBaseUrl, authHeaders, product.id, items,
+        (localId, mediaId) => setItems((prev) => prev.map((it) =>
+          it.id === localId ? { ...it, id: mediaId, isExisting: true, file: undefined } : it)),
+      );
 
       const formData = new FormData();
 
