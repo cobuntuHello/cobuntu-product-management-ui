@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
@@ -55,9 +55,15 @@ import {
   Image as ImageIcon, Plus, Check, X,
   PenLine, Wallet, Gift, CreditCard, AlertCircle, ListChecks, BadgePercent,
 } from "lucide-react";
-import { ValueLinesModal, sumValueLines, formatMoney, type ValueLine } from "@cobuntu/management-ui-shared";
+import { ValueLinesModal, sumValueLines, formatMoney, useSharedT, type ValueLine } from "@cobuntu/management-ui-shared";
 import { memberPricingSummary, variantTakesMemberPricing } from "./memberPricesRow";
-import type { CommunitySegment } from "./PriceEditModal/member-pricing";
+import { buildRowsFromOverrides, buildUpsertBody, type CommunitySegment, type MemberPricingRow } from "./PriceEditModal/member-pricing";
+import {
+  MemberPricesStep,
+  memberPriceRowError,
+  MEMBER_PRICES_NS,
+  type MemberPricesSegmentsStatus,
+} from "./MemberPricesStep";
 
 // draftMode makes ZERO API calls (mount fetch, member-pricing fetch, and
 // FormStep's load/persist are all gated on `!draftMode` or a saved tier id),
@@ -296,6 +302,13 @@ export interface ProductFormData {
    */
   donation: DonationDraft;
   /**
+   * The first problem with a member price on the "Member prices" step (a
+   * ticked tier with no amount, a percentage over 100), or null. Only ever set
+   * when `memberPricesStep` is on; the wizard refuses Next and submit on it,
+   * the same way it does for a missing variant price.
+   */
+  memberPricingError?: string | null;
+  /**
    * Physical-only. NULL on every other product type, and that is enforced
    * rather than assumed: the backend normaliser THROWS if a digital product
    * carries either, so the emit below nulls them whenever productType is not
@@ -429,7 +442,16 @@ export interface ProductFormProps {
    * regardless of page, so opening a dialog on one page and switching pages
    * never loses its contents.
    */
-  page?: "listing" | "commerce" | "settings" | "all";
+  page?: "listing" | "commerce" | "settings" | "members" | "all";
+  /**
+   * The create wizard has a "Member prices" step of its own (the shared
+   * resolveCreateSteps' `withMembersStep`). On: `page="members"` renders it,
+   * and the two older ways in step aside so there is ONE place to set a member
+   * price while creating: the "Member prices" row under the prices, and the
+   * member section inside each variant's editor. Off (the default): unchanged,
+   * for hosts that have not added the step (the admin app).
+   */
+  memberPricesStep?: boolean;
   /**
    * Surfaces community member (tier) pricing inside the draftMode tier wizard
    * so per-segment discount overrides can be configured at CREATE time (they
@@ -453,7 +475,7 @@ export interface ProductFormProps {
 
 // ─── Component ─────────────────────────────────────────────────
 
-export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, hideRepeatPurchase, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false, memberPricingScope, labels, stripeStatusOverride, ownership = "community" }: ProductFormProps) {
+export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, hideRepeatPurchase, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false, memberPricingScope, memberPricesStep = false, labels, stripeStatusOverride, ownership = "community" }: ProductFormProps) {
   /* Merged once rather than at each use, so a partial override cannot leave
    * one string reading "course" beside another still reading "product". */
   const L = { ...DEFAULT_LABELS, ...(labels ?? {}) };
@@ -796,25 +818,123 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   };
 
   /*
-   * The community's tiers, for the "Member prices" row: it shows only when
-   * there is a tier to price for, and names them in its summary. The same
-   * same-origin read the tier editor makes in draft mode (a seller reads the
-   * community's public tiers, a leader its own list).
+   * The community's tiers, for the "Member prices" row and step: the row shows
+   * only when there is a tier to price for, and names them in its summary; the
+   * step lists them. The same same-origin read the tier editor makes in draft
+   * mode (a seller reads the community's public tiers, a leader every tier).
+   *
+   * A leader's list is `member-pricing/segments?scope=community`, NOT the
+   * leaders' `segments` route: that one is the tier ADMIN list and needs
+   * COMMUNITY_MANAGE_TIERS, while creating the item needs only *_CREATE, so a
+   * leader who could create the item got a 403 here and member pricing hid
+   * itself without a word (Pathseekers, 2026-11-12).
+   *
+   * Read ONCE per community and scope rather than on every page switch, and
+   * with a status, so the step can tell "still loading" and "did not load"
+   * from "this community has no tiers" instead of showing nothing for all three.
    */
   const effectiveMemberPricingScope: MemberPricingScope =
     memberPricingScope ?? (ownership === "personal" ? "seller" : "community");
   const [pricingSegments, setPricingSegments] = useState<CommunitySegment[]>([]);
+  const [segmentsStatus, setSegmentsStatus] = useState<MemberPricesSegmentsStatus>("loading");
+  const [segmentsReload, setSegmentsReload] = useState(0);
+  const fetchedSegmentsKey = useRef<string | null>(null);
+  const wantsSegments = !!showMemberPricing && !!showTiers && !!communityTag
+    && (page === "all" || page === "commerce" || page === "members");
+  const segmentsKey = `${communityTag}|${effectiveMemberPricingScope}|${segmentsReload}`;
   useEffect(() => {
-    if (!showMemberPricing || !showTiers || !communityTag) return;
-    if (!(page === "all" || page === "commerce")) return;
+    if (!wantsSegments || fetchedSegmentsKey.current === segmentsKey) return;
+    fetchedSegmentsKey.current = segmentsKey;
     let cancelled = false;
-    const path = effectiveMemberPricingScope === "seller" ? "member-pricing/segments" : "segments";
+    let done = false;
+    setSegmentsStatus("loading");
+    const path = effectiveMemberPricingScope === "seller"
+      ? "member-pricing/segments"
+      : "member-pricing/segments?scope=community";
     fetch(`/api/communities/${encodeURIComponent(communityTag)}/${path}`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((d) => { if (!cancelled && Array.isArray(d)) setPricingSegments(d); })
-      .catch(() => { /* no row is the safe fallback: the editor still has the section */ });
-    return () => { cancelled = true; };
-  }, [showMemberPricing, showTiers, communityTag, page, effectiveMemberPricingScope]);
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((d) => {
+        done = true;
+        if (cancelled) return;
+        setPricingSegments(Array.isArray(d) ? d : []);
+        setSegmentsStatus("ready");
+      })
+      .catch(() => {
+        done = true;
+        if (cancelled) return;
+        // Not remembered as fetched, so "Try again" (or coming back) re-reads.
+        fetchedSegmentsKey.current = null;
+        setSegmentsStatus("error");
+      });
+    return () => {
+      cancelled = true;
+      // Left mid-flight (a page switch): forget it, so the next visit reads again.
+      if (!done) fetchedSegmentsKey.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsSegments, segmentsKey]);
+
+  /*
+   * The "Member prices" step's rows, one list per variant (keyed by localId),
+   * seeded from the variant's own draftMemberPricing once the tiers are in.
+   *
+   * Kept here rather than in the step so they survive moving between steps,
+   * and kept apart from `tiers` because a row can be mid-edit and invalid (a
+   * ticked tier with no amount yet). Only a VALID set of rows is folded back
+   * into the variant's draftMemberPricing, which is what the create payload
+   * carries; until then the variant keeps its last valid member prices and
+   * `memberPricingError` holds the wizard on this step.
+   */
+  // The step's copy (shared.managementUi.memberPricesStep), translated by the host.
+  const tMP = useSharedT(MEMBER_PRICES_NS);
+  const [memberRowsByTier, setMemberRowsByTier] = useState<Map<string, MemberPricingRow[]>>(() => new Map());
+  useEffect(() => {
+    if (!memberPricesStep || segmentsStatus !== "ready" || pricingSegments.length === 0) return;
+    setMemberRowsByTier((prev) => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const t of tiers) {
+        if (t.deleted || next.has(t.localId)) continue;
+        next.set(t.localId, buildRowsFromOverrides(pricingSegments, t.draftMemberPricing ?? [], t.currency || currency));
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [memberPricesStep, segmentsStatus, pricingSegments, tiers, currency]);
+
+  const handleMemberRowChange = (localId: string, segmentId: string, patch: Partial<MemberPricingRow>) => {
+    const rows = memberRowsByTier.get(localId);
+    if (!rows) return;
+    const nextRows = rows.map((r) => (r.segmentId === segmentId ? { ...r, ...patch } : r));
+    setMemberRowsByTier((prev) => {
+      const next = new Map(prev);
+      next.set(localId, nextRows);
+      return next;
+    });
+    if (nextRows.some((r) => memberPriceRowError(r, tMP))) return;
+    setTiers((ts) => ts.map((t) => {
+      if (t.localId !== localId) return t;
+      // The same conversion the variant editor's save uses (cents, whole
+      // percentages, recurringScope only on a subscription variant).
+      const folded = nextRows
+        .filter((r) => r.enabled)
+        .map((r) => buildUpsertBody(r, t.currency || currency, !!t.isRecurring));
+      return { ...t, draftMemberPricing: folded.length ? folded : null };
+    }));
+  };
+
+  /** First problem on the step's visible variants, or null (see ProductFormData). */
+  const memberPricingError = useMemo(() => {
+    if (!memberPricesStep) return null;
+    for (const t of tiers) {
+      if (t.deleted || !t.name.trim() || !variantTakesMemberPricing(t)) continue;
+      for (const r of memberRowsByTier.get(t.localId) ?? []) {
+        const e = memberPriceRowError(r, tMP);
+        if (e) return e;
+      }
+    }
+    return null;
+  }, [memberPricesStep, tiers, memberRowsByTier, tMP]);
 
   /**
    * A tier being added but not yet committed.
@@ -872,6 +992,16 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
     /* A parcel has no download channel — see the `tiers:` emit below. */
     const withoutDigitalDelivery = (t: DraftTier): DraftTier =>
       isPhysical ? { ...t, files: [], links: [] } : t;
+    /*
+     * A variant that stopped charging (set back to free after its member
+     * prices were set) is not shown on the "Member prices" step, so its rows
+     * could neither be seen nor removed there. Dropped on emit, like the
+     * deliverables above: set a price again and they come back.
+     */
+    const withoutStrayMemberPricing = (t: DraftTier): DraftTier =>
+      memberPricesStep && t.draftMemberPricing && !variantTakesMemberPricing(t)
+        ? { ...t, draftMemberPricing: null }
+        : t;
 
     const named = tiers.filter(t => !t.deleted && t.name.trim());
     const paid = named.some(t => t.priceMode === "pwyw" || (!!t.price && parseFloat(t.price) > 0));
@@ -961,17 +1091,18 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
        * Emptied on EMIT, not cleared from state, exactly as the product-level
        * rule did: switch back to Digital and the deliverables are still there.
        */
-      tiers: named.map(withoutDigitalDelivery),
+      tiers: named.map(withoutDigitalDelivery).map(withoutStrayMemberPricing),
       donation,
+      memberPricingError,
     });
-  }, [name, description, tags, categoryId, subCategoryId, mediaItems, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, refundPolicy, valueLines, allowRepeatPurchase, hideRepeatPurchase, tiers, donation, condition, parcelClass, isPhysical]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [name, description, tags, categoryId, subCategoryId, mediaItems, currency, recurringInterval, ctaText, viewAccess, buyAccess, requiresApproval, refundPolicy, valueLines, allowRepeatPurchase, hideRepeatPurchase, tiers, donation, condition, parcelClass, isPhysical, memberPricingError]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Configured tiers drive the Pricing row summary + tier cards. A blank
   // seed tier ("Standard") counts once the user has named it.
   const configuredTiers = tiers.filter(t => !t.deleted && t.name.trim());
   // The variants a member price applies to (see variantTakesMemberPricing).
   const memberPricedTiers = configuredTiers.filter(variantTakesMemberPricing);
-  const showMemberPricesRow = showMemberPricing && pricingSegments.length > 0 && memberPricedTiers.length > 0;
+  const showMemberPricesRow = showMemberPricing && !memberPricesStep && pricingSegments.length > 0 && memberPricedTiers.length > 0;
 
   /*
    * Name length. The counter stays hidden until the last fifth of the budget,
@@ -1677,6 +1808,21 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       )}
 
 
+      {/* ─── Member prices ─── the create wizard's own step (memberPricesStep).
+          See MemberPricesStep for why it is a step and not a row. */}
+      {page === "members" && memberPricesStep && (
+        <MemberPricesStep
+          scope={effectiveMemberPricingScope}
+          status={showMemberPricing ? segmentsStatus : "ready"}
+          segments={showMemberPricing ? pricingSegments : []}
+          tiers={memberPricedTiers}
+          rowsByTier={memberRowsByTier}
+          showErrors={!!showErrors}
+          onRowChange={handleMemberRowChange}
+          onRetry={() => setSegmentsReload((n) => n + 1)}
+        />
+      )}
+
       {/* ─── Description Editor Dialog ─── */}
       {/* The shared dialog (events, products and courses use the same one).
           It edits a draft, so Cancel now really discards: the old dialog wrote
@@ -1787,7 +1933,10 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
              * the fix is to thread its own through, not to fill this in.
              */
             showToast={() => {}}
-            showMemberPricing={showMemberPricing}
+            /* With the "Member prices" step on, the step is the one place to
+               set them: the variant editor's section steps aside (Save then
+               leaves draftMemberPricing exactly as the step set it). */
+            showMemberPricing={showMemberPricing && !memberPricesStep}
             // A personal product priced in the create flow is the seller's
             // own: its tiers come from the community's public list.
             memberPricingScope={effectiveMemberPricingScope}

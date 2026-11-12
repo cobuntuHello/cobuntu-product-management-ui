@@ -26,7 +26,7 @@ const tier = (o: Record<string, unknown> = {}) => ({
 
 function stubSegments(segments: unknown[] = SEGMENTS) {
   const fetchSpy = vi.fn(async (url: string) => {
-    if (/\/(member-pricing\/)?segments$/.test(String(url))) {
+    if (/\/member-pricing\/segments(\?scope=community)?$/.test(String(url))) {
       return { ok: true, json: async () => segments } as any;
     }
     return { ok: false, json: async () => ({}) } as any;
@@ -119,10 +119,10 @@ describe("ProductForm — Member prices row on the pricing step", () => {
     expect(screen.queryByText("Add member prices")).toBeNull();
   });
 
-  it("a leader's community-owned item reads the community's own tier list", async () => {
+  it("a leader's community-owned item reads every tier with scope=community, not the leaders' admin list", async () => {
     const fetchSpy = stubSegments();
     renderForm([tier({ price: "275" })], { ownership: "community" });
     await screen.findByText("Add member prices");
-    expect(fetchSpy.mock.calls.map((c) => String(c[0]))).toContain("/api/communities/pathseekers/segments");
+    expect(fetchSpy.mock.calls.map((c) => String(c[0]))).toContain("/api/communities/pathseekers/member-pricing/segments?scope=community");
   });
 });
