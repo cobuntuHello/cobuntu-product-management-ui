@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
 import { ProductForm } from "../components/ProductForm";
-import { memberPriceRowError } from "../components/MemberPricesStep";
+import { createSharedTranslator } from "@cobuntu/management-ui-shared";
+import { memberPriceRowError, MEMBER_PRICES_NS } from "../components/MemberPricesStep";
 import { renderWithConfig } from "./test-utils";
 import { blankTier } from "../components/PriceEditModal/helpers";
 
@@ -64,19 +65,22 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("memberPriceRowError", () => {
   const row = (o: Record<string, unknown>) => ({ enabled: true, mode: "PERCENT_OFF", value: "20", segmentName: "Coach", ...o }) as any;
+  // The shared package's English, exactly as a host with no translations gets it.
+  const en = createSharedTranslator();
+  const tEn = (k: string, v?: Record<string, string | number | Date>) => en(`${MEMBER_PRICES_NS}.${k}`, v);
 
   it("accepts an unticked row, a free one, and a sensible amount", () => {
-    expect(memberPriceRowError(row({ enabled: false, value: "" }))).toBeNull();
-    expect(memberPriceRowError(row({ mode: "FREE", value: "" }))).toBeNull();
-    expect(memberPriceRowError(row({ mode: "FIXED_PRICE", value: "65" }))).toBeNull();
-    expect(memberPriceRowError(row({ mode: "PERCENT_OFF", value: "100" }))).toBeNull();
+    expect(memberPriceRowError(row({ enabled: false, value: "" }), tEn)).toBeNull();
+    expect(memberPriceRowError(row({ mode: "FREE", value: "" }), tEn)).toBeNull();
+    expect(memberPriceRowError(row({ mode: "FIXED_PRICE", value: "65" }), tEn)).toBeNull();
+    expect(memberPriceRowError(row({ mode: "PERCENT_OFF", value: "100" }), tEn)).toBeNull();
   });
 
   it("refuses a ticked tier with no amount, and a percentage that is not a whole 1 to 100", () => {
-    expect(memberPriceRowError(row({ value: "" }))).toBe("Enter an amount for Coach, or untick it.");
-    expect(memberPriceRowError(row({ value: "150" }))).toMatch(/^Coach: the discount must be/);
-    expect(memberPriceRowError(row({ value: "12.5" }))).toMatch(/^Coach: the discount must be/);
-    expect(memberPriceRowError(row({ mode: "FLAT_OFF", value: "-1" }))).toBe("Enter an amount for Coach, or untick it.");
+    expect(memberPriceRowError(row({ value: "" }), tEn)).toBe("Enter an amount for Coach, or untick it.");
+    expect(memberPriceRowError(row({ value: "150" }), tEn)).toMatch(/^Coach: the discount must be/);
+    expect(memberPriceRowError(row({ value: "12.5" }), tEn)).toMatch(/^Coach: the discount must be/);
+    expect(memberPriceRowError(row({ mode: "FLAT_OFF", value: "-1" }), tEn)).toBe("Enter an amount for Coach, or untick it.");
   });
 });
 

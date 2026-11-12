@@ -55,14 +55,13 @@ import {
   Image as ImageIcon, Plus, Check, X,
   PenLine, Wallet, Gift, CreditCard, AlertCircle, ListChecks, BadgePercent,
 } from "lucide-react";
-import { ValueLinesModal, sumValueLines, formatMoney, type ValueLine } from "@cobuntu/management-ui-shared";
+import { ValueLinesModal, sumValueLines, formatMoney, useSharedT, type ValueLine } from "@cobuntu/management-ui-shared";
 import { memberPricingSummary, variantTakesMemberPricing } from "./memberPricesRow";
 import { buildRowsFromOverrides, buildUpsertBody, type CommunitySegment, type MemberPricingRow } from "./PriceEditModal/member-pricing";
 import {
   MemberPricesStep,
   memberPriceRowError,
-  DEFAULT_MEMBER_PRICES_STEP_LABELS,
-  type MemberPricesStepLabels,
+  MEMBER_PRICES_NS,
   type MemberPricesSegmentsStatus,
 } from "./MemberPricesStep";
 
@@ -453,8 +452,6 @@ export interface ProductFormProps {
    * for hosts that have not added the step (the admin app).
    */
   memberPricesStep?: boolean;
-  /** Copy for the step, merged over its English defaults (the app passes its translations). */
-  memberPricesLabels?: Partial<MemberPricesStepLabels>;
   /**
    * Surfaces community member (tier) pricing inside the draftMode tier wizard
    * so per-segment discount overrides can be configured at CREATE time (they
@@ -478,7 +475,7 @@ export interface ProductFormProps {
 
 // ─── Component ─────────────────────────────────────────────────
 
-export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, hideRepeatPurchase, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false, memberPricingScope, memberPricesStep = false, memberPricesLabels, labels, stripeStatusOverride, ownership = "community" }: ProductFormProps) {
+export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, hideRepeatPurchase, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false, memberPricingScope, memberPricesStep = false, labels, stripeStatusOverride, ownership = "community" }: ProductFormProps) {
   /* Merged once rather than at each use, so a partial override cannot leave
    * one string reading "course" beside another still reading "product". */
   const L = { ...DEFAULT_LABELS, ...(labels ?? {}) };
@@ -888,7 +885,8 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
    * carries; until then the variant keeps its last valid member prices and
    * `memberPricingError` holds the wizard on this step.
    */
-  const ML: MemberPricesStepLabels = { ...DEFAULT_MEMBER_PRICES_STEP_LABELS, ...(memberPricesLabels ?? {}) };
+  // The step's copy (shared.managementUi.memberPricesStep), translated by the host.
+  const tMP = useSharedT(MEMBER_PRICES_NS);
   const [memberRowsByTier, setMemberRowsByTier] = useState<Map<string, MemberPricingRow[]>>(() => new Map());
   useEffect(() => {
     if (!memberPricesStep || segmentsStatus !== "ready" || pricingSegments.length === 0) return;
@@ -913,7 +911,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       next.set(localId, nextRows);
       return next;
     });
-    if (nextRows.some((r) => memberPriceRowError(r, ML))) return;
+    if (nextRows.some((r) => memberPriceRowError(r, tMP))) return;
     setTiers((ts) => ts.map((t) => {
       if (t.localId !== localId) return t;
       // The same conversion the variant editor's save uses (cents, whole
@@ -931,13 +929,12 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
     for (const t of tiers) {
       if (t.deleted || !t.name.trim() || !variantTakesMemberPricing(t)) continue;
       for (const r of memberRowsByTier.get(t.localId) ?? []) {
-        const e = memberPriceRowError(r, ML);
+        const e = memberPriceRowError(r, tMP);
         if (e) return e;
       }
     }
     return null;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [memberPricesStep, tiers, memberRowsByTier, memberPricesLabels]);
+  }, [memberPricesStep, tiers, memberRowsByTier, tMP]);
 
   /**
    * A tier being added but not yet committed.
@@ -1823,7 +1820,6 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           showErrors={!!showErrors}
           onRowChange={handleMemberRowChange}
           onRetry={() => setSegmentsReload((n) => n + 1)}
-          labels={memberPricesLabels}
         />
       )}
 
