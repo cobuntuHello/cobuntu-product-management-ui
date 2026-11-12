@@ -1,3 +1,5 @@
+import { richTextToPlain } from "@cobuntu/management-ui-shared";
+
 /**
  * Flatten an HTML rich-text string into a plain-text preview: strip tags
  * AND decode the common entities a WYSIWYG editor emits (&nbsp;, &amp;,
@@ -58,6 +60,8 @@ function safeCodePoint(cp: number): string {
  */
 export function descriptionToPlainText(description: string | null | undefined): string {
   if (!description) return "";
+  // A mention reads as @Name and an image disappears, not their stored syntax.
+  description = richTextToPlain(description);
   /*
    * Markdown block markers (#, -, >, 1.) are only recognizable at the START
    * of a LINE — so they have to be stripped while "\n" still marks line

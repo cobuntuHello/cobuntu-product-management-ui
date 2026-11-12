@@ -75,3 +75,10 @@ describe("descriptionToPlainText (handles both stored formats during the migrati
     expect(descriptionToPlainText(undefined)).toBe("");
   });
 });
+
+describe("descriptionToPlainText: mentions and images", () => {
+  it("shows a mention as @Name and drops an image", () => {
+    expect(descriptionToPlainText("Hike with @[Stella Marie Viereck](user:bb05b515_x) at sunset.\n![](https://x.test/a_b.png)\nBring **water**."))
+      .toBe("Hike with @Stella Marie Viereck at sunset. Bring water.");
+  });
+});
