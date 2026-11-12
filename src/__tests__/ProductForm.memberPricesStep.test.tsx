@@ -89,6 +89,8 @@ describe("ProductForm: the Member prices step", () => {
     const fetchSpy = stubSegments();
     renderForm([tier({ price: "275" })]);
     expect(await screen.findByLabelText("Offer Creators membership a member price")).toBeTruthy();
+    // A seller's own item: the one line the heading does not already say.
+    expect(screen.getByText("The community approves your member prices along with your listing.")).toBeTruthy();
     expect(screen.getByLabelText("Offer Free a member price")).toBeTruthy();
     expect(screen.getByText("Standard")).toBeTruthy();
     expect(screen.getByText("€275.00")).toBeTruthy();
@@ -100,7 +102,8 @@ describe("ProductForm: the Member prices step", () => {
     renderForm([tier({ price: "275" })], { ownership: "community", memberPricingScope: "community" });
     await screen.findByLabelText("Offer Creators membership a member price");
     expect(fetchSpy.mock.calls.map((c) => String(c[0]))).toContain("/api/communities/pathseekers/member-pricing/segments?scope=community");
-    expect(screen.getByText(/Give members of your tiers a lower price/)).toBeTruthy();
+    // The heading says what the step is; a community's own item gets no second line.
+    expect(screen.queryByText(/approves your member prices/)).toBeNull();
   });
 
   it("ticking a tier and typing a discount puts it on the variant the create payload carries", async () => {
