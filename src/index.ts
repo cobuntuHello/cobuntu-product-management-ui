@@ -204,3 +204,5 @@ export { AfterCheckoutCard } from "./page/sections/AfterCheckoutCard";
 export { getProductManagementConfig } from "./config";
 export { UserAvatarFallback } from "./ui/user-avatar-fallback";
 export type { MemberPricingScope } from "./components/MemberPricingSection";
+// The create wizard's "Member prices" step (ProductForm memberPricesStep + page="members").
+export { DEFAULT_MEMBER_PRICES_STEP_LABELS, type MemberPricesStepLabels } from "./components/MemberPricesStep";

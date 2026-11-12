@@ -72,7 +72,7 @@ function stubLoadRoutes() {
       status: 404,
       body: {},
     },
-    { method: "GET", url: /\/api\/communities\/orbis\/segments$/, body: segments },
+    { method: "GET", url: /\/api\/communities\/orbis\/member-pricing\/segments\?scope=community$/, body: segments },
     {
       method: "GET",
       url: /\/api\/communities\/orbis\/tiers\/tier-1\/member-pricing$/,
@@ -162,7 +162,7 @@ describe("PriceEditModal (product) — Member Pricing round-trip", () => {
     mockFetch([
       { method: "GET", url: /\/api\/communities\/orbis\/products\/p-1\/tiers$/, body: [tier] },
       { method: "GET", url: /\/api\/communities\/orbis\/tiers\/tier-1\/form$/, status: 404, body: {} },
-      { method: "GET", url: /\/api\/communities\/orbis\/segments$/, body: [] }, // NO segments
+      { method: "GET", url: /\/api\/communities\/orbis\/member-pricing\/segments\?scope=community$/, body: [] }, // NO segments
       { method: "GET", url: /\/api\/communities\/orbis\/stripe\/connected$/, body: { connected: true, chargesEnabled: true } },
     ]);
     renderWithConfig(<PriceEditModal {...baseProps()} />);
