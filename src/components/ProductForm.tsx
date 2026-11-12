@@ -11,7 +11,7 @@ import { EventTags } from "../ui/event-tags";
 import { descriptionToPlainText } from "../lib/htmlToPlainText";
 import { LISTING_NAME_MAX, NAME_COUNTER_FROM, listingNameTooLong } from "../lib/listingNameLimit";
 import { dataUrlToFile } from "../lib/dataUrlToFile";
-import { MarkdownEditor } from "../ui/markdown-editor";
+import { DescriptionDialog } from "@cobuntu/management-ui-shared";
 import { type MediaItem } from "../ui/sortable-media-gallery";
 import { BannerCropModal, type BannerCropResult } from "../ui/banner-crop-modal";
 import { COVER_SIZE_HINT } from "../lib/coverFormat";
@@ -1678,27 +1678,20 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
 
 
       {/* ─── Description Editor Dialog ─── */}
-      <Dialog open={isDescriptionOpen} onOpenChange={setIsDescriptionOpen}>
-        {/* Fixed height (not just a max-height cap): this dialog holds only the
-            description editor, and now that MarkdownEditor's own textarea caps
-            its growth and scrolls internally past ~200px, nothing left inside
-            this dialog still changes size as you type -- h-[520px] keeps the
-            dialog itself from visibly resizing too, on top of that. max-h-[85vh]
-            stays as the safety cap for short/mobile viewports. */}
-        <DialogContent className="sm:max-w-3xl h-[520px] max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{L.descriptionTitle}</DialogTitle>
-            <DialogDescription>{L.descriptionHint}</DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <MarkdownEditor value={description} onChange={setDescription} placeholder={L.descriptionPlaceholder} />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDescriptionOpen(false)}>Cancel</Button>
-            <Button onClick={() => setIsDescriptionOpen(false)}>Done</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* The shared dialog (events, products and courses use the same one).
+          It edits a draft, so Cancel now really discards: the old dialog wrote
+          every keystroke straight into the form, and Cancel did what Done did. */}
+      <DescriptionDialog
+        open={isDescriptionOpen}
+        title={L.descriptionTitle}
+        subtitle={L.descriptionHint}
+        value={description}
+        placeholder={L.descriptionPlaceholder}
+        cancelLabel="Cancel"
+        doneLabel="Done"
+        onCancel={() => setIsDescriptionOpen(false)}
+        onDone={(next) => { setDescription(next); setIsDescriptionOpen(false); }}
+      />
 
       {/* Postage & condition are inline now (see the commerce group above), so
           there is no dialog here. */}

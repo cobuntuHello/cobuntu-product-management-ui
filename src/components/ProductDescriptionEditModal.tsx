@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ModalShell } from "../page/helpers";
-import { MarkdownEditor } from "../ui/markdown-editor";
+import { DescriptionDialog } from "@cobuntu/management-ui-shared";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
 
 /**
@@ -34,10 +34,9 @@ export function ProductDescriptionEditModal({
 }) {
   const { apiBaseUrl } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
-  const [content, setContent] = React.useState<string>(product?.description || "");
   const [saving, setSaving] = React.useState(false);
 
-  async function save() {
+  async function save(content: string) {
     setSaving(true);
     try {
       const res = await fetch(`${apiBaseUrl}/api/users/me/products/${productId}`, {
@@ -59,28 +58,18 @@ export function ProductDescriptionEditModal({
   }
 
   return (
-    <ModalShell onClose={onClose} width="w-full sm:w-[640px]">
-      <h3 className="text-[15px] font-semibold text-zinc-900 mb-4">Edit description</h3>
-      <div className="mb-4 max-h-[60vh] overflow-y-auto">
-        <MarkdownEditor
-          value={content}
-          onChange={setContent}
-          placeholder="Describe your product..."
-        />
-      </div>
-      <div className="flex justify-end gap-2">
-        <button onClick={onClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">
-          Cancel
-        </button>
-        <button
-          onClick={save}
-          disabled={saving}
-          className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer"
-        >
-          {saving ? "Saving..." : "Save"}
-        </button>
-      </div>
-    </ModalShell>
+    <DescriptionDialog
+      open
+      title="Edit description"
+      value={product?.description || ""}
+      placeholder="Describe your product..."
+      cancelLabel="Cancel"
+      doneLabel="Save"
+      busy={saving}
+      busyLabel="Saving..."
+      onCancel={onClose}
+      onDone={(next) => void save(next)}
+    />
   );
 }
 
