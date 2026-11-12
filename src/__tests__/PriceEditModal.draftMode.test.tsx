@@ -212,8 +212,8 @@ describe("PriceEditModal — draftMode save failures are visible without a host 
     expect(await screen.findByRole("alert")).toBeTruthy();
 
     // Give it a price, save again — the banner goes and the commit lands.
-    // The price field lives inside the tier (L2), not on the L1 list.
-    await user.click(screen.getByRole("button", { name: /Standard/ }));
+    // Since 2026-11-09 a failed Save opens the failing variant itself (L2), so
+    // its price field is already on screen: no click on the L1 row.
     const price = await screen.findByPlaceholderText("0.00");
     await user.type(price, "25");
     await user.click(screen.getByRole("button", { name: /^save$/i }));
