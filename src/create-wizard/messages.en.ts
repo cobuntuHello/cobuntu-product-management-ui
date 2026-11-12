@@ -33,6 +33,8 @@ export const PRODUCT_WIZARD_MESSAGES_EN = {
       "stepDetailsSubtitle": "Photos, description, tags and category.",
       "stepCommerceTitle": "Pricing & Deliverables",
       "stepCommerceSubtitle": "Set your variants, their prices, and what buyers receive.",
+      "stepMembersTitle": "Member prices",
+      "stepMembersSubtitle": "Optional. A lower price for members, variant by variant.",
       "stepSettingsTitle": "Policies & access",
       "stepSettingsSubtitle": "The optional extras: approval and repeat purchase.",
       "stepAccessTitle": "Who is this for?",
