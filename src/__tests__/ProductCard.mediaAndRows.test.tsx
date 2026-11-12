@@ -263,7 +263,7 @@ describe("the media column's actions", () => {
      * there, and one card looking like the other won here.
      */
     const { container } = renderCard();
-    const frame = container.querySelector(".w-\\[280px\\].h-\\[280px\\]") as HTMLElement;
+    const frame = container.querySelector(".w-\\[280px\\].aspect-\\[4\\/3\\]") as HTMLElement;
     expect(frame.textContent).toContain("Copy product link");
   });
 
@@ -331,20 +331,20 @@ describe("which image is the banner", () => {
     // The column exists and events read it in five places; products ignored
     // it, so "which one is the banner" had two answers.
     const { container } = renderCard({ media: [img("a", 0), img("b", 1, true)] });
-    const banner = container.querySelector(".w-\\[280px\\].h-\\[280px\\] img") as HTMLImageElement;
+    const banner = container.querySelector(".w-\\[280px\\].aspect-\\[4\\/3\\] img") as HTMLImageElement;
     expect(banner.src).toContain("b.jpg");
   });
 
   it("falls back to the first by order when nothing is flagged", () => {
     const { container } = renderCard({ media: [img("b", 1), img("a", 0)] });
-    const banner = container.querySelector(".w-\\[280px\\].h-\\[280px\\] img") as HTMLImageElement;
+    const banner = container.querySelector(".w-\\[280px\\].aspect-\\[4\\/3\\] img") as HTMLImageElement;
     expect(banner.src).toContain("a.jpg");
   });
 
   it("shows a legacy bannerImageUrl when there are NO media rows", () => {
     // Exactly the case that rendered an empty state over a real banner.
     const { container } = renderCard({ media: [], bannerImageUrl: "https://x.test/legacy.jpg" });
-    const banner = container.querySelector(".w-\\[280px\\].h-\\[280px\\] img") as HTMLImageElement;
+    const banner = container.querySelector(".w-\\[280px\\].aspect-\\[4\\/3\\] img") as HTMLImageElement;
     expect(banner.src).toContain("legacy.jpg");
     expect(screen.queryByText("Add your first image")).not.toBeInTheDocument();
   });
@@ -353,7 +353,7 @@ describe("which image is the banner", () => {
     const { container } = renderCard({
       media: [], cardImageUrl: "https://x.test/card.jpg", bannerImageUrl: "https://x.test/legacy.jpg",
     });
-    const banner = container.querySelector(".w-\\[280px\\].h-\\[280px\\] img") as HTMLImageElement;
+    const banner = container.querySelector(".w-\\[280px\\].aspect-\\[4\\/3\\] img") as HTMLImageElement;
     expect(banner.src).toContain("card.jpg");
   });
 
