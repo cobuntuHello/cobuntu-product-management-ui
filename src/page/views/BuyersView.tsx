@@ -6,7 +6,7 @@ import { UserAvatarFallback } from "../../ui/user-avatar-fallback";
 import { useCanEdit } from "../../lib/manageAccess";
 import {
     PersonPickerModal, ResponsiveDrawer,
-    userIdsOf, recipientsToApi, perRecipientMessages,
+    userIdsOf, emailsOf, recipientsToApi, perRecipientMessages,
     type Recipient, type PersonPickerTierStep,
 } from "@cobuntu/management-ui-shared";
 import { ModalShell } from "../helpers";
@@ -48,6 +48,14 @@ interface Grant {
     note?: string | null;
     createdAt: string;
     users?: { id: string; name?: string | null; usertag?: string | null; profileImage?: string | null } | null;
+}
+
+/** A gift held for an address with no account yet (it turns real when they join). */
+interface PendingGrant {
+    id: string;
+    email: string;
+    name?: string | null;
+    createdAt: string;
 }
 
 interface Invitation {
@@ -108,6 +116,11 @@ export function BuyersView({
     const UserAvatar = ConfigAvatar ?? UserAvatarFallback;
 
     const [grants, setGrants] = React.useState<Grant[] | null>(null);
+    const [pendingGrants, setPendingGrants] = React.useState<PendingGrant[]>([]);
+    /* Approved applicants with no account yet. Only a leader who reviews
+       applications may list them; anyone else gets nothing here. */
+    const [awaiting, setAwaiting] = React.useState<Array<{ email: string; name: string | null }>>([]);
+    const [confirmRevokePending, setConfirmRevokePending] = React.useState<PendingGrant | null>(null);
     const [invites, setInvites] = React.useState<Invitation[] | null>(null);
     const [customers, setCustomers] = React.useState<Customer[] | null>(null);
     /** The customer whose download/licence detail is open in the drawer, if any. */
@@ -131,20 +144,33 @@ export function BuyersView({
 
     const load = React.useCallback(async () => {
         const headers = authHeaders();
-        const [g, i, c] = await Promise.all([
+        const [g, i, c, p] = await Promise.all([
             fetch(`${apiBaseUrl}/api/products/${product.id}/access-grants`, { headers })
                 .then((r) => (r.ok ? r.json() : [])).catch(() => []),
             fetch(`${apiBaseUrl}/api/products/${product.id}/invitations`, { headers })
                 .then((r) => (r.ok ? r.json() : [])).catch(() => []),
             fetch(`${apiBaseUrl}/api/products/${product.id}/customers`, { headers })
                 .then((r) => (r.ok ? r.json() : [])).catch(() => []),
+            fetch(`${apiBaseUrl}/api/products/${product.id}/access-grants/pending`, { headers })
+                .then((r) => (r.ok ? r.json() : [])).catch(() => []),
         ]);
         setGrants(Array.isArray(g) ? g : []);
+        setPendingGrants(Array.isArray(p) ? p : []);
         setInvites(Array.isArray(i) ? i : []);
         setCustomers(Array.isArray(c) ? c : []);
     }, [apiBaseUrl, authHeaders, product.id]);
 
     React.useEffect(() => { load(); }, [load]);
+
+    React.useEffect(() => {
+        if (!communityTag || !mayEdit) { setAwaiting([]); return; }
+        let cancelled = false;
+        fetch(`${apiBaseUrl}/api/communities/${encodeURIComponent(communityTag)}/members/awaiting-account`, { headers: authHeaders() })
+            .then((r) => (r.ok ? r.json() : { people: [] }))
+            .then((data) => { if (!cancelled) setAwaiting(Array.isArray(data?.people) ? data.people : []); })
+            .catch(() => { if (!cancelled) setAwaiting([]); });
+        return () => { cancelled = true; };
+    }, [apiBaseUrl, authHeaders, communityTag, mayEdit]);
 
     /**
      * Open a customer's download/licence detail in the drawer, fetched once
@@ -167,6 +193,12 @@ export function BuyersView({
             setCustomerDetails((d) => ({ ...d, [customer.id]: "error" }));
         }
     }, [apiBaseUrl, authHeaders, product.id, customerDetails]);
+
+    /* Approved applicants to offer, minus anyone already holding a waiting gift. */
+    const awaitingToOffer = React.useMemo(() => {
+        const held = new Set(pendingGrants.map((p) => p.email.toLowerCase()));
+        return awaiting.filter((a) => !held.has(a.email.toLowerCase()));
+    }, [awaiting, pendingGrants]);
 
     /** Everyone who already has it or has been asked — never offered again. */
     const excludeUserIds = React.useMemo(() => [
@@ -222,11 +254,17 @@ export function BuyersView({
     } : undefined;
 
     async function giveAccess(recipients: Recipient[]) {
-        /* Keyed by user id, unlike invitations: a grant writes a row against
-           an account, so this picker is mounted without `emails` and there is
-           nobody here without one. */
+        /* Accounts by id; addresses with no account become gifts that wait for
+           them to join (an approved applicant, a speaker). */
         const userIds = userIdsOf(recipients);
-        if (userIds.length === 0) throw new Error("Choose at least one person.");
+        const emails = emailsOf(recipients);
+        if (userIds.length === 0 && emails.length === 0) throw new Error("Choose at least one person.");
+        const names = recipients
+            .filter((r) => !r.id && r.email && r.name)
+            .map((r) => ({ email: r.email!, name: String(r.name) }));
+        /* An address has no id to key a per-person variant on, so it takes the
+           variant chosen for the batch. */
+        const emailTierId = recipients.find((r) => !r.id && r.tierId)?.tierId;
         /* Per person, because an imported list can mix variants. The server
            checks every id belongs to this product and refuses otherwise. */
         const tierAssignments = recipients
@@ -236,7 +274,10 @@ export function BuyersView({
             method: "POST",
             headers: jsonHeaders(),
             body: JSON.stringify({
-                userIds,
+                userIds: userIds.length > 0 ? userIds : undefined,
+                emails: emails.length > 0 ? emails : undefined,
+                names: names.length > 0 ? names : undefined,
+                tierId: emailTierId || undefined,
                 tierAssignments: tierAssignments.length > 0 ? tierAssignments : undefined,
             }),
         });
@@ -250,9 +291,13 @@ export function BuyersView({
          * batch, so a partial result has to be SAID. Silently claiming five
          * when three landed is worse than the failure.
          */
-        const body = await res.json().catch(() => ({ granted: userIds, failed: [] }));
+        const body = await res.json().catch(() => ({ granted: userIds, pending: emails, failed: [] }));
         if (Array.isArray(body.failed) && body.failed.length > 0) {
-            throw new Error(`${body.granted?.length ?? 0} added, ${body.failed.length} could not be.`);
+            const done = (body.granted?.length ?? 0) + (body.pending?.length ?? 0);
+            const reasons = body.failed
+                .filter((f: any) => f && typeof f === "object" && f.reason)
+                .map((f: any) => `${f.email || "someone"}: ${f.reason}`);
+            throw new Error(`${done} added, ${body.failed.length} could not be.${reasons.length > 0 ? ` ${reasons.join("; ")}` : ""}`);
         }
     }
 
@@ -276,6 +321,26 @@ export function BuyersView({
             const body = await res.json().catch(() => null);
             if (res.status === 403) throw new Error("You don't have permission to manage this product.");
             throw new Error(body?.error || `Could not send invitations (${res.status})`);
+        }
+    }
+
+    async function revokePending(p: PendingGrant) {
+        if (busy) return;
+        setBusy(true);
+        setError(null);
+        try {
+            const res = await fetch(`${apiBaseUrl}/api/products/${product.id}/access-grants/pending/${p.id}`, {
+                method: "DELETE", headers: authHeaders(),
+            });
+            if (res.ok || res.status === 404) {
+                await load();
+                showToast("Access removed");
+                setConfirmRevokePending(null);
+            } else {
+                setError("Could not remove that access");
+            }
+        } finally {
+            setBusy(false);
         }
     }
 
@@ -351,7 +416,7 @@ export function BuyersView({
             <div className="mt-5">
             <Section
                 title="Has access"
-                count={grants?.length}
+                count={grants === null ? undefined : grants.length + pendingGrants.length}
                 subtitle="Given the product for free. Not a sale."
                 action={mayEdit ? (
                     <button
@@ -364,7 +429,7 @@ export function BuyersView({
             >
                 {grants === null ? (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
-                ) : grants.length === 0 ? (
+                ) : grants.length === 0 && pendingGrants.length === 0 ? (
                     <CompactEmptyRow
                         icon={<PeopleIcon />}
                         title="Nobody has been given this yet"
@@ -373,6 +438,27 @@ export function BuyersView({
                 ) : (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
                     <ul className="divide-y divide-zinc-100">
+                        {/* Given to an address that has no account yet. It is
+                            theirs the moment they join with that address. */}
+                        {pendingGrants.map((p) => (
+                            <li key={`pending-${p.id}`} className="flex items-center gap-3 px-5 py-3">
+                                <UserAvatar user={{ id: p.email, name: p.name ?? p.email }} className="w-8 h-8 shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-[13px] text-zinc-900 truncate">{p.name || p.email}</p>
+                                    <p className="text-[11px] text-zinc-400 truncate">
+                                        {p.name ? `${p.email} · ` : ""}Waiting for them to join
+                                    </p>
+                                </div>
+                                {mayEdit && (
+                                    <button
+                                        onClick={() => setConfirmRevokePending(p)}
+                                        className="px-3 py-1.5 text-[12px] rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200 shrink-0"
+                                    >
+                                        Remove
+                                    </button>
+                                )}
+                            </li>
+                        ))}
                         {grants.map((g) => (
                             <li key={g.id} className="flex items-center gap-3 px-5 py-3">
                                 <UserAvatar user={g.users ?? { id: g.userId }} className="w-8 h-8 shrink-0" />
@@ -504,6 +590,25 @@ export function BuyersView({
                     UserAvatar={UserAvatar}
                     multiple
                     tierStep={tierStep}
+                    /*
+                     * Addresses too: somebody without an account (an approved
+                     * applicant who has not joined, a guest) is given the
+                     * product now and has it the moment they join with that
+                     * address.
+                     */
+                    emails={{
+                        addRow: (a) => `Give to ${a}`,
+                        importCsv: "Import CSV",
+                        imported: (n) => `Imported ${n} ${n === 1 ? "address" : "addresses"}.`,
+                        importedNothing: "No email addresses in the first column of that file.",
+                        importFailed: "That file could not be read.",
+                        noMatchesHint: "Not a member yet? Type their full email address. They get it as soon as they join.",
+                    }}
+                    outsiders={awaitingToOffer.length > 0 ? {
+                        label: "Approved, not joined yet",
+                        note: "Hasn't joined yet",
+                        people: awaitingToOffer,
+                    } : undefined}
                     copy={{
                         ...BASE_COPY,
                         title: "Give access",
@@ -515,7 +620,7 @@ export function BuyersView({
                     stepTwo={{
                         kind: "consequences",
                         items: [
-                            "They get the product immediately, free. No payment is taken.",
+                            "They get the product immediately, free. No payment is taken. Someone without an account gets it as soon as they join with that address.",
                             "This is not a sale: no commission, and nothing appears in the ledger.",
                             "You can take the access away again later.",
                         ],
@@ -611,6 +716,31 @@ export function BuyersView({
                         </button>
                         <button
                             onClick={() => revoke(confirmRevoke)}
+                            disabled={busy}
+                            className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-40 cursor-pointer"
+                        >
+                            {busy ? "Removing…" : "Remove access"}
+                        </button>
+                    </div>
+                </ModalShell>
+            )}
+
+            {confirmRevokePending && (
+                <ModalShell onClose={() => setConfirmRevokePending(null)}>
+                    <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">Remove access?</h3>
+                    <p className="text-[12px] text-zinc-500 mb-4">
+                        {confirmRevokePending.name || confirmRevokePending.email} will not get{" "}
+                        {product?.name ?? "this product"} when they join.
+                    </p>
+                    <div className="flex justify-end gap-2">
+                        <button
+                            onClick={() => setConfirmRevokePending(null)}
+                            className="px-4 py-2 text-[13px] rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={() => revokePending(confirmRevokePending)}
                             disabled={busy}
                             className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-40 cursor-pointer"
                         >
