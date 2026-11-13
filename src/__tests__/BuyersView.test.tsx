@@ -315,16 +315,58 @@ describe("giving access", () => {
         expect(posted(fetchMock, /access-grants/)).toEqual({ userIds: ["u-ana"] });
     });
 
-    it("offers nobody without an account, since there would be nothing to grant to", async () => {
-        // The invite flow below deliberately does the opposite.
+    it("gives to an address with no account; it waits for them to join", async () => {
+        // Pathseekers, 2026-11-13: an approved applicant had no account yet.
         const user = userEvent.setup();
-        renderView();
+        const fetchMock = renderView([
+            { method: "POST", url: /\/access-grants$/, body: { granted: [], pending: ["outsider@example.com"], failed: [] } },
+        ]);
 
         await user.click(await screen.findByText("Give access"));
         await screen.findByText("Ana Neto");
         await user.type(screen.getByPlaceholderText(/Search by name/), "outsider@example.com");
-        await waitFor(() => expect(screen.getByText("No matches.")).toBeInTheDocument());
-        expect(screen.queryByText(/^Invite outsider/)).not.toBeInTheDocument();
+        await user.click(await screen.findByText("Give to outsider@example.com"));
+        await user.click(screen.getByRole("button", { name: "Review" }));
+        await user.click(screen.getAllByRole("button", { name: "Give access" }).at(-1)!);
+
+        await waitFor(() => expect(posted(fetchMock, /access-grants/)).toBeTruthy());
+        expect(posted(fetchMock, /access-grants/)).toEqual({ emails: ["outsider@example.com"] });
+    });
+
+    it("lists approved applicants who have not joined, and gives by their address", async () => {
+        const user = userEvent.setup();
+        const fetchMock = renderView([
+            { method: "GET", url: /\/members\/awaiting-account$/, body: { people: [{ email: "malgo@example.com", name: "Malgorzata Grzasko" }] } },
+            { method: "POST", url: /\/access-grants$/, body: { granted: [], pending: ["malgo@example.com"], failed: [] } },
+        ]);
+
+        await user.click(await screen.findByText("Give access"));
+        expect(await screen.findByText("Approved, not joined yet")).toBeInTheDocument();
+        await user.click(screen.getByText("Malgorzata Grzasko"));
+        await user.click(screen.getByRole("button", { name: "Review" }));
+        await user.click(screen.getAllByRole("button", { name: "Give access" }).at(-1)!);
+
+        await waitFor(() => expect(posted(fetchMock, /access-grants/)).toBeTruthy());
+        expect(posted(fetchMock, /access-grants/)).toEqual({
+            emails: ["malgo@example.com"],
+            names: [{ email: "malgo@example.com", name: "Malgorzata Grzasko" }],
+        });
+    });
+
+    it("shows a waiting gift under Has access, and can withdraw it", async () => {
+        const user = userEvent.setup();
+        const fetchMock = renderView([
+            { method: "GET", url: /\/access-grants\/pending$/, body: [{ id: "pg-1", email: "malgo@example.com", name: "Malgorzata", createdAt: "2026-11-13T10:00:00Z" }] },
+            { method: "DELETE", url: /\/access-grants\/pending\/pg-1$/, status: 200, body: {} },
+        ]);
+
+        expect(await screen.findByText("Malgorzata")).toBeInTheDocument();
+        expect(screen.getByText(/Waiting for them to join/)).toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: "Remove" }));
+        await user.click(await screen.findByRole("button", { name: "Remove access" }));
+        await waitFor(() => expect(
+            fetchMock.mock.calls.some(([u, init]: any) => /pending\/pg-1$/.test(String(u)) && init?.method === "DELETE"),
+        ).toBe(true));
     });
 
     it("says so when only some of them landed", async () => {
