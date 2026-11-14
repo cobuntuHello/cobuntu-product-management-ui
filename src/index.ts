@@ -152,7 +152,7 @@ export { MarkdownEditor, type MarkdownEditorProps } from "./ui/markdown-editor";
 export { FileUploadZone, type UploadedFile } from "./ui/file-upload-zone";
 export { StockPhotoPicker } from "./ui/stock-photo-picker";
 export { BannerCropModal, type BannerCropResult } from "./ui/banner-crop-modal";
-export { FocalPointModal, type FocalPoint } from "./ui/focal-point-modal";
+export type { FocalPoint } from "./ui/sortable-media-gallery";
 export { SortableMediaGallery, type MediaItem } from "./ui/sortable-media-gallery";
 // The one shape + size a product/course cover is shown and designed at.
 export { COVER_ASPECT, COVER_SIZE, COVER_SIZE_HINT } from "./lib/coverFormat";
