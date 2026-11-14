@@ -162,10 +162,10 @@ describe("customers", () => {
      * `findByText("Give access")`-style queries — fixed by dropping the
      * inline action entirely rather than by giving it a different label.
      */
-    it("shows exactly one Give access and one Invite to buy button, each beside its own section", async () => {
+    it("shows exactly one Send a gift and one Invite to buy button, each beside its own section", async () => {
         renderWithCustomers([]);
         await screen.findByText("Nobody has bought this yet");
-        expect(screen.getAllByText("Give access")).toHaveLength(1);
+        expect(screen.getAllByText("Send a gift")).toHaveLength(1);
         expect(screen.getAllByText("Invite to buy")).toHaveLength(1);
     });
 
@@ -177,7 +177,7 @@ describe("customers", () => {
               user: { id: "u-ana", name: "Ana Neto", usertag: "ana-neto", profileImage: null } },
         ]);
 
-        await user.click(await screen.findByText("Give access"));
+        await user.click(await screen.findByText("Send a gift"));
         await screen.findByText("Bo Silva");
         // "Ana Neto" still appears once, in the Customers list behind the
         // modal — but not a SECOND time in the picker roster.
@@ -304,12 +304,10 @@ describe("giving access", () => {
             { method: "POST", url: /\/access-grants$/, body: { granted: ["u-ana"], failed: [] } },
         ]);
 
-        await user.click(await screen.findByText("Give access"));
+        await user.click(await screen.findByText("Send a gift"));
         await user.click(await screen.findByText("Ana Neto"));
-        await user.click(screen.getByRole("button", { name: "Review" }));
-        // Two buttons carry the action's name: the one that opened the modal
-        // and the one that performs it. The confirm is the later.
-        await user.click(screen.getAllByRole("button", { name: "Give access" }).at(-1)!);
+        await user.click(screen.getByRole("button", { name: "Write and preview" }));
+        await user.click(screen.getByRole("button", { name: "Send gift" }));
 
         await waitFor(() => expect(posted(fetchMock, /access-grants/)).toBeTruthy());
         expect(posted(fetchMock, /access-grants/)).toEqual({ userIds: ["u-ana"] });
@@ -322,12 +320,12 @@ describe("giving access", () => {
             { method: "POST", url: /\/access-grants$/, body: { granted: [], pending: ["outsider@example.com"], failed: [] } },
         ]);
 
-        await user.click(await screen.findByText("Give access"));
+        await user.click(await screen.findByText("Send a gift"));
         await screen.findByText("Ana Neto");
         await user.type(screen.getByPlaceholderText(/Search by name/), "outsider@example.com");
-        await user.click(await screen.findByText("Give to outsider@example.com"));
-        await user.click(screen.getByRole("button", { name: "Review" }));
-        await user.click(screen.getAllByRole("button", { name: "Give access" }).at(-1)!);
+        await user.click(await screen.findByText("Send to outsider@example.com"));
+        await user.click(screen.getByRole("button", { name: "Write and preview" }));
+        await user.click(screen.getByRole("button", { name: "Send gift" }));
 
         await waitFor(() => expect(posted(fetchMock, /access-grants/)).toBeTruthy());
         expect(posted(fetchMock, /access-grants/)).toEqual({ emails: ["outsider@example.com"] });
@@ -340,11 +338,11 @@ describe("giving access", () => {
             { method: "POST", url: /\/access-grants$/, body: { granted: [], pending: ["malgo@example.com"], failed: [] } },
         ]);
 
-        await user.click(await screen.findByText("Give access"));
+        await user.click(await screen.findByText("Send a gift"));
         expect(await screen.findByText("Approved, not joined yet")).toBeInTheDocument();
         await user.click(screen.getByText("Malgorzata Grzasko"));
-        await user.click(screen.getByRole("button", { name: "Review" }));
-        await user.click(screen.getAllByRole("button", { name: "Give access" }).at(-1)!);
+        await user.click(screen.getByRole("button", { name: "Write and preview" }));
+        await user.click(screen.getByRole("button", { name: "Send gift" }));
 
         await waitFor(() => expect(posted(fetchMock, /access-grants/)).toBeTruthy());
         expect(posted(fetchMock, /access-grants/)).toEqual({
@@ -353,7 +351,7 @@ describe("giving access", () => {
         });
     });
 
-    it("shows a waiting gift under Has access, and can withdraw it", async () => {
+    it("shows a waiting gift under Gifted, and can take it back", async () => {
         const user = userEvent.setup();
         const fetchMock = renderView([
             { method: "GET", url: /\/access-grants\/pending$/, body: [{ id: "pg-1", email: "malgo@example.com", name: "Malgorzata", createdAt: "2026-11-13T10:00:00Z" }] },
@@ -361,11 +359,56 @@ describe("giving access", () => {
         ]);
 
         expect(await screen.findByText("Malgorzata")).toBeInTheDocument();
-        expect(screen.getByText(/Waiting for them to join/)).toBeInTheDocument();
+        expect(screen.getByText(/No account yet/)).toBeInTheDocument();
         await user.click(screen.getByRole("button", { name: "Remove" }));
-        await user.click(await screen.findByRole("button", { name: "Remove access" }));
+        await user.click(await screen.findByRole("button", { name: "Take it back" }));
         await waitFor(() => expect(
             fetchMock.mock.calls.some(([u, init]: any) => /pending\/pg-1$/.test(String(u)) && init?.method === "DELETE"),
+        ).toBe(true));
+    });
+
+    it("sends the note with the gift, and previews it with no price", async () => {
+        const user = userEvent.setup();
+        const fetchMock = renderView([
+            { method: "POST", url: /\/access-grants$/, body: { granted: ["u-ana"], failed: [] } },
+        ]);
+
+        await user.click(await screen.findByText("Send a gift"));
+        await user.click(await screen.findByText("Ana Neto"));
+        await user.click(screen.getByRole("button", { name: "Write and preview" }));
+        await user.type(screen.getByPlaceholderText(/Add a note/), "For our session on Tuesday");
+        expect(screen.getByText("A gift for you")).toBeInTheDocument();
+        expect(screen.getAllByText("For our session on Tuesday").length).toBeGreaterThan(0);
+        // You do not leave the price tag on a present.
+        expect(screen.queryByText(/24\.00/)).not.toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: "Send gift" }));
+
+        await waitFor(() => expect(posted(fetchMock, /access-grants/)).toBeTruthy());
+        expect(posted(fetchMock, /access-grants/)).toEqual({ userIds: ["u-ana"], note: "For our session on Tuesday" });
+    });
+
+    it("says when a gift was opened, and when it was not yet", async () => {
+        renderView([
+            { method: "GET", url: /\/access-grants$/, body: [
+                { id: "g1", userId: "u-ana", createdAt: "2026-11-13T10:00:00Z", openedAt: "2026-11-14T10:00:00Z", users: { id: "u-ana", name: "Ana Neto", usertag: "ana-neto" } },
+                { id: "g2", userId: "u-bo", createdAt: "2026-11-13T10:00:00Z", openedAt: null, users: { id: "u-bo", name: "Bo Silva", usertag: "bo" } },
+            ] },
+        ]);
+        expect(await screen.findByText("Opened 14 Nov")).toBeInTheDocument();
+        expect(screen.getByText("Not opened yet")).toBeInTheDocument();
+    });
+
+    it("sends a waiting gift's email again", async () => {
+        const user = userEvent.setup();
+        const fetchMock = renderView([
+            { method: "GET", url: /\/access-grants\/pending$/, body: [{ id: "pg-1", email: "malgo@example.com", name: "Malgorzata", createdAt: "2026-11-13T10:00:00Z", lastSentAt: "2026-11-14T10:00:00Z" }] },
+            { method: "POST", url: /\/access-grants\/pending\/pg-1\/resend$/, status: 200, body: { sent: true } },
+        ]);
+
+        expect(await screen.findByText(/Emailed 14 Nov/)).toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: "Send again" }));
+        await waitFor(() => expect(
+            fetchMock.mock.calls.some(([u, init]: any) => /pending\/pg-1\/resend$/.test(String(u)) && init?.method === "POST"),
         ).toBe(true));
     });
 
@@ -380,13 +423,11 @@ describe("giving access", () => {
             { method: "POST", url: /\/access-grants$/, body: { granted: ["u-ana"], failed: ["u-bo"] } },
         ]);
 
-        await user.click(await screen.findByText("Give access"));
+        await user.click(await screen.findByText("Send a gift"));
         await user.click(await screen.findByText("Ana Neto"));
         await user.click(screen.getByText("Bo Silva"));
-        await user.click(screen.getByRole("button", { name: "Review" }));
-        // Two buttons carry the action's name: the one that opened the modal
-        // and the one that performs it. The confirm is the later.
-        await user.click(screen.getAllByRole("button", { name: "Give access" }).at(-1)!);
+        await user.click(screen.getByRole("button", { name: "Write and preview" }));
+        await user.click(screen.getByRole("button", { name: "Send gift" }));
 
         expect(await screen.findByText("1 added, 1 could not be.")).toBeInTheDocument();
     });
@@ -493,12 +534,12 @@ describe("giving away a specific variant", () => {
             WITH_VARIANTS,
         );
 
-        await user.click(await screen.findByText("Give access"));
+        await user.click(await screen.findByText("Send a gift"));
         await user.click(await screen.findByText("Ana Neto"));
         await user.click(screen.getByRole("button", { name: "Choose a variant" }));
         // Small is the only one with stock, so it is already selected.
-        await user.click(screen.getByRole("button", { name: "Review" }));
-        await user.click(screen.getAllByRole("button", { name: "Give access" }).at(-1)!);
+        await user.click(screen.getByRole("button", { name: "Write and preview" }));
+        await user.click(screen.getByRole("button", { name: "Send gift" }));
 
         await waitFor(() => expect(posted(fetchMock, /access-grants/)).toBeTruthy());
         expect(posted(fetchMock, /access-grants/).tierAssignments).toEqual([
@@ -510,7 +551,7 @@ describe("giving away a specific variant", () => {
         const user = userEvent.setup();
         renderView([], WITH_VARIANTS);
 
-        await user.click(await screen.findByText("Give access"));
+        await user.click(await screen.findByText("Send a gift"));
         await user.click(await screen.findByText("Ana Neto"));
         await user.click(screen.getByRole("button", { name: "Choose a variant" }));
 
@@ -539,10 +580,10 @@ describe("giving away a specific variant", () => {
             [{ method: "POST", url: /\/access-grants$/, body: { granted: ["u-ana"], failed: [] } }],
         );
 
-        await user.click(await screen.findByText("Give access"));
+        await user.click(await screen.findByText("Send a gift"));
         await user.click(await screen.findByText("Ana Neto"));
-        await user.click(screen.getByRole("button", { name: "Review" }));
-        await user.click(screen.getAllByRole("button", { name: "Give access" }).at(-1)!);
+        await user.click(screen.getByRole("button", { name: "Write and preview" }));
+        await user.click(screen.getByRole("button", { name: "Send gift" }));
 
         await waitFor(() => expect(posted(fetchMock, /access-grants/)).toBeTruthy());
         expect(posted(fetchMock, /access-grants/).tierAssignments).toBeUndefined();
