@@ -47,6 +47,8 @@ interface Grant {
     userId: string;
     note?: string | null;
     createdAt: string;
+    /** When they first unwrapped the gift; null = not opened yet. */
+    openedAt?: string | null;
     users?: { id: string; name?: string | null; usertag?: string | null; profileImage?: string | null } | null;
 }
 
@@ -55,7 +57,10 @@ interface PendingGrant {
     id: string;
     email: string;
     name?: string | null;
+    note?: string | null;
     createdAt: string;
+    /** When the gift email last went out ("Send again" moves it). */
+    lastSentAt?: string | null;
 }
 
 interface Invitation {
@@ -121,6 +126,9 @@ export function BuyersView({
        applications may list them; anyone else gets nothing here. */
     const [awaiting, setAwaiting] = React.useState<Array<{ email: string; name: string | null }>>([]);
     const [confirmRevokePending, setConfirmRevokePending] = React.useState<PendingGrant | null>(null);
+    /** The waiting gift whose email is being sent again, if any. */
+    const [resendingId, setResendingId] = React.useState<string | null>(null);
+    const isCourse = product?.productType === "COURSE";
     const [invites, setInvites] = React.useState<Invitation[] | null>(null);
     const [customers, setCustomers] = React.useState<Customer[] | null>(null);
     /** The customer whose download/licence detail is open in the drawer, if any. */
@@ -253,7 +261,12 @@ export function BuyersView({
         },
     } : undefined;
 
-    async function giveAccess(recipients: Recipient[]) {
+    /*
+     * A GIFT (backend docs/features/gifts.md). The note goes in the gift email
+     * and stays with the gift, so the person reads it when they unwrap it and
+     * every time they open it from their library.
+     */
+    async function giveAccess(recipients: Recipient[], message?: string | null) {
         /* Accounts by id; addresses with no account become gifts that wait for
            them to join (an approved applicant, a speaker). */
         const userIds = userIdsOf(recipients);
@@ -279,12 +292,13 @@ export function BuyersView({
                 names: names.length > 0 ? names : undefined,
                 tierId: emailTierId || undefined,
                 tierAssignments: tierAssignments.length > 0 ? tierAssignments : undefined,
+                note: message?.trim() || undefined,
             }),
         });
         if (!res.ok) {
             const body = await res.json().catch(() => null);
             if (res.status === 403) throw new Error("You don't have permission to manage this product.");
-            throw new Error(body?.error || `Could not give access (${res.status})`);
+            throw new Error(body?.error || `Could not send the gift (${res.status})`);
         }
         /*
          * The endpoint reports per-person outcomes rather than failing the
@@ -324,6 +338,26 @@ export function BuyersView({
         }
     }
 
+    /** "Send again": the gift email once more, for someone who has not joined yet. */
+    async function resendPending(p: PendingGrant) {
+        if (resendingId) return;
+        setResendingId(p.id);
+        setError(null);
+        try {
+            const res = await fetch(`${apiBaseUrl}/api/products/${product.id}/access-grants/pending/${p.id}/resend`, {
+                method: "POST", headers: authHeaders(),
+            });
+            if (res.ok) {
+                await load();
+                showToast("Gift email sent again");
+            } else {
+                setError("Could not send the gift email again");
+            }
+        } finally {
+            setResendingId(null);
+        }
+    }
+
     async function revokePending(p: PendingGrant) {
         if (busy) return;
         setBusy(true);
@@ -334,7 +368,7 @@ export function BuyersView({
             });
             if (res.ok || res.status === 404) {
                 await load();
-                showToast("Access removed");
+                showToast("Gift taken back");
                 setConfirmRevokePending(null);
             } else {
                 setError("Could not remove that access");
@@ -355,7 +389,7 @@ export function BuyersView({
             if (res.ok) {
                 await load();
                 await onUpdate();
-                showToast("Access removed");
+                showToast("Gift taken back");
                 setConfirmRevoke(null);
             } else {
                 setError("Could not remove that access");
@@ -415,15 +449,16 @@ export function BuyersView({
 
             <div className="mt-5">
             <Section
-                title="Has access"
+                title="Gifted"
                 count={grants === null ? undefined : grants.length + pendingGrants.length}
-                subtitle="Given the product for free. Not a sale."
+                subtitle="Given free, as a gift. Not a sale."
                 action={mayEdit ? (
                     <button
                         onClick={() => setMode("grant")}
-                        className="shrink-0 px-3 py-1.5 text-[12px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
+                        className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
                     >
-                        Give access
+                        <GiftIcon />
+                        Send a gift
                     </button>
                 ) : undefined}
             >
@@ -432,8 +467,10 @@ export function BuyersView({
                 ) : grants.length === 0 && pendingGrants.length === 0 ? (
                     <CompactEmptyRow
                         icon={<PeopleIcon />}
-                        title="Nobody has been given this yet"
-                        hint="Hand somebody the product without charging them."
+                        title="No gifts yet"
+                        hint={isCourse
+                            ? "Give somebody this course as a gift. They get an email with your note."
+                            : "Give somebody this product as a gift. They get an email with your note."}
                     />
                 ) : (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
@@ -446,9 +483,19 @@ export function BuyersView({
                                 <div className="min-w-0 flex-1">
                                     <p className="text-[13px] text-zinc-900 truncate">{p.name || p.email}</p>
                                     <p className="text-[11px] text-zinc-400 truncate">
-                                        {p.name ? `${p.email} · ` : ""}Waiting for them to join
+                                        {p.name ? `${p.email} · ` : ""}No account yet
+                                        {` · Emailed ${shortDate(p.lastSentAt || p.createdAt)}`}
                                     </p>
                                 </div>
+                                {mayEdit && (
+                                    <button
+                                        onClick={() => resendPending(p)}
+                                        disabled={resendingId === p.id}
+                                        className="px-3 py-1.5 text-[12px] rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200 disabled:opacity-50 shrink-0"
+                                    >
+                                        {resendingId === p.id ? "Sending…" : "Send again"}
+                                    </button>
+                                )}
                                 {mayEdit && (
                                     <button
                                         onClick={() => setConfirmRevokePending(p)}
@@ -468,6 +515,10 @@ export function BuyersView({
                                         <p className="text-[11px] text-zinc-400 truncate">@{g.users.usertag}</p>
                                     )}
                                 </div>
+                                {/* Did the gift land? A muted word, not a coloured pill. */}
+                                <span className="text-[11.5px] text-zinc-400 shrink-0">
+                                    {g.openedAt ? `Opened ${shortDate(g.openedAt)}` : "Not opened yet"}
+                                </span>
                                 {mayEdit && (
                                     <button
                                         onClick={() => setConfirmRevoke(g)}
@@ -597,12 +648,14 @@ export function BuyersView({
                      * address.
                      */
                     emails={{
-                        addRow: (a) => `Give to ${a}`,
+                        addRow: (a) => `Send to ${a}`,
                         importCsv: "Import CSV",
                         imported: (n) => `Imported ${n} ${n === 1 ? "address" : "addresses"}.`,
                         importedNothing: "No email addresses in the first column of that file.",
                         importFailed: "That file could not be read.",
-                        noMatchesHint: "Not a member yet? Type their full email address. They get it as soon as they join.",
+                        noMatchesHint: isCourse
+                            ? "Not a member yet? Type their full email address. The course is theirs as soon as they join."
+                            : "Not a member yet? Type their full email address. They can download it from the email, no account needed.",
                     }}
                     outsiders={awaitingToOffer.length > 0 ? {
                         label: "Approved, not joined yet",
@@ -611,26 +664,31 @@ export function BuyersView({
                     } : undefined}
                     copy={{
                         ...BASE_COPY,
-                        title: "Give access",
-                        pickedSubtitle: "They get the product free. This is not a sale.",
-                        stepTwo: "Review",
-                        confirm: "Give access",
-                        confirming: "Giving access…",
+                        title: "Send a gift",
+                        pickedSubtitle: "They get it free, with your note. This is not a sale.",
+                        stepTwo: "Write and preview",
+                        confirm: "Send gift",
+                        confirming: "Sending…",
+                        messageLabel: "Your note",
+                        messagePlaceholder: "Add a note. It's in the gift email and stays with the gift.",
                     }}
                     stepTwo={{
-                        kind: "consequences",
-                        items: [
-                            "They get the product immediately, free. No payment is taken. Someone without an account gets it as soon as they join with that address.",
-                            "This is not a sale: no commission, and nothing appears in the ledger.",
-                            "You can take the access away again later.",
-                        ],
+                        kind: "compose",
+                        maxLength: 1000,
+                        preview: (message) => (
+                            <GiftPreview
+                                productName={product?.name ?? (isCourse ? "this course" : "this product")}
+                                isCourse={isCourse}
+                                message={message}
+                            />
+                        ),
                     }}
                     onConfirm={giveAccess}
                     onAdded={async () => {
                         setMode(null);
                         await load();
                         await onUpdate();
-                        showToast("Access given");
+                        showToast("Gift sent");
                     }}
                 />
             )}
@@ -699,7 +757,7 @@ export function BuyersView({
 
             {confirmRevoke && (
                 <ModalShell onClose={() => setConfirmRevoke(null)}>
-                    <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">Remove access?</h3>
+                    <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">Take the gift back?</h3>
                     <p className="text-[12px] text-zinc-500 mb-4">
                         {confirmRevoke.users?.name || "This person"} will no longer be able to open{" "}
                         {product?.name ?? "this product"}.
@@ -719,7 +777,7 @@ export function BuyersView({
                             disabled={busy}
                             className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-40 cursor-pointer"
                         >
-                            {busy ? "Removing…" : "Remove access"}
+                            {busy ? "Removing…" : "Take it back"}
                         </button>
                     </div>
                 </ModalShell>
@@ -727,10 +785,10 @@ export function BuyersView({
 
             {confirmRevokePending && (
                 <ModalShell onClose={() => setConfirmRevokePending(null)}>
-                    <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">Remove access?</h3>
+                    <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">Take the gift back?</h3>
                     <p className="text-[12px] text-zinc-500 mb-4">
                         {confirmRevokePending.name || confirmRevokePending.email} will not get{" "}
-                        {product?.name ?? "this product"} when they join.
+                        {product?.name ?? "this product"} when they join, and the download link in their email stops working.
                     </p>
                     <div className="flex justify-end gap-2">
                         <button
@@ -744,7 +802,7 @@ export function BuyersView({
                             disabled={busy}
                             className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-40 cursor-pointer"
                         >
-                            {busy ? "Removing…" : "Remove access"}
+                            {busy ? "Removing…" : "Take it back"}
                         </button>
                     </div>
                 </ModalShell>
@@ -886,6 +944,66 @@ function EmailPreview({
                 </span>
             </div>
         </div>
+    );
+}
+
+/** "14 Nov": a short day and month. */
+function shortDate(iso: string): string {
+    try {
+        return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    } catch {
+        return "";
+    }
+}
+
+/**
+ * What the person receives: the gift email in miniature (badge, "A gift for
+ * you", the item, the note as a gift tag, the button). No price: you do not
+ * leave the price tag on a present. Then what happens, in plain words.
+ */
+function GiftPreview({ productName, isCourse, message }: { productName: string; isCourse: boolean; message: string }) {
+    return (
+        <div className="flex flex-col gap-3">
+            <div className="rounded-xl border border-zinc-200 overflow-hidden">
+                <div className="px-3 py-1.5 border-b border-zinc-100 bg-zinc-50 text-[11px] text-zinc-400">
+                    Email preview
+                </div>
+                <div className="p-3.5 flex flex-col items-center text-center">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-white">
+                        <GiftIcon size={16} />
+                    </span>
+                    <p className="m-0 mt-2 text-[10.5px] font-bold uppercase tracking-[0.12em] text-zinc-500">A gift for you</p>
+                    <p className="m-0 mt-0.5 text-[13px] font-semibold text-zinc-900">{productName}</p>
+                    {message.trim() && (
+                        <p className="m-0 mt-2.5 w-full rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-2.5 py-2 text-left text-[12px] italic text-zinc-700 whitespace-pre-line">
+                            {message}
+                        </p>
+                    )}
+                    <span className="mt-3 inline-block rounded-md bg-zinc-900 px-3 py-1.5 text-[11.5px] font-medium text-white">
+                        {isCourse ? "Start the course" : "Open your gift"}
+                    </span>
+                </div>
+            </div>
+            <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[12px] text-zinc-600">
+                <li>They get it right away, free. No payment is taken.</li>
+                <li>{isCourse
+                    ? "Someone without an account gets it as soon as they join with that address."
+                    : "Someone without an account can download it straight from the email, or join to keep it in their library."}</li>
+                <li>Not a sale: no commission, nothing in the ledger.</li>
+                <li>You can take the gift back later.</li>
+            </ul>
+        </div>
+    );
+}
+
+function GiftIcon({ size = 14 }: { size?: number }) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3" y="8" width="18" height="4" rx="1" />
+            <path d="M12 8v13" />
+            <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" />
+            <path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" />
+        </svg>
     );
 }
 
