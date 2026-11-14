@@ -450,9 +450,32 @@ describe("the commission step", () => {
     expect(screen.getByText("15%")).toBeInTheDocument();
     expect(screen.getByText("Card processing")).toBeInTheDocument();
     expect(screen.getByText("Cobuntu")).toBeInTheDocument();
-    // 2.5% platform rate, same 1.5%/€0.25 processing split PackagePicker always uses.
+    // 2.5% platform rate on top of Stripe's 1.5%, the fixed parts in the
+    // item's currency (the fixture is priced in dollars: $0.35 all-in, of
+    // which Stripe $0.30; multi-currency MC3c).
+    expect(screen.getByText("1.5% + $0.30")).toBeInTheDocument();
+    expect(screen.getByText("2.5% + $0.05")).toBeInTheDocument();
+  });
+
+  it("states the fixed parts in the item's currency: euros as always, pounds in pence", async () => {
+    h.fake = fake({ currency: "EUR" });
+    const { unmount } = await toCommissionStep({
+      transport: transport({ myPackages: twoPackages }),
+      community: { tag: "orbis", id: "c1", name: "Orbis", memberFeeModel: "FLAT", memberRequireApproval: true, platformFeeRate: 0.025 },
+    });
+    await screen.findByText("Standard");
     expect(screen.getByText("1.5% + €0.25")).toBeInTheDocument();
     expect(screen.getByText("2.5% + €0.05")).toBeInTheDocument();
+    unmount();
+
+    h.fake = fake({ currency: "GBP" });
+    await toCommissionStep({
+      transport: transport({ myPackages: twoPackages }),
+      community: { tag: "orbis", id: "c1", name: "Orbis", memberFeeModel: "FLAT", memberRequireApproval: true, platformFeeRate: 0.025 },
+    });
+    await screen.findByText("Standard");
+    expect(screen.getByText("1.5% + £0.20")).toBeInTheDocument();
+    expect(screen.getByText("2.5% + £0.05")).toBeInTheDocument();
   });
 
   it("zeroes Cobuntu's cut when the host reports a premium community (platformFeeRate 0)", async () => {
@@ -461,7 +484,7 @@ describe("the commission step", () => {
       community: { tag: "orbis", id: "c1", name: "Orbis", memberFeeModel: "FLAT", memberRequireApproval: true, platformFeeRate: 0 },
     });
     await screen.findByText("Standard");
-    expect(screen.getByText("0% + €0.05")).toBeInTheDocument();
+    expect(screen.getByText("0% + $0.05")).toBeInTheDocument();
   });
 
   it("still shows the no-packages note when the community has published none", async () => {
@@ -479,8 +502,8 @@ describe("the commission step", () => {
     });
     expect(screen.getByText("Card processing")).toBeInTheDocument();
     expect(screen.getByText("Cobuntu")).toBeInTheDocument();
-    expect(screen.getByText("1.5% + €0.25")).toBeInTheDocument();
-    expect(screen.getByText("2.5% + €0.05")).toBeInTheDocument();
+    expect(screen.getByText("1.5% + $0.30")).toBeInTheDocument();
+    expect(screen.getByText("2.5% + $0.05")).toBeInTheDocument();
   });
 
   it("never claims the community hasn't published terms when the fetch simply failed", async () => {

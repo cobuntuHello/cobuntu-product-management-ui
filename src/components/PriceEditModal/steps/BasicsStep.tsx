@@ -10,6 +10,7 @@ import { getSymbol, isTierLocked } from "../helpers";
 import { Collapse, Eyebrow, StepInput } from "../_primitives";
 import { MembersStep } from "./MembersStep";
 import type { MemberPricingRow, MemberPricingTierState } from "../member-pricing";
+import { PayoutsInEurosNote } from "../../PayoutsInEurosNote";
 
 export interface BasicsStepProps {
   t: DraftTier;
@@ -131,6 +132,7 @@ export function BasicsStep({
               ))}
             </SelectContent>
           </Select>
+          <PayoutsInEurosNote currency={t.currency} />
         </div>
       </div>
 

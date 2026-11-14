@@ -6,6 +6,7 @@ import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Plus, Trash2, ChevronDown, ChevronRight as ChevronRightIcon } from "lucide-react";
+import { PayoutsInEurosNote } from "./PayoutsInEurosNote";
 
 /**
  * Tier list + donations block for product create / edit.
@@ -264,6 +265,7 @@ function TierRow({
                   {SUPPORTED_CURRENCIES.map(c => <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <PayoutsInEurosNote currency={tier.currency} />
             </div>
             <div className="space-y-2">
               <Label>Pricing mode</Label>
