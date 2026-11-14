@@ -53,4 +53,15 @@ describe("media tiles", () => {
         const { container } = renderGallery();
         expect(container.innerHTML).toContain("Click to crop");
     });
+
+    it("offers no card focal point, since cards no longer trim the cover", () => {
+        /*
+         * "Choose what the card shows" aimed the card's trim. Cards now show the
+         * whole cover over a blurred fill (community app CardCover), so the
+         * control would preview a crop that never happens.
+         */
+        const { container, queryByLabelText } = renderGallery();
+        expect(queryByLabelText("Choose what the card shows")).toBeNull();
+        expect(container.innerHTML).not.toContain("Choose what the card shows");
+    });
 });
