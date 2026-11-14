@@ -50,11 +50,14 @@ const LISTS = [
 
 function renderView(routes: any[] = [], product: any = PRODUCT) {
     const fetchMock = mockFetch([...LISTS, ROSTER, ...routes]);
+    // The toast, reachable from a test as fetchMock.toast.
+    const toast = vi.fn();
+    (fetchMock as any).toast = toast;
     renderWithConfig(
         <BuyersView
             product={product}
             onUpdate={vi.fn()}
-            showToast={vi.fn()}
+            showToast={toast}
             communityTag="c"
             currentUserId="u-own"
         />,
@@ -410,6 +413,16 @@ describe("giving access", () => {
         await waitFor(() => expect(
             fetchMock.mock.calls.some(([u, init]: any) => /pending\/pg-1\/resend$/.test(String(u)) && init?.method === "POST"),
         ).toBe(true));
+    });
+
+    it("says when a waiting gift was already emailed today", async () => {
+        const user = userEvent.setup();
+        const fetchMock = renderView([
+            { method: "GET", url: /\/access-grants\/pending$/, body: [{ id: "pg-1", email: "malgo@example.com", name: "Malgorzata", createdAt: "2026-11-13T10:00:00Z", lastSentAt: "2026-11-14T10:00:00Z" }] },
+            { method: "POST", url: /\/access-grants\/pending\/pg-1\/resend$/, status: 200, body: { sent: false, alreadySentToday: true } },
+        ]);
+        await user.click(await screen.findByRole("button", { name: "Send again" }));
+        await waitFor(() => expect((fetchMock as any).toast).toHaveBeenCalledWith("Already sent today"));
     });
 
     it("says so when only some of them landed", async () => {
