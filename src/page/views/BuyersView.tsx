@@ -348,8 +348,10 @@ export function BuyersView({
                 method: "POST", headers: authHeaders(),
             });
             if (res.ok) {
+                // At most once a day: a second press the same day sends nothing.
+                const body = await res.json().catch(() => ({}));
                 await load();
-                showToast("Gift email sent again");
+                showToast(body?.alreadySentToday ? "Already sent today" : "Gift email sent again");
             } else {
                 setError("Could not send the gift email again");
             }
