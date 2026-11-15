@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronRight, Layers } from "lucide-react";
-import { SectionCard } from "@cobuntu/management-ui-shared";
+import { DiscountCodesSection, SectionCard } from "@cobuntu/management-ui-shared";
 import { PriceEditModal } from "../../components/PriceEditModal";
 import {
   getSymbol,
@@ -340,6 +340,22 @@ export function PricingView({
           </div>
         )}
       </SectionCard>
+
+      {/*
+        * Discount codes (backend docs/features/discount-codes.md, Phase 3).
+        * The card loads its own codes and renders nothing where codes are off
+        * for this community, so it needs only the endpoint. For editors only:
+        * codes are the seller's, not something a viewer reads.
+        */}
+      {canEdit && (
+        <DiscountCodesSection
+          endpoint={{ apiBaseUrl, communityTag, item: { kind: "product", id: productId }, headers: () => jsonHeaders() }}
+          itemName={product?.name ?? ""}
+          tiers={tiers.map((t: any) => ({ id: t.id, name: t.name }))}
+          currency={tiers[0]?.products?.currency || product?.currency || "EUR"}
+          onCopied={() => showToast?.("Code copied")}
+        />
+      )}
 
       {editingTier && (
         <PriceEditModal
