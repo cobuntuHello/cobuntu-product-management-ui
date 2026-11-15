@@ -2,7 +2,9 @@
 
 import * as React from "react";
 import { ModalShell } from "../page/helpers";
-import { SortableMediaGallery, type MediaItem } from "../ui/sortable-media-gallery";
+import { type MediaItem } from "../ui/sortable-media-gallery";
+import { MediaManager, type FramedPhoto } from "@cobuntu/management-ui-shared";
+import { replaceWithCrop } from "../lib/replaceWithCrop";
 import { useProductManagementConfig } from "../config";
 import { uploadNewGalleryItems } from "../lib/productMediaUpload";
 import { COVER_SIZE_HINT } from "../lib/coverFormat";
@@ -158,7 +160,20 @@ export function ProductMediaModal({
       </p>
 
       <div className="mb-4 max-h-[55vh] overflow-y-auto">
-        <SortableMediaGallery items={items} onChange={setItems} />
+        {/* The shared MediaManager: upload modal, frame each photo at 4:3,
+            reorder, re-frame, replace, remove. Videos are added as they are. */}
+        <MediaManager
+          items={items}
+          onChange={setItems}
+          aspect={4 / 3}
+          maxItems={5}
+          hint={`Best at ${COVER_SIZE_HINT}`}
+          commit={(photo: FramedPhoto, replacing?: MediaItem): MediaItem =>
+            replacing
+              ? replaceWithCrop(replacing, photo.dataUrl)
+              : { id: crypto.randomUUID(), preview: photo.dataUrl, type: "image", file: photo.file }}
+          addVideo={(file: File): MediaItem => ({ id: crypto.randomUUID(), file, preview: URL.createObjectURL(file), type: "video" })}
+        />
       </div>
 
       <div className="flex justify-end gap-2">
