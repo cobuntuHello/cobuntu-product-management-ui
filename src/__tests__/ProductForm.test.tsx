@@ -54,8 +54,8 @@ describe("ProductForm", () => {
 
     expect(screen.getByPlaceholderText("Product Name")).toBeInTheDocument();
     expect(screen.getByText("Add description")).toBeInTheDocument();
-    // Several add-photo affordances (one per empty slot) - one is enough.
-    expect(screen.getAllByLabelText("Add photo").length).toBeGreaterThan(0);
+    // The photos: the shared MediaManager's one wide drop area.
+    expect(screen.getByRole("button", { name: /Add photos/ })).toBeInTheDocument();
     expect(screen.getByText("Call to Action Label")).toBeInTheDocument();
     // "Variants" (the old in-card title) is gone (feat/wizard-presets-and-
     // banners) — the pricing surface is now identified by its own controls.
