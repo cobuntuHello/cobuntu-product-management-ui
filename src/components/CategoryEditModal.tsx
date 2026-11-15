@@ -20,9 +20,16 @@ import { useProductManagementConfig, useJsonHeaders } from "../config";
  * hidden when a host has not supplied them: better absent than dead.
  */
 export function CategoryEditModal({
-  productId, categories, categoryId, subCategoryId, onClose, onSaved, showToast,
+  productId, communityTag, categories, categoryId, subCategoryId, onClose, onSaved, showToast,
 }: {
   productId: string;
+  /**
+   * The community this edit is made FROM. Categories belong to each community
+   * that carries the product, so the server re-files only this community's
+   * listing (the same product in another community keeps that one's
+   * category). Omitted = the product's home community, the old behaviour.
+   */
+  communityTag?: string;
   categories: CategoryOption[];
   categoryId: string | null;
   subCategoryId: string | null;
@@ -49,6 +56,7 @@ export function CategoryEditModal({
         body: JSON.stringify({
           categoryId: draft.categoryId,
           subCategoryId: draft.subCategoryId,
+          ...(communityTag ? { communityTag } : {}),
         }),
       });
       if (!res.ok) {

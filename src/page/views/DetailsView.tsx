@@ -325,6 +325,7 @@ export function DetailsView({
       {modal === "category" && (
         <CategoryEditModal
           productId={product.id}
+          communityTag={communityTag}
           categories={categories ?? []}
           categoryId={product.categoryId ?? null}
           subCategoryId={product.subCategoryId ?? null}

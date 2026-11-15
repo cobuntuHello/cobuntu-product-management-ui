@@ -109,6 +109,19 @@ describe("CategoryEditModal", () => {
     const body = JSON.parse((fetchMock.mock.calls[0][1] as any).body);
     expect(body).toEqual({ categoryId: "c1", subCategoryId: "s1" });
   });
+
+  /*
+   * Premium multi-community: a product carried by two communities is filed
+   * under each one's own category, so the edit names the community it is made
+   * from and the server re-files only that community's listing.
+   */
+  it("says which community the category is for", async () => {
+    const fetchMock = mockFetch([{ method: "PATCH", url: /users\/me\/products/, body: {} }]);
+    render({ categoryId: "c1", subCategoryId: "s1", communityTag: "coimbra" });
+    await userEvent.click(screen.getByText("Save"));
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as any).body);
+    expect(body).toEqual({ categoryId: "c1", subCategoryId: "s1", communityTag: "coimbra" });
+  });
 });
 
 describe("category icons", () => {
