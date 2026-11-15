@@ -166,7 +166,7 @@ function WizardInner({
   community, viewer, transport, navigation, extraSteps = [], productType,
   renderContentStep, validateContentStep,
   isLeader: isLeaderHere, drafts: myDrafts, draftId, draftStepFromUrl,
-  syncStepToUrl = true, onLocalResume,
+  syncStepToUrl = true, onLocalResume, sellerPremium,
 }: InnerProps) {
   const { tag: communityTag, id: communityId, name: communityName, memberFeeModel, memberRequireApproval, platformFeeRate } = community;
   const hrefs = navigation.hrefs;
@@ -822,7 +822,7 @@ function WizardInner({
                * with a different base. This used to read the all-in rate as
                * platformFeeRate + Stripe's 1.5%.
                */
-              platformFee={memberFeeFor(formDataRef.current?.currency, { premium: props.sellerPremium === true })}
+              platformFee={memberFeeFor(formDataRef.current?.currency, { premium: sellerPremium === true })}
             />
           </div>
         </div>
