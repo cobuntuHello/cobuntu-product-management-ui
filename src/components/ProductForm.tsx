@@ -10,10 +10,8 @@ import {
 import { EventTags } from "../ui/event-tags";
 import { descriptionToPlainText } from "../lib/htmlToPlainText";
 import { LISTING_NAME_MAX, NAME_COUNTER_FROM, listingNameTooLong } from "../lib/listingNameLimit";
-import { dataUrlToFile } from "../lib/dataUrlToFile";
-import { DescriptionDialog } from "@cobuntu/management-ui-shared";
+import { DescriptionDialog, MediaManager, type FramedPhoto } from "@cobuntu/management-ui-shared";
 import { type MediaItem } from "../ui/sortable-media-gallery";
-import { BannerCropModal, type BannerCropResult } from "../ui/banner-crop-modal";
 import { COVER_SIZE_HINT } from "../lib/coverFormat";
 import { replaceWithCrop } from "../lib/replaceWithCrop";
 import { type UploadedFile } from "../ui/file-upload-zone";
@@ -735,70 +733,17 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
   const parcelClass: ParcelClassValue = initialData?.parcelClass ?? "STANDARD";
   const isPhysical = productType === "PHYSICAL";
 
-  // ─── Inline photo upload ───
-  // Tap a slot → native device picker (our own hidden input) → the 4:3
-  // cropper (the only popup) → the photo lands in the carousel. No separate
-  // "Product Photos" gallery popup. cropEditIndex null = adding a new photo;
-  // a number = re-cropping the photo at that index.
-  const photoInputRef = useRef<HTMLInputElement | null>(null);
-  const [cropOpen, setCropOpen] = useState(false);
-  const [cropSrc, setCropSrc] = useState<string | null>(null);
-  const [cropEditIndex, setCropEditIndex] = useState<number | null>(null);
-  const mediaSrc = (m?: MediaItem) => m?.preview || m?.url || "";
-
-  function pickPhoto() {
-    setCropEditIndex(null);
-    photoInputRef.current?.click();
-  }
-  function onPhotoFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (photoInputRef.current) photoInputRef.current.value = "";
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { setCropSrc(reader.result as string); setCropOpen(true); };
-    reader.readAsDataURL(file);
-  }
-  function recropPhoto(index: number) {
-    const m = mediaItems[index];
-    if (!m) return;
-    setCropEditIndex(index);
-    setCropSrc(mediaSrc(m));
-    setCropOpen(true);
-  }
-  function onCropSave(result: BannerCropResult) {
-    if (!result.base64) return;
-    /*
-     * Rebuild an uploadable File from the crop.
-     *
-     * The original File is already gone here — onPhotoFile only reads it to
-     * get a src for the cropper — and the cropper returns base64 alone. The
-     * consumer uploads `item.file` and skips items without one, so a photo
-     * added with no File attached rendered in the carousel and was then
-     * silently dropped at submit: products saved with no images.
-     * Reported 2026-08-09.
-     */
-    if (cropEditIndex === null) {
-      const file = dataUrlToFile(result.base64, `photo-${Date.now()}`);
-      setMediaItems([...mediaItems, { id: crypto.randomUUID(), preview: result.base64, type: "image" as const, file }].slice(0, 5));
-    } else {
-      const next = [...mediaItems];
-      // Re-cropping a photo has to replace its file too, or the upload keeps
-      // the pre-crop image. For an already SAVED photo that is not enough on
-      // its own (saved photos are never re-uploaded), so replaceWithCrop
-      // turns it into a new photo in the same slot.
-      if (next[cropEditIndex]) next[cropEditIndex] = replaceWithCrop(next[cropEditIndex], result.base64);
-      setMediaItems(next);
-    }
-  }
-  function removePhoto(index: number) {
-    setMediaItems(mediaItems.filter((_, i) => i !== index));
-  }
-  function makeCover(index: number) {
-    if (index <= 0 || !mediaItems[index]) return;
-    const next = [...mediaItems];
-    const [m] = next.splice(index, 1);
-    next.unshift(m);
-    setMediaItems(next);
+  // ─── Photos (MediaManager, see the Photos section below) ───
+  /*
+   * A framed photo becomes a gallery item kept as a FILE until save (the
+   * consumer uploads `item.file`, lib/productMediaUpload). Re-framing or
+   * replacing a photo that was already SAVED makes it a new, unsaved item in
+   * the same slot (replaceWithCrop): saved photos are never re-uploaded, so
+   * keeping the old id would show the new framing and save the old one.
+   */
+  function commitPhoto(photo: FramedPhoto, replacing?: MediaItem): MediaItem {
+    if (replacing) return replaceWithCrop(replacing, photo.dataUrl);
+    return { id: crypto.randomUUID(), preview: photo.dataUrl, type: "image", file: photo.file };
   }
   // Tier wizard (the shared PriceEditModal in draftMode). Opened from the
   // Advanced-pricing summary row; commits drafts back into `tiers`/`donation`.
@@ -1168,66 +1113,19 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         )}
       </div>
 
-      {/* ─── Photos ─── inline uploader. Tap the cover or any slot → the
-           device's own photo picker → the 4:3 cropper (the ONLY popup) →
-           the photo lands here. Cover (photo 1) is a capped 4:3 frame, the
-           shape every card shows it in (lib/coverFormat), so what is framed
-           here is what buyers see. Tap a thumbnail to make it
-           the cover; tap the corner X to remove. Fully responsive: the cover
-           is full-width up to 360px, thumbnails wrap. No gallery popup. */}
-      <div>
-        {mediaItems[0] ? (
-          <div className="group relative w-full max-w-[360px] aspect-[4/3] rounded-2xl overflow-hidden ring-1 ring-zinc-100">
-            <button type="button" onClick={() => recropPhoto(0)} className="block w-full h-full cursor-pointer" aria-label="Recrop cover photo">
-              <img src={mediaSrc(mediaItems[0])} alt="" className="w-full h-full object-cover" />
-              <span className="absolute top-3 left-3 text-[11px] font-semibold tracking-wide bg-white/85 backdrop-blur-sm text-zinc-800 px-2.5 py-1 rounded-full">Cover</span>
-              <span className="absolute inset-0 flex items-center justify-center gap-2 bg-black/25 text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                <ImageIcon className="h-[18px] w-[18px]" /> Recrop
-              </span>
-            </button>
-            <button type="button" onClick={() => removePhoto(0)} aria-label="Remove cover photo"
-              className="absolute top-2.5 right-2.5 h-7 w-7 rounded-full bg-black/55 hover:bg-black/75 text-white flex items-center justify-center transition-colors cursor-pointer">
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ) : (
-          <button type="button" onClick={pickPhoto}
-            className="group relative w-full max-w-[360px] aspect-[4/3] rounded-2xl bg-zinc-50 border-2 border-dashed border-zinc-200 hover:border-zinc-300 transition-colors cursor-pointer flex flex-col items-center justify-center gap-2.5 text-zinc-400 hover:text-zinc-500">
-            <span className="w-12 h-12 rounded-2xl bg-white ring-1 ring-zinc-100 flex items-center justify-center transition-transform duration-200 group-hover:scale-105">
-              <ImageIcon className="h-6 w-6 text-zinc-300" />
-            </span>
-            <span className="text-[13px] font-medium">Add cover photo</span>
-            <span className="text-[11px] text-zinc-300">Best at {COVER_SIZE_HINT} · up to 5</span>
-          </button>
-        )}
-
-        {/* Thumbnails (photos 2-5) — filled tiles or ghost add-slots. */}
-        <div className="flex flex-wrap gap-2.5 mt-2.5">
-          {[1, 2, 3, 4].map((i) => {
-            const m = mediaItems[i];
-            return m ? (
-              <div key={m.id ?? i} className="group relative w-16 h-16 rounded-xl overflow-hidden ring-1 ring-zinc-100">
-                <button type="button" onClick={() => makeCover(i)} title="Make cover" aria-label="Make this the cover"
-                  className="block w-full h-full cursor-pointer transition-transform duration-150 hover:scale-[1.04]">
-                  <img src={mediaSrc(m)} alt="" className="w-full h-full object-cover" />
-                  <span className="absolute inset-x-0 bottom-0 text-[9px] font-semibold text-white text-center py-0.5 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity">Make cover</span>
-                </button>
-                <button type="button" onClick={() => removePhoto(i)} aria-label="Remove photo"
-                  className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-black/70 hover:bg-black/85 text-white flex items-center justify-center transition-colors cursor-pointer">
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ) : (
-              <button type="button" key={`add-${i}`} onClick={pickPhoto} aria-label="Add photo"
-                className="w-16 h-16 rounded-xl flex items-center justify-center text-zinc-300 border-2 border-dashed border-zinc-200 transition-all duration-150 hover:text-zinc-500 hover:border-zinc-300 hover:-translate-y-0.5 hover:scale-[1.04] cursor-pointer">
-                <Plus className="h-5 w-5" />
-              </button>
-            );
-          })}
-        </div>
-        <p className="text-[12px] text-zinc-400 mt-2.5">{mediaItems.length > 0 ? `${mediaItems.length} of 5 photos · tap a photo to make it the cover` : "Up to 5 photos · the first is your cover"}</p>
-        <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={onPhotoFile} />
-      </div>
+      {/* ─── Photos ─── the shared MediaManager (@cobuntu/management-ui-shared):
+           one wide drop area, an upload modal with drag and drop, each photo
+           framed after at 4:3 (the shape every card shows the cover in, see
+           lib/coverFormat), then reorder by drag, re-frame, replace, make
+           cover or remove. Photos stay files until the product is saved. */}
+      <MediaManager
+        items={mediaItems}
+        onChange={setMediaItems}
+        aspect={4 / 3}
+        maxItems={5}
+        hint={`Best at ${COVER_SIZE_HINT}`}
+        commit={commitPhoto}
+      />
       </>)}
 
       {/* ─── Detail rows — done-states (check + snippet when filled) + hover
@@ -1865,17 +1763,6 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         </DialogContent>
       </Dialog>
 
-      {/* ─── Crop popup ─── the ONLY photo popup. The device picker feeds it
-           an image (directCropSrc); the user frames it to the 4:3 cover and it
-           lands in the carousel. No gallery popup in between. */}
-      <BannerCropModal
-        open={cropOpen}
-        onOpenChange={setCropOpen}
-        directCropSrc={cropSrc}
-        onSave={onCropSave}
-        title="Frame your photo"
-        hideStockPhotos
-      />
 
       {/* Files / Link-deliverables / License modals removed — deliverables are
           per-variant now and edited inside VariantEditView (opened from the
