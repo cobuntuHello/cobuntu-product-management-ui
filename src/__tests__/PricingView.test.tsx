@@ -23,6 +23,10 @@ import { PricingView } from "../page/views/PricingView";
  *     file CALLS useCanEdit; it cannot prove the call changes anything.
  */
 
+// The Discount codes card loads its own list; stubbed so this file's fetch
+// assertions see only the calls under test (it has its own test file).
+vi.mock("@cobuntu/management-ui-shared", async (orig) => ({ ...(await orig() as any), DiscountCodesSection: () => null }));
+
 vi.mock("../components/PriceEditModal/DonationsSection", () => ({
   DonationsSection: ({ onUpdate, defaultCurrency }: any) => (
     <div data-testid="donations">
