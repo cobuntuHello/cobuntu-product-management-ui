@@ -453,6 +453,7 @@ export function ProductManagePage({
           product={product}
           productId={productId}
           communityTag={communityTag}
+          publicUrlBase={publicUrlBase}
           onUpdate={onUpdate}
           showToast={showToast}
           showMemberPricing={showMemberPricing}

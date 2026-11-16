@@ -65,6 +65,8 @@ export interface PricingViewProps {
   product: any;
   communityTag: string;
   productId: string;
+  /** Where the PUBLIC page lives ("/learning/" for a course), for a code's share link. Defaults to the marketplace. */
+  publicUrlBase?: string;
   /** Refetch after a write so the cards reflect what was saved. */
   onUpdate: () => void;
   showToast: (msg: string) => void;
@@ -114,6 +116,7 @@ export function PricingView({
   product,
   communityTag,
   productId,
+  publicUrlBase = "/marketplace/",
   onUpdate,
   showToast,
   showMemberPricing,
@@ -357,6 +360,9 @@ export function PricingView({
           tiers={tiers.map((t: any) => ({ id: t.id, name: t.name, currency: t.products?.currency || product?.currency || undefined }))}
           currency={tiers[0]?.products?.currency || product?.currency || "EUR"}
           tierNoun="variant"
+          // A saved code's share link (?code=, T-368): the same public page
+          // the Details tab's copy-link points at.
+          itemUrl={`https://${communityTag}.cobuntu.com${publicUrlBase}${encodeURIComponent(product?.id ?? productId)}`}
         />
       )}
 

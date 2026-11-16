@@ -18,6 +18,7 @@ vi.mock("@cobuntu/management-ui-shared", async (orig) => {
         <span data-testid="dc-endpoint">{JSON.stringify({ ...props.endpoint, headers: undefined })}</span>
         <span data-testid="dc-tiers">{JSON.stringify(props.tiers)}</span>
         <span data-testid="dc-currency">{props.currency}</span>
+        <span data-testid="dc-url">{props.itemUrl}</span>
       </div>
     ),
   };
@@ -30,10 +31,10 @@ const product = {
   tiers: [{ id: "v-a", name: "Standard", products: { price: 2500, currency: "GBP" } }],
 };
 
-function renderView(canEdit: boolean) {
+function renderView(canEdit: boolean, publicUrlBase?: string) {
   renderWithConfig(
     <ManageAccessProvider canEdit={canEdit}>
-      <PricingView product={product} productId="p-1" communityTag="demo" onUpdate={vi.fn()} showToast={vi.fn()} showMemberPricing />
+      <PricingView product={product} productId="p-1" communityTag="demo" onUpdate={vi.fn()} showToast={vi.fn()} showMemberPricing publicUrlBase={publicUrlBase} />
     </ManageAccessProvider>,
   );
 }
@@ -44,6 +45,16 @@ describe("PricingView discount codes", () => {
     expect(JSON.parse(screen.getByTestId("dc-endpoint").textContent!)).toMatchObject({ communityTag: "demo", item: { kind: "product", id: "p-1" } });
     expect(JSON.parse(screen.getByTestId("dc-tiers").textContent!)).toEqual([{ id: "v-a", name: "Standard", currency: "GBP" }]);
     expect(screen.getByTestId("dc-currency").textContent).toBe("GBP");
+  });
+
+  it("gives the card the item's public page, for a code's share link", () => {
+    renderView(true);
+    expect(screen.getByTestId("dc-url").textContent).toBe("https://demo.cobuntu.com/marketplace/p-1");
+  });
+
+  it("uses a course's /learning/ page when the host says so", () => {
+    renderView(true, "/learning/");
+    expect(screen.getByTestId("dc-url").textContent).toBe("https://demo.cobuntu.com/learning/p-1");
   });
 
   it("is absent for a read-only viewer", () => {
