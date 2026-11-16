@@ -49,7 +49,10 @@ const LISTS = [
 ];
 
 function renderView(routes: any[] = [], product: any = PRODUCT) {
-    const fetchMock = mockFetch([...LISTS, ROSTER, ...routes]);
+    // A test's own routes first: the first match wins, so the empty LISTS
+    // defaults must not shadow a list the test fills (this hid both gifts in
+    // "says when a gift was opened").
+    const fetchMock = mockFetch([...routes, ...LISTS, ROSTER]);
     // The toast, reachable from a test as fetchMock.toast.
     const toast = vi.fn();
     (fetchMock as any).toast = toast;
