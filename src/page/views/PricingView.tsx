@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronRight, Layers } from "lucide-react";
-import { DiscountCodesSection, SectionCard } from "@cobuntu/management-ui-shared";
+import { DiscountCodesSection, PricingSectionHeading } from "@cobuntu/management-ui-shared";
 import { PriceEditModal } from "../../components/PriceEditModal";
 import {
   getSymbol,
@@ -10,7 +10,7 @@ import {
   loadDonationFromProduct,
   buildDonationBody,
 } from "../../components/PriceEditModal/helpers";
-import { DonationsSection } from "../../components/PriceEditModal/DonationsSection";
+import { DonationsHeading, DonationsSection } from "../../components/PriceEditModal/DonationsSection";
 import type { DonationDraft } from "../../components/PriceEditModal/types";
 import { useProductManagementConfig, useJsonHeaders } from "../../config";
 import { useCanEdit } from "../../lib/manageAccess";
@@ -209,11 +209,11 @@ export function PricingView({
           another bordered surface nested a card inside a card and made the
           real ones read as list rows rather than as the things you open. */}
       <div>
-        <h2 className="text-[15px] font-semibold text-zinc-900">Variants</h2>
-        <p className="text-[12px] text-zinc-500 mt-1 mb-4 max-w-[68ch] leading-relaxed">
-          Each variant is a version buyers can purchase, with its own price, capacity and
-          {isPhysical ? " stock" : " downloadable content"}. Open one to edit it.
-        </p>
+        {/* The one heading style every Pricing section shares (approved redesign, 2026-11-16). */}
+        <PricingSectionHeading
+          title="Variants"
+          description={`Each variant is a version buyers can purchase, with its own price, capacity and${isPhysical ? " stock" : " downloadable content"}. Open one to edit it.`}
+        />
 
         {tiers.length > 0 && (
           <div className="space-y-2 mb-3">
@@ -307,8 +307,9 @@ export function PricingView({
         * section heading sitting consistently above each block the way
         * "Variants" already does.
         */}
-      <div>
-        <h2 className="text-[15px] font-semibold text-zinc-900">Donations</h2>
+      {/* "Donations" once: the heading carries the title and the explainer. */}
+      <div className="-mb-2">
+        <DonationsHeading />
       </div>
 
       {/*
@@ -318,7 +319,8 @@ export function PricingView({
         * list above, donations is ONE settings block, not a list of
         * card-like objects, so there's no card-in-a-card problem to avoid.
         */}
-      <SectionCard>
+      {/* A plain settings row between two hairlines, not a card (approved redesign). */}
+      <div className="border-y border-zinc-200 py-4">
         <DonationsSection
           donation={donation}
           onUpdate={updateDonation}
@@ -339,7 +341,7 @@ export function PricingView({
             </button>
           </div>
         )}
-      </SectionCard>
+      </div>
 
       {/*
         * Discount codes (backend docs/features/discount-codes.md, Phase 3).
@@ -354,6 +356,7 @@ export function PricingView({
           // Each tier's currency: an amount off is in the currency of the tiers it covers.
           tiers={tiers.map((t: any) => ({ id: t.id, name: t.name, currency: t.products?.currency || product?.currency || undefined }))}
           currency={tiers[0]?.products?.currency || product?.currency || "EUR"}
+          tierNoun="variant"
           onCopied={() => showToast?.("Code copied")}
         />
       )}

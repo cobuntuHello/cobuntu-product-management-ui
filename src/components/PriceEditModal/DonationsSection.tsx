@@ -1,6 +1,6 @@
 "use client";
 
-import { DonationsSection as SharedDonationsSection } from "@cobuntu/management-ui-shared";
+import { DonationsHeading as SharedDonationsHeading, DonationsSection as SharedDonationsSection } from "@cobuntu/management-ui-shared";
 import type { DonationDraft } from "./types";
 import { getSymbol } from "./helpers";
 
@@ -22,4 +22,9 @@ export interface DonationsSectionProps {
  */
 export function DonationsSection(props: DonationsSectionProps) {
   return <SharedDonationsSection {...props} symbolFor={getSymbol} tierNoun="variant" />;
+}
+
+/** The Donations section's heading on Pricing: title and explainer, said once (approved redesign, 2026-11-16). */
+export function DonationsHeading() {
+  return <SharedDonationsHeading tierNoun="variant" />;
 }

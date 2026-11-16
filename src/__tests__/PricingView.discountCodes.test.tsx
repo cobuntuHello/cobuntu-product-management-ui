@@ -22,7 +22,7 @@ vi.mock("@cobuntu/management-ui-shared", async (orig) => {
     ),
   };
 });
-vi.mock("../components/PriceEditModal/DonationsSection", () => ({ DonationsSection: () => <div /> }));
+vi.mock("../components/PriceEditModal/DonationsSection", () => ({ DonationsSection: () => <div />, DonationsHeading: () => null }));
 vi.mock("../components/PriceEditModal", () => ({ PriceEditModal: () => <div /> }));
 
 const product = {
