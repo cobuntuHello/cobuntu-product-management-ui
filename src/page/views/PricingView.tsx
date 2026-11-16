@@ -351,7 +351,8 @@ export function PricingView({
         <DiscountCodesSection
           endpoint={{ apiBaseUrl, communityTag, item: { kind: "product", id: productId }, headers: () => jsonHeaders() }}
           itemName={product?.name ?? ""}
-          tiers={tiers.map((t: any) => ({ id: t.id, name: t.name }))}
+          // Each tier's currency: an amount off is in the currency of the tiers it covers.
+          tiers={tiers.map((t: any) => ({ id: t.id, name: t.name, currency: t.products?.currency || product?.currency || undefined }))}
           currency={tiers[0]?.products?.currency || product?.currency || "EUR"}
           onCopied={() => showToast?.("Code copied")}
         />
