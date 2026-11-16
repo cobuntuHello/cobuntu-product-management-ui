@@ -42,7 +42,7 @@ describe("PricingView discount codes", () => {
   it("mounts the card for an editor, with this product's endpoint, tiers and currency", () => {
     renderView(true);
     expect(JSON.parse(screen.getByTestId("dc-endpoint").textContent!)).toMatchObject({ communityTag: "demo", item: { kind: "product", id: "p-1" } });
-    expect(JSON.parse(screen.getByTestId("dc-tiers").textContent!)).toEqual([{ id: "v-a", name: "Standard" }]);
+    expect(JSON.parse(screen.getByTestId("dc-tiers").textContent!)).toEqual([{ id: "v-a", name: "Standard", currency: "GBP" }]);
     expect(screen.getByTestId("dc-currency").textContent).toBe("GBP");
   });
 
