@@ -357,7 +357,6 @@ export function PricingView({
           tiers={tiers.map((t: any) => ({ id: t.id, name: t.name, currency: t.products?.currency || product?.currency || undefined }))}
           currency={tiers[0]?.products?.currency || product?.currency || "EUR"}
           tierNoun="variant"
-          onCopied={() => showToast?.("Code copied")}
         />
       )}
 
