@@ -36,7 +36,7 @@ export interface ProductActivityTabProps {
 
 interface ActivityEntry {
   id: string;
-  source: "PRODUCT_AUDIT" | "COLLABORATOR_AUDIT";
+  source: "PRODUCT_AUDIT" | "COLLABORATOR_AUDIT" | "SALE";
   action: string;
   createdAt: string;
   actor: { id: string; name: string | null; usertag: string | null; profileImage: string | null } | null;

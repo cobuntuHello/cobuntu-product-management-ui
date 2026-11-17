@@ -409,7 +409,7 @@ export function BuyersView({
                 title of the section it actually acts on, rather than grouped
                 together above all three sections where neither read as
                 belonging to one in particular. */}
-            <Section title="Customers" count={customers?.length} subtitle="Bought it themselves — free or paid.">
+            <Section title="Customers" count={customers?.length} subtitle="One row per checkout, free or paid. The same person can appear more than once.">
                 {customers === null ? (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
                 ) : customers.length === 0 ? (
@@ -421,7 +421,9 @@ export function BuyersView({
                 ) : (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
                     <ul className="divide-y divide-zinc-100">
-                        {customers.map((c) => (
+                        {customers.map((c) => {
+                            const nth = checkoutNumber(customers, c);
+                            return (
                             <li key={c.id}>
                                 <button
                                     type="button"
@@ -436,14 +438,19 @@ export function BuyersView({
                                         ) : c.user?.name && c.guestEmail ? (
                                             <p className="text-[11px] text-zinc-400 truncate">{c.guestEmail}</p>
                                         ) : null}
+                                        <p className="text-[11px] text-zinc-400 truncate">
+                                            {shortDate(c.createdAt)}
+                                            {nth > 1 ? ` · Checkout #${nth} by this person` : ""}
+                                        </p>
                                     </div>
-                                    <span className="text-[12px] font-medium text-zinc-500 shrink-0">
+                                    <span className={`text-[12px] font-medium shrink-0 ${c.grossAmount > 0 ? "text-zinc-700" : "text-zinc-400"}`}>
                                         {formatCustomerAmount(c.grossAmount, c.currency)}
                                     </span>
                                     <ChevronRightIcon className="shrink-0 text-zinc-300" />
                                 </button>
                             </li>
-                        ))}
+                            );
+                        })}
                     </ul>
                     </div>
                 )}
@@ -900,6 +907,19 @@ function CompactEmptyRow({ icon, title, hint }: { icon: React.ReactNode; title: 
  * and swapping to a word only on the zero case is the inconsistency.
  * Cents, like everywhere else on the platform.
  */
+
+/**
+ * Which checkout by the same person this is (1 = their first). People can claim
+ * a free option or buy again, so the list holds several rows for one person and
+ * they all looked identical. Identity is the account, else the guest email.
+ */
+function checkoutNumber(all: Customer[], c: Customer): number {
+    const key = (x: Customer) => x.user?.id ?? (x.guestEmail ? x.guestEmail.toLowerCase() : x.id);
+    const k = key(c);
+    const at = new Date(c.createdAt).getTime();
+    return all.filter((x) => key(x) === k && (new Date(x.createdAt).getTime() < at || (new Date(x.createdAt).getTime() === at && x.id <= c.id))).length;
+}
+
 function formatCustomerAmount(grossAmount: number, currency: string): string {
     try {
         return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 2 })
