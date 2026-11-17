@@ -656,8 +656,8 @@ export function BuyersView({
                         importedNothing: "No email addresses in the first column of that file.",
                         importFailed: "That file could not be read.",
                         noMatchesHint: isCourse
-                            ? "Not a member yet? Type their full email address. The course is theirs as soon as they join."
-                            : "Not a member yet? Type their full email address. They can download it from the email, no account needed.",
+                            ? "Not a member yet? Type their @usertag, or their full email address. The course is theirs as soon as they join."
+                            : "Not a member yet? Type their @usertag, or their full email address. They can download it from the email, no account needed.",
                     }}
                     outsiders={awaitingToOffer.length > 0 ? {
                         label: "Approved, not joined yet",
