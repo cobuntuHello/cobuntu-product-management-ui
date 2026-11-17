@@ -152,3 +152,29 @@ describe("formatRelativeTime", () => {
     expect(formatRelativeTime("not-a-date", now)).toBe("not-a-date");
   });
 });
+
+describe("sales", () => {
+  const sale = (action: string, payload: Record<string, unknown>) =>
+    entry({ source: "SALE", action, payload });
+
+  it("says a paid checkout was a purchase, with the amount", () => {
+    expect(renderProductActivitySentence(sale("PURCHASED", { amount: 1200, currency: "EUR", quantity: 1 })).text)
+      .toBe("Bea bought this for €12.00");
+  });
+
+  it("says a free checkout was got for free, not bought and not an update", () => {
+    const text = renderProductActivitySentence(sale("PURCHASED", { amount: 0, currency: "EUR", quantity: 1 })).text;
+    expect(text).toBe("Bea got this for free");
+    expect(text).not.toMatch(/updated/);
+  });
+
+  it("names the quantity when more than one was bought", () => {
+    expect(renderProductActivitySentence(sale("PURCHASED", { amount: 2400, currency: "EUR", quantity: 2 })).text)
+      .toBe("Bea bought 2 of this for €24.00");
+  });
+
+  it("reports a refund as a refund", () => {
+    expect(renderProductActivitySentence(sale("PURCHASE_REFUNDED", { amount: 1200, currency: "EUR" })).text)
+      .toBe("Bea's purchase was refunded");
+  });
+});

@@ -605,3 +605,39 @@ describe("giving away a specific variant", () => {
         expect(posted(fetchMock, /access-grants/).tierAssignments).toBeUndefined();
     });
 });
+
+describe("customers: repeat checkouts by the same person", () => {
+    function render(customers: unknown[]) {
+        mockFetch([
+            { method: "GET", url: /\/access-grants$/, body: [] },
+            { method: "GET", url: /\/invitations$/, body: [] },
+            { method: "GET", url: /\/customers$/, body: customers },
+            ROSTER,
+        ]);
+        renderWithConfig(
+            <BuyersView product={PRODUCT} onUpdate={vi.fn()} showToast={vi.fn()} communityTag="c" currentUserId="u-own" />,
+        );
+    }
+    const ana = { id: "u-ana", name: "Ana Neto", usertag: "ana-neto", profileImage: null };
+    const bo = { id: "u-bo", name: "Bo Silva", usertag: "bo-silva", profileImage: null };
+
+    it("tells identical-looking rows apart: each shows its date, and a person's later checkouts are numbered", async () => {
+        render([
+            { id: "s3", grossAmount: 0, currency: "EUR", createdAt: "2026-03-01T10:00:00Z", guestEmail: null, user: ana },
+            { id: "s2", grossAmount: 0, currency: "EUR", createdAt: "2026-02-01T10:00:00Z", guestEmail: null, user: bo },
+            { id: "s1", grossAmount: 0, currency: "EUR", createdAt: "2026-01-01T10:00:00Z", guestEmail: null, user: ana },
+        ]);
+
+        expect(await screen.findAllByText("Ana Neto")).toHaveLength(2);
+        // Ana's second checkout is marked; her first and Bo's only one are not.
+        expect(screen.getAllByText(/Checkout #2 by this person/)).toHaveLength(1);
+        expect(screen.queryByText(/Checkout #1/)).not.toBeInTheDocument();
+        expect(screen.getAllByText(/Mar 1|1 Mar/).length).toBeGreaterThan(0);
+    });
+
+    it("does not mark a person who checked out once", async () => {
+        render([{ id: "s1", grossAmount: 2400, currency: "EUR", createdAt: "2026-01-01T10:00:00Z", guestEmail: null, user: ana }]);
+        expect(await screen.findByText("Ana Neto")).toBeInTheDocument();
+        expect(screen.queryByText(/Checkout #/)).not.toBeInTheDocument();
+    });
+});

@@ -21,7 +21,7 @@
  */
 
 export interface ProductActivityEntryForRender {
-  source: "PRODUCT_AUDIT" | "COLLABORATOR_AUDIT";
+  source: "PRODUCT_AUDIT" | "COLLABORATOR_AUDIT" | "SALE";
   action: string;
   actor: { id: string; name: string | null; usertag: string | null; profileImage: string | null } | null;
   payload: Record<string, unknown> | null;
@@ -53,6 +53,16 @@ function arr(payload: Record<string, unknown> | null, key: string): string[] {
   if (!payload) return [];
   const v = payload[key];
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
+
+
+/** Money in the sale's own currency; amounts are in the smallest unit (cents). */
+function money(cents: number, currency: string | null): string {
+  try {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: currency || "EUR", maximumFractionDigits: 2 }).format(cents / 100);
+  } catch {
+    return `${(cents / 100).toFixed(2)} ${currency ?? ""}`.trim();
+  }
 }
 
 function bool(payload: Record<string, unknown> | null, key: string): boolean {
@@ -115,6 +125,22 @@ export function renderProductActivitySentence(
       default:
         return { text: `${actor} updated co-sellers`, subjectName: target };
     }
+  }
+
+  // sales — somebody ACQUIRED it. The actor is the buyer. A paid checkout and
+  // a free one are different things to a seller ("bought" vs "got"), and a sale
+  // used to fall through to the generic "updated the product" below.
+  if (entry.source === "SALE") {
+    const amount = num(entry.payload, "amount") ?? 0;
+    const currency = str(entry.payload, "currency");
+    const qty = num(entry.payload, "quantity") ?? 1;
+    if (entry.action === "PURCHASE_REFUNDED") {
+      return { text: `${actor}'s ${amount > 0 ? "purchase" : "order"} was refunded` };
+    }
+    if (amount > 0) {
+      return { text: `${actor} bought ${qty > 1 ? `${qty} of this` : "this"} for ${money(amount, currency)}` };
+    }
+    return { text: `${actor} got this for free` };
   }
 
   switch (entry.action) {
