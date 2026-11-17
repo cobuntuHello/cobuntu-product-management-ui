@@ -316,7 +316,7 @@ describe("giving access", () => {
         await user.click(screen.getByRole("button", { name: "Send gift" }));
 
         await waitFor(() => expect(posted(fetchMock, /access-grants/)).toBeTruthy());
-        expect(posted(fetchMock, /access-grants/)).toEqual({ userIds: ["u-ana"] });
+        expect(posted(fetchMock, /access-grants/)).toEqual({ userIds: ["u-ana"], mode: "gift" });
     });
 
     it("gives to an address with no account; it waits for them to join", async () => {
@@ -334,7 +334,7 @@ describe("giving access", () => {
         await user.click(screen.getByRole("button", { name: "Send gift" }));
 
         await waitFor(() => expect(posted(fetchMock, /access-grants/)).toBeTruthy());
-        expect(posted(fetchMock, /access-grants/)).toEqual({ emails: ["outsider@example.com"] });
+        expect(posted(fetchMock, /access-grants/)).toEqual({ emails: ["outsider@example.com"], mode: "gift" });
     });
 
     it("lists approved applicants who have not joined, and gives by their address", async () => {
@@ -354,6 +354,7 @@ describe("giving access", () => {
         expect(posted(fetchMock, /access-grants/)).toEqual({
             emails: ["malgo@example.com"],
             names: [{ email: "malgo@example.com", name: "Malgorzata Grzasko" }],
+            mode: "gift",
         });
     });
 
@@ -390,7 +391,7 @@ describe("giving access", () => {
         await user.click(screen.getByRole("button", { name: "Send gift" }));
 
         await waitFor(() => expect(posted(fetchMock, /access-grants/)).toBeTruthy());
-        expect(posted(fetchMock, /access-grants/)).toEqual({ userIds: ["u-ana"], note: "For our session on Tuesday" });
+        expect(posted(fetchMock, /access-grants/)).toEqual({ userIds: ["u-ana"], note: "For our session on Tuesday", mode: "gift" });
     });
 
     it("says when a gift was opened, and when it was not yet", async () => {
@@ -400,8 +401,8 @@ describe("giving access", () => {
                 { id: "g2", userId: "u-bo", createdAt: "2026-11-13T10:00:00Z", openedAt: null, users: { id: "u-bo", name: "Bo Silva", usertag: "bo" } },
             ] },
         ]);
-        expect(await screen.findByText("Opened 14 Nov")).toBeInTheDocument();
-        expect(screen.getByText("Not opened yet")).toBeInTheDocument();
+        expect(await screen.findByText("Gift · opened 14 Nov")).toBeInTheDocument();
+        expect(screen.getByText("Gift · not opened yet")).toBeInTheDocument();
     });
 
     it("sends a waiting gift's email again", async () => {
@@ -639,5 +640,33 @@ describe("customers: repeat checkouts by the same person", () => {
         render([{ id: "s1", grossAmount: 2400, currency: "EUR", createdAt: "2026-01-01T10:00:00Z", guestEmail: null, user: ana }]);
         expect(await screen.findByText("Ana Neto")).toBeInTheDocument();
         expect(screen.queryByText(/Checkout #/)).not.toBeInTheDocument();
+    });
+});
+
+describe("Add people (a plain add, not a gift; backend docs/features/add-vs-gift.md)", () => {
+    it("posts mode add with the note kept private, and says Added", async () => {
+        const user = userEvent.setup();
+        const fetchMock = renderView([
+            { method: "POST", url: /\/access-grants$/, body: { granted: ["u-ana"], failed: [] } },
+        ]);
+        await user.click(await screen.findByText("Add people"));
+        await user.click(await screen.findByText("Ana Neto"));
+        await user.click(screen.getByRole("button", { name: "Review" }));
+        expect(screen.getByText("Private note (optional)")).toBeInTheDocument();
+        await user.type(screen.getByPlaceholderText(/Only you and your team see this/), "Paid by transfer");
+        await user.click(screen.getByRole("button", { name: "Add" }));
+        await waitFor(() => expect(posted(fetchMock, /access-grants/)).toBeTruthy());
+        expect(posted(fetchMock, /access-grants/)).toEqual({ userIds: ["u-ana"], note: "Paid by transfer", mode: "add" });
+    });
+
+    it("marks an added person as Added, and a gift as a gift", async () => {
+        renderView([
+            { method: "GET", url: /\/access-grants$/, body: [
+                { id: "g1", userId: "u-ana", kind: "ADD", createdAt: "2026-11-13T10:00:00Z", openedAt: null, users: { id: "u-ana", name: "Ana Neto", usertag: "ana-neto" } },
+                { id: "g2", userId: "u-bo", kind: "GIFT", createdAt: "2026-11-13T10:00:00Z", openedAt: null, users: { id: "u-bo", name: "Bo Silva", usertag: "bo" } },
+            ] },
+        ]);
+        expect(await screen.findByText("Added")).toBeInTheDocument();
+        expect(screen.getByText("Gift · not opened yet")).toBeInTheDocument();
     });
 });

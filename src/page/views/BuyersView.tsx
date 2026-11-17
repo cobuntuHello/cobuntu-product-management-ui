@@ -49,6 +49,8 @@ interface Grant {
     createdAt: string;
     /** When they first unwrapped the gift; null = not opened yet. */
     openedAt?: string | null;
+    /** GIFT (Send a gift) or ADD (Add people, not a gift). backend docs/features/add-vs-gift.md */
+    kind?: "GIFT" | "ADD";
     users?: { id: string; name?: string | null; usertag?: string | null; profileImage?: string | null } | null;
 }
 
@@ -61,6 +63,7 @@ interface PendingGrant {
     createdAt: string;
     /** When the gift email last went out ("Send again" moves it). */
     lastSentAt?: string | null;
+    kind?: "GIFT" | "ADD";
 }
 
 interface Invitation {
@@ -137,7 +140,8 @@ export function BuyersView({
        same map rather than a parallel one so there is one source of truth per
        row and no risk of the two falling out of sync. */
     const [customerDetails, setCustomerDetails] = React.useState<Record<string, CustomerDetail | "loading" | "error">>({});
-    const [mode, setMode] = React.useState<null | "grant" | "invite">(null);
+    /* "grant" = Send a gift, "add" = Add people (a plain add, not a gift). */
+    const [mode, setMode] = React.useState<null | "grant" | "add" | "invite">(null);
     const [confirmRevoke, setConfirmRevoke] = React.useState<Grant | null>(null);
     const [busy, setBusy] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
@@ -266,7 +270,7 @@ export function BuyersView({
      * and stays with the gift, so the person reads it when they unwrap it and
      * every time they open it from their library.
      */
-    async function giveAccess(recipients: Recipient[], message?: string | null) {
+    async function giveAccess(recipients: Recipient[], message?: string | null, how: "gift" | "add" = "gift") {
         /* Accounts by id; addresses with no account become gifts that wait for
            them to join (an approved applicant, a speaker). */
         const userIds = userIdsOf(recipients);
@@ -293,6 +297,8 @@ export function BuyersView({
                 tierId: emailTierId || undefined,
                 tierAssignments: tierAssignments.length > 0 ? tierAssignments : undefined,
                 note: message?.trim() || undefined,
+                // A plain add keeps the note private to managers (add-vs-gift.md).
+                mode: how,
             }),
         });
         if (!res.ok) {
@@ -458,17 +464,25 @@ export function BuyersView({
 
             <div className="mt-5">
             <Section
-                title="Gifted"
+                title="Added and gifted"
                 count={grants === null ? undefined : grants.length + pendingGrants.length}
-                subtitle="Given free, as a gift. Not a sale."
+                subtitle="Given free by you or your team. Not a sale."
                 action={mayEdit ? (
-                    <button
-                        onClick={() => setMode("grant")}
-                        className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
-                    >
-                        <GiftIcon />
-                        Send a gift
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button
+                            onClick={() => setMode("add")}
+                            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-zinc-100 text-zinc-900 rounded-lg hover:bg-zinc-200 cursor-pointer"
+                        >
+                            Add people
+                        </button>
+                        <button
+                            onClick={() => setMode("grant")}
+                            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
+                        >
+                            <GiftIcon />
+                            Send a gift
+                        </button>
+                    </div>
                 ) : undefined}
             >
                 {grants === null ? (
@@ -476,10 +490,10 @@ export function BuyersView({
                 ) : grants.length === 0 && pendingGrants.length === 0 ? (
                     <CompactEmptyRow
                         icon={<PeopleIcon />}
-                        title="No gifts yet"
+                        title="Nobody added yet"
                         hint={isCourse
-                            ? "Give somebody this course as a gift. They get an email with your note."
-                            : "Give somebody this product as a gift. They get an email with your note."}
+                            ? "Add somebody to this course, or give it as a gift with your note."
+                            : "Add somebody to this product, or give it as a gift with your note."}
                     />
                 ) : (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
@@ -492,7 +506,7 @@ export function BuyersView({
                                 <div className="min-w-0 flex-1">
                                     <p className="text-[13px] text-zinc-900 truncate">{p.name || p.email}</p>
                                     <p className="text-[11px] text-zinc-400 truncate">
-                                        {p.name ? `${p.email} · ` : ""}No account yet
+                                        {p.kind === "ADD" ? "Added · " : "Gift · "}{p.name ? `${p.email} · ` : ""}No account yet
                                         {` · Emailed ${shortDate(p.lastSentAt || p.createdAt)}`}
                                     </p>
                                 </div>
@@ -526,7 +540,7 @@ export function BuyersView({
                                 </div>
                                 {/* Did the gift land? A muted word, not a coloured pill. */}
                                 <span className="text-[11.5px] text-zinc-400 shrink-0">
-                                    {g.openedAt ? `Opened ${shortDate(g.openedAt)}` : "Not opened yet"}
+                                    {g.kind === "ADD" ? "Added" : g.openedAt ? `Gift · opened ${shortDate(g.openedAt)}` : "Gift · not opened yet"}
                                 </span>
                                 {mayEdit && (
                                     <button
@@ -638,7 +652,7 @@ export function BuyersView({
                 })()}
             </ResponsiveDrawer>
 
-            {mode === "grant" && (
+            {(mode === "grant" || mode === "add") && (
                 <PersonPickerModal
                     open
                     onClose={() => setMode(null)}
@@ -671,7 +685,16 @@ export function BuyersView({
                         note: "Hasn't joined yet",
                         people: awaitingToOffer,
                     } : undefined}
-                    copy={{
+                    copy={mode === "add" ? {
+                        ...BASE_COPY,
+                        title: "Add people",
+                        pickedSubtitle: "They get it free, with a short email. This is not a sale and not a gift.",
+                        stepTwo: "Review",
+                        confirm: "Add",
+                        confirming: "Adding…",
+                        messageLabel: "Private note (optional)",
+                        messagePlaceholder: "Only you and your team see this, for example \"Paid by transfer\".",
+                    } : {
                         ...BASE_COPY,
                         title: "Send a gift",
                         pickedSubtitle: "They get it free, with your note. This is not a sale.",
@@ -684,7 +707,11 @@ export function BuyersView({
                     stepTwo={{
                         kind: "compose",
                         maxLength: 1000,
-                        preview: (message) => (
+                        preview: (message) => mode === "add" ? (
+                            <div className="rounded-xl bg-zinc-50 border border-zinc-100 p-3 text-[12px] text-zinc-600 leading-relaxed">
+                                Each gets a short email saying {product?.name ?? (isCourse ? "the course" : "the product")} is theirs, with a button to open it. Your note stays with your team.
+                            </div>
+                        ) : (
                             <GiftPreview
                                 productName={product?.name ?? (isCourse ? "this course" : "this product")}
                                 isCourse={isCourse}
@@ -692,12 +719,13 @@ export function BuyersView({
                             />
                         ),
                     }}
-                    onConfirm={giveAccess}
+                    onConfirm={(recipients, message) => giveAccess(recipients, message, mode === "add" ? "add" : "gift")}
                     onAdded={async () => {
+                        const wasAdd = mode === "add";
                         setMode(null);
                         await load();
                         await onUpdate();
-                        showToast("Gift sent");
+                        showToast(wasAdd ? "Added" : "Gift sent");
                     }}
                 />
             )}
