@@ -34,7 +34,37 @@ export interface RenderedProductSentence {
 }
 
 function actorName(entry: ProductActivityEntryForRender): string {
-  return entry.actor?.name?.trim() || entry.actor?.usertag || "Someone";
+  // A guest buyer has no account: the address on the sale is their name.
+  return entry.actor?.name?.trim() || entry.actor?.usertag || str(entry.payload, "buyerEmail") || "Someone";
+}
+
+/** Whoever an access row names: their name, @usertag, or the address it went to. */
+function recipientOf(payload: Record<string, unknown> | null): string {
+  return str(payload, "name")?.trim()
+    || (str(payload, "usertag") ? `@${str(payload, "usertag")}` : null)
+    || str(payload, "email")
+    || "someone";
+}
+
+/**
+ * What else a sale row says (add-vs-gift.md phase 4): the discount code and a
+ * bought gift's recipient. Both optional; a plain sale reads as before.
+ */
+function saleDetails(payload: Record<string, unknown> | null, currency: string | null): string {
+  const out: string[] = [];
+  const d = payload?.discount as { code?: unknown; amount?: unknown; percentOff?: unknown } | undefined;
+  if (d && typeof d.code === "string" && d.code) {
+    if (typeof d.percentOff === "number") out.push(`used ${d.code} for ${d.percentOff}% off`);
+    else if (typeof d.amount === "number") out.push(`used ${d.code} for ${money(d.amount, currency)} off`);
+  }
+  const g = payload?.gift as { recipientName?: unknown; recipientUsertag?: unknown; recipientEmail?: unknown } | undefined;
+  if (g) {
+    const name = (typeof g.recipientName === "string" && g.recipientName.trim())
+      || (typeof g.recipientUsertag === "string" && g.recipientUsertag ? `@${g.recipientUsertag}` : "")
+      || (typeof g.recipientEmail === "string" ? g.recipientEmail : "");
+    if (name) out.push(`a gift for ${name}`);
+  }
+  return out.map((x) => ` · ${x}`).join("");
 }
 
 function str(payload: Record<string, unknown> | null, key: string): string | null {
@@ -137,10 +167,11 @@ export function renderProductActivitySentence(
     if (entry.action === "PURCHASE_REFUNDED") {
       return { text: `${actor}'s ${amount > 0 ? "purchase" : "order"} was refunded` };
     }
+    const details = saleDetails(entry.payload, currency);
     if (amount > 0) {
-      return { text: `${actor} bought ${qty > 1 ? `${qty} of this` : "this"} for ${money(amount, currency)}` };
+      return { text: `${actor} bought ${qty > 1 ? `${qty} of this` : "this"} for ${money(amount, currency)}${details}` };
     }
-    return { text: `${actor} got this for free` };
+    return { text: `${actor} got this for free${details}` };
   }
 
   switch (entry.action) {
@@ -237,6 +268,26 @@ export function renderProductActivitySentence(
       return { text: `${actor} changed access to ${visibilityLabel(entry.payload?.to)}` };
     case "DISTRIBUTION_UPDATED":
       return { text: `${actor} changed how this product is delivered` };
+
+    // ── Access given away (add-vs-gift.md) ──────────────────────────
+    // These fell through to "updated the product" (found live, 2026-11-18).
+    case "ACCESS_GRANTED": {
+      const who = recipientOf(entry.payload);
+      const pending = bool(entry.payload, "pending") ? " (emailed, no account yet)" : "";
+      // A bought gift reaching its person: the actor is the buyer.
+      if (bool(entry.payload, "purchased")) {
+        return { text: `${who} received the gift ${actor} bought${pending}`, subjectName: who };
+      }
+      const mode = str(entry.payload, "mode");
+      if (mode === "add") return { text: `${actor} added ${who}${pending}`, subjectName: who };
+      if (mode === "gift") return { text: `${actor} gave ${who} this as a gift${pending}`, subjectName: who };
+      // Before add-vs-gift every grant was given access, no mode recorded.
+      return { text: `${actor} gave ${who} access${pending}`, subjectName: who };
+    }
+    case "ACCESS_REVOKED": {
+      const who = recipientOf(entry.payload);
+      return { text: `${actor} took back ${who}'s access`, subjectName: who };
+    }
 
     default:
       // Rule 2. A BE ahead of this bundle degrades to a vague-but-true

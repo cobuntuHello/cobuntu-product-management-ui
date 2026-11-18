@@ -178,3 +178,55 @@ describe("sales", () => {
       .toBe("Bea's purchase was refunded");
   });
 });
+
+/*
+ * Add vs Gift phase 4 (backend docs/features/add-vs-gift.md). Giving access
+ * used to read as "Bea updated the product" (found live, 2026-11-18).
+ */
+describe("access given away", () => {
+  const grant = (payload: Record<string, unknown>) => entry({ action: "ACCESS_GRANTED", payload });
+
+  it("says add, gift, or plain access, with the person", () => {
+    expect(renderProductActivitySentence(grant({ mode: "add", name: "Malgo", userId: "u2" })).text).toBe("Bea added Malgo");
+    expect(renderProductActivitySentence(grant({ mode: "gift", name: null, email: "g@x.com", pending: true })).text)
+      .toBe("Bea gave g@x.com this as a gift (emailed, no account yet)");
+    expect(renderProductActivitySentence(grant({ name: null, usertag: "rita" })).text).toBe("Bea gave @rita access");
+  });
+
+  it("a bought gift reaching its person names the buyer", () => {
+    const text = renderProductActivitySentence(entry({
+      action: "ACCESS_GRANTED",
+      actor: { id: "p", name: "Joao", usertag: "joao", profileImage: null },
+      payload: { mode: "gift", purchased: true, saleId: "s1", name: "Rita", userId: "u3" },
+    })).text;
+    expect(text).toBe("Rita received the gift Joao bought");
+  });
+
+  it("taking access back is said as such", () => {
+    expect(renderProductActivitySentence(entry({ action: "ACCESS_REVOKED", payload: { name: "Malgo" } })).text).toBe("Bea took back Malgo's access");
+  });
+});
+
+describe("a sale names a guest, its code and its gift", () => {
+  const sale = (payload: Record<string, unknown>, actor: ProductActivityEntryForRender["actor"] = null) =>
+    entry({ source: "SALE", action: "PURCHASED", actor, payload });
+
+  it("a guest buyer is named by their address, not 'Someone'", () => {
+    expect(renderProductActivitySentence(sale({ buyerEmail: "g@x.com", amount: 2500, currency: "EUR", quantity: 1 })).text)
+      .toBe("g@x.com bought this for €25.00");
+  });
+
+  it("the code with its percent, and who a bought gift is for", () => {
+    const text = renderProductActivitySentence(sale({
+      amount: 2000, currency: "EUR", quantity: 1,
+      discount: { code: "SUMMER20", amount: 500, percentOff: 20 },
+      gift: { recipientName: "Rita", recipientUsertag: "rita", recipientEmail: null },
+    }, { id: "p", name: "Joao", usertag: "joao", profileImage: null })).text;
+    expect(text).toBe("Joao bought this for €20.00 · used SUMMER20 for 20% off · a gift for Rita");
+  });
+
+  it("a code that made it free", () => {
+    expect(renderProductActivitySentence(sale({ buyerEmail: "g@x.com", amount: 0, currency: "EUR", discount: { code: "FREE", amount: 2500, percentOff: 100 } })).text)
+      .toBe("g@x.com got this for free · used FREE for 100% off");
+  });
+});
