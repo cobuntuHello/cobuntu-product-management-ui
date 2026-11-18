@@ -296,7 +296,7 @@ export function BuyersView({
         const tierAssignments = recipients
             .filter((r) => r.id && r.tierId)
             .map((r) => ({ userId: r.id!, tierId: r.tierId! }));
-        const body = JSON.stringify({
+        const payload = JSON.stringify({
             userIds: userIds.length > 0 ? userIds : undefined,
             emails: emails.length > 0 ? emails : undefined,
             names: names.length > 0 ? names : undefined,
@@ -309,10 +309,10 @@ export function BuyersView({
         const res = await fetch(`${apiBaseUrl}/api/products/${product.id}/access-grants`, {
             method: "POST",
             headers: jsonHeaders(),
-            body,
+            body: payload,
             /* The undo window can end because the tab closed; keepalive still
                delivers it. Browsers cap that body near 64 KB. */
-            keepalive: body.length < 60_000,
+            keepalive: payload.length < 60_000,
         });
         if (!res.ok) {
             const body = await res.json().catch(() => null);
