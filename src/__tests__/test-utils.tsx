@@ -3,6 +3,8 @@ import { render, type RenderOptions } from "@testing-library/react";
 import { ProductManagementConfigProvider, type ProductManagementConfig } from "../config";
 
 const defaultConfig: ProductManagementConfig = {
+  // No undo window by default: a test that is not about it should not wait.
+  undoSeconds: 0,
   apiBaseUrl: "http://api.test",
   authHeaders: () => ({ Authorization: "Bearer test-token" }),
   stripeConnectUrl: (communityTag: string) => `/test-stripe-connect/${communityTag}`,

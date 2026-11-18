@@ -123,7 +123,9 @@ export function BuyersView({
     communityTag?: string | null;
     currentUserId?: string | null;
 }) {
-    const { apiBaseUrl, authHeaders, UserAvatar: ConfigAvatar } = useProductManagementConfig();
+    const { apiBaseUrl, authHeaders, UserAvatar: ConfigAvatar, undoSeconds: configUndo } = useProductManagementConfig();
+    /* Seconds to change their mind before anyone is emailed (add-vs-gift.md phase 5). */
+    const undoSeconds = configUndo ?? 8;
     const jsonHeaders = useJsonHeaders();
     const UserAvatar = ConfigAvatar ?? UserAvatarFallback;
 
@@ -135,6 +137,9 @@ export function BuyersView({
     const [confirmRevokePending, setConfirmRevokePending] = React.useState<PendingGrant | null>(null);
     /** The waiting gift whose email is being sent again, if any. */
     const [resendingId, setResendingId] = React.useState<string | null>(null);
+    /* Naming a waiting guest (add-vs-gift.md phase 5). */
+    const [renamingId, setRenamingId] = React.useState<string | null>(null);
+    const [nameDraft, setNameDraft] = React.useState("");
     const isCourse = product?.productType === "COURSE";
     const [invites, setInvites] = React.useState<Invitation[] | null>(null);
     const [customers, setCustomers] = React.useState<Customer[] | null>(null);
@@ -291,19 +296,23 @@ export function BuyersView({
         const tierAssignments = recipients
             .filter((r) => r.id && r.tierId)
             .map((r) => ({ userId: r.id!, tierId: r.tierId! }));
+        const payload = JSON.stringify({
+            userIds: userIds.length > 0 ? userIds : undefined,
+            emails: emails.length > 0 ? emails : undefined,
+            names: names.length > 0 ? names : undefined,
+            tierId: emailTierId || undefined,
+            tierAssignments: tierAssignments.length > 0 ? tierAssignments : undefined,
+            note: message?.trim() || undefined,
+            // A plain add keeps the note private to managers (add-vs-gift.md).
+            mode: how,
+        });
         const res = await fetch(`${apiBaseUrl}/api/products/${product.id}/access-grants`, {
             method: "POST",
             headers: jsonHeaders(),
-            body: JSON.stringify({
-                userIds: userIds.length > 0 ? userIds : undefined,
-                emails: emails.length > 0 ? emails : undefined,
-                names: names.length > 0 ? names : undefined,
-                tierId: emailTierId || undefined,
-                tierAssignments: tierAssignments.length > 0 ? tierAssignments : undefined,
-                note: message?.trim() || undefined,
-                // A plain add keeps the note private to managers (add-vs-gift.md).
-                mode: how,
-            }),
+            body: payload,
+            /* The undo window can end because the tab closed; keepalive still
+               delivers it. Browsers cap that body near 64 KB. */
+            keepalive: payload.length < 60_000,
         });
         if (!res.ok) {
             const body = await res.json().catch(() => null);
@@ -345,6 +354,25 @@ export function BuyersView({
             const body = await res.json().catch(() => null);
             if (res.status === 403) throw new Error("You don't have permission to manage this product.");
             throw new Error(body?.error || `Could not send invitations (${res.status})`);
+        }
+    }
+
+    /** Name (or rename) a guest still waiting for their account (add-vs-gift.md phase 5). */
+    async function renamePending(p: PendingGrant) {
+        const name = nameDraft.trim();
+        if (!name) return;
+        try {
+            const res = await fetch(`${apiBaseUrl}/api/products/${product.id}/access-grants/pending/${p.id}`, {
+                method: "PATCH",
+                headers: jsonHeaders(),
+                body: JSON.stringify({ name }),
+            });
+            if (!res.ok) { showToast("Could not save the name"); return; }
+            setPendingGrants((prev) => prev.map((x) => (x.id === p.id ? { ...x, name } : x)));
+            setRenamingId(null);
+            showToast("Name saved");
+        } catch {
+            showToast("Could not save the name");
         }
     }
 
@@ -508,12 +536,39 @@ export function BuyersView({
                             <li key={`pending-${p.id}`} className="flex items-center gap-3 px-5 py-3">
                                 <UserAvatar user={{ id: p.email, name: p.name ?? p.email }} className="w-8 h-8 shrink-0" />
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-[13px] text-zinc-900 truncate">{p.name || p.email}</p>
+                                    {renamingId === p.id ? (
+                                        <form
+                                            className="flex items-center gap-1.5"
+                                            onSubmit={(e) => { e.preventDefault(); void renamePending(p); }}
+                                        >
+                                            <input
+                                                autoFocus
+                                                value={nameDraft}
+                                                onChange={(e) => setNameDraft(e.target.value)}
+                                                maxLength={120}
+                                                aria-label="Their name"
+                                                placeholder="Their name"
+                                                className="min-w-0 flex-1 border border-zinc-200 rounded-lg px-2 py-1 text-[16px] sm:text-[13px] text-zinc-900 focus:outline-none focus:border-zinc-400"
+                                            />
+                                            <button type="submit" disabled={!nameDraft.trim()} className="px-2.5 py-1 text-[12px] font-medium bg-zinc-900 text-white rounded-lg cursor-pointer disabled:opacity-40">Save</button>
+                                            <button type="button" onClick={() => setRenamingId(null)} className="px-2.5 py-1 text-[12px] rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200">Cancel</button>
+                                        </form>
+                                    ) : (
+                                        <p className="text-[13px] text-zinc-900 truncate">{p.name || p.email}</p>
+                                    )}
                                     <p className="text-[11px] text-zinc-400 truncate">
                                         {p.saleId ? "Bought as a gift · " : p.kind === "ADD" ? "Added · " : "Gift · "}{p.name ? `${p.email} · ` : ""}No account yet
                                         {` · Emailed ${shortDate(p.lastSentAt || p.createdAt)}`}
                                     </p>
                                 </div>
+                                {mayEdit && renamingId !== p.id && (
+                                    <button
+                                        onClick={() => { setNameDraft(p.name ?? ""); setRenamingId(p.id); }}
+                                        className="px-3 py-1.5 text-[12px] rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200 shrink-0"
+                                    >
+                                        {p.name ? "Edit name" : "Add name"}
+                                    </button>
+                                )}
                                 {mayEdit && (
                                     <button
                                         onClick={() => resendPending(p)}
@@ -684,7 +739,24 @@ export function BuyersView({
                         noMatchesHint: isCourse
                             ? "Not a member yet? Type their @usertag, or their full email address. The course is theirs as soon as they join."
                             : "Not a member yet? Type their @usertag, or their full email address. They can download it from the email, no account needed.",
+                        /* A name per address, and a nudge when one is empty: a
+                           guest otherwise appears as their address
+                           (add-vs-gift.md phase 5). */
+                        guestName: {
+                            label: "Their names (only you and your team see them)",
+                            placeholder: "Their name",
+                            missing: (n) => `${n} ${n === 1 ? "person has" : "people have"} no name yet. Add it, or send anyway.`,
+                        },
                     }}
+                    // Gmail-style: nothing is sent until the countdown runs out.
+                    undo={undoSeconds > 0 ? {
+                        seconds: undoSeconds,
+                        counting: (n, sec) => mode === "add"
+                            ? `Adding ${n} ${n === 1 ? "person" : "people"} in ${sec}s`
+                            : `Sending ${n} ${n === 1 ? "gift" : "gifts"} in ${sec}s`,
+                        undo: "Undo",
+                        undone: "Nothing was sent. Change anything you need, then send again.",
+                    } : undefined}
                     outsiders={awaitingToOffer.length > 0 ? {
                         label: "Approved, not joined yet",
                         note: "Hasn't joined yet",

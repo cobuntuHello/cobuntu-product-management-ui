@@ -688,3 +688,25 @@ describe("Add people (a plain add, not a gift; backend docs/features/add-vs-gift
         expect(screen.getByText("Gift · not opened yet")).toBeInTheDocument();
     });
 });
+
+/*
+ * Add vs Gift phase 5 (backend docs/features/add-vs-gift.md): fixing a
+ * mistake. Name a guest still waiting for their account; an undo window and a
+ * missing-name nudge before anyone is emailed (products and courses alike).
+ */
+describe("fixing a mistake on Buyers", () => {
+    it("names a waiting guest who was added without one", async () => {
+        const user = userEvent.setup();
+        const fetchMock = renderView([
+            { method: "GET", url: /\/access-grants\/pending$/, body: [{ id: "pg-r", email: "rui@ruibarros.com", createdAt: "2026-11-18T09:55:00Z", kind: "ADD" }] },
+            { method: "PATCH", url: /\/access-grants\/pending\/pg-r$/, body: { id: "pg-r", email: "rui@ruibarros.com", name: "Rui Barros" } },
+        ]);
+        await user.click(await screen.findByRole("button", { name: "Add name" }));
+        await user.type(screen.getByPlaceholderText("Their name"), "Rui Barros");
+        await user.click(screen.getByRole("button", { name: "Save" }));
+        await waitFor(() => expect(screen.getByText("Rui Barros")).toBeInTheDocument());
+        const call = fetchMock.mock.calls.find(([url, init]: any) => /pending\/pg-r$/.test(String(url)) && init?.method === "PATCH");
+        expect(JSON.parse((call![1] as RequestInit).body as string)).toEqual({ name: "Rui Barros" });
+        expect((fetchMock as any).toast).toHaveBeenCalledWith("Name saved");
+    });
+});

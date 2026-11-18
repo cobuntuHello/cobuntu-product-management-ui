@@ -18,6 +18,13 @@ export interface ProductManagementConfig {
   apiBaseUrl: string;
 
   /**
+   * Seconds a seller has to Undo after Add people / Send a gift before anyone
+   * is emailed (backend docs/features/add-vs-gift.md phase 5). Default 8; 0
+   * turns the window off (tests).
+   */
+  undoSeconds?: number;
+
+  /**
    * Returns the Authorization headers to attach to API requests. Called
    * once per request; should be cheap.
    */
