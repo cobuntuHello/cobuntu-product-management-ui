@@ -51,6 +51,8 @@ interface Grant {
     openedAt?: string | null;
     /** GIFT (Send a gift) or ADD (Add people, not a gift). backend docs/features/add-vs-gift.md */
     kind?: "GIFT" | "ADD";
+    /** Set when a buyer PAID for this gift (gift-purchases.md): not the host's. */
+    saleId?: string | null;
     users?: { id: string; name?: string | null; usertag?: string | null; profileImage?: string | null } | null;
 }
 
@@ -64,6 +66,8 @@ interface PendingGrant {
     /** When the gift email last went out ("Send again" moves it). */
     lastSentAt?: string | null;
     kind?: "GIFT" | "ADD";
+    /** Set when a buyer PAID for this gift (gift-purchases.md): not the host's. */
+    saleId?: string | null;
 }
 
 interface Invitation {
@@ -506,7 +510,7 @@ export function BuyersView({
                                 <div className="min-w-0 flex-1">
                                     <p className="text-[13px] text-zinc-900 truncate">{p.name || p.email}</p>
                                     <p className="text-[11px] text-zinc-400 truncate">
-                                        {p.kind === "ADD" ? "Added · " : "Gift · "}{p.name ? `${p.email} · ` : ""}No account yet
+                                        {p.saleId ? "Bought as a gift · " : p.kind === "ADD" ? "Added · " : "Gift · "}{p.name ? `${p.email} · ` : ""}No account yet
                                         {` · Emailed ${shortDate(p.lastSentAt || p.createdAt)}`}
                                     </p>
                                 </div>
@@ -540,7 +544,8 @@ export function BuyersView({
                                 </div>
                                 {/* Did the gift land? A muted word, not a coloured pill. */}
                                 <span className="text-[11.5px] text-zinc-400 shrink-0">
-                                    {g.kind === "ADD" ? "Added" : g.openedAt ? `Gift · opened ${shortDate(g.openedAt)}` : "Gift · not opened yet"}
+                                    {/* A gift someone PAID for is a sale, not the host's gift. */}
+                                    {g.kind === "ADD" ? "Added" : `${g.saleId ? "Bought as a gift" : "Gift"} · ${g.openedAt ? `opened ${shortDate(g.openedAt)}` : "not opened yet"}`}
                                 </span>
                                 {mayEdit && (
                                     <button

@@ -405,6 +405,24 @@ describe("giving access", () => {
         expect(screen.getByText("Gift · not opened yet")).toBeInTheDocument();
     });
 
+    // Add vs Gift phase 4: a waiting guest who was ADDED reads "Added" (the
+    // list now carries kind; every one read "Gift" before), and a gift a buyer
+    // paid for says so, apart from the host's own gifts.
+    it("labels a waiting add as Added, and a bought gift as bought", async () => {
+        renderView([
+            { method: "GET", url: /\/access-grants\/pending$/, body: [
+                { id: "pg-a", email: "added@example.com", createdAt: "2026-11-13T10:00:00Z", kind: "ADD", saleId: null },
+                { id: "pg-b", email: "bought@example.com", createdAt: "2026-11-13T10:00:00Z", kind: "GIFT", saleId: "s-1" },
+            ] },
+            { method: "GET", url: /\/access-grants$/, body: [
+                { id: "g3", userId: "u-rita", createdAt: "2026-11-13T10:00:00Z", openedAt: null, kind: "GIFT", saleId: "s-2", users: { id: "u-rita", name: "Rita", usertag: "rita" } },
+            ] },
+        ]);
+        expect(await screen.findByText(/^Added · No account yet/)).toBeInTheDocument();
+        expect(screen.getByText(/^Bought as a gift · No account yet/)).toBeInTheDocument();
+        expect(screen.getByText("Bought as a gift · not opened yet")).toBeInTheDocument();
+    });
+
     it("sends a waiting gift's email again", async () => {
         const user = userEvent.setup();
         const fetchMock = renderView([
