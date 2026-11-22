@@ -55,7 +55,7 @@ describe("ProductForm — refund policy", () => {
         {...base}
         onChange={onChange}
         page="settings"
-        initialData={{ refundPolicy: { mode: "default", customBuyerWindowDays: 0 } } as any}
+        initialData={{ tiers: [paidTier], refundPolicy: { mode: "default", customBuyerWindowDays: 0 } } as any}
       />,
     );
     expect(screen.getByRole("button", { name: /No self-service refunds/i })).toHaveAttribute("aria-pressed", "true");
