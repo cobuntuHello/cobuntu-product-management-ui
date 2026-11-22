@@ -37,6 +37,6 @@ describe("the refund controls are gated on it", () => {
     expect(read("../page/ProductSettingsDrawer.tsx")).toContain("productHasPaidOffer(product) && (");
   });
   it("the form shows the refund field only when a variant can be paid", () => {
-    expect(read("../components/ProductForm.tsx")).toContain("showSettings && formVariantsHavePaid(tiers) && (");
+    expect(read("../components/ProductForm.tsx")).toContain("showSettings && (multiTier ? formVariantsHavePaid(tiers) : Number(price) > 0) && (");
   });
 });

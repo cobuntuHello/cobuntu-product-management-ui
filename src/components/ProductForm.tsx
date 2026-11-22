@@ -1605,7 +1605,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               control the manage page's refund modal uses (RefundPolicyField).
               Standard = platform default window; None = buyers contact the seller.
               Always on the settings page for every sellable artifact. */}
-          {showSettings && formVariantsHavePaid(tiers) && (
+          {showSettings && (multiTier ? formVariantsHavePaid(tiers) : Number(price) > 0) && (
           <div>
             <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Refunds</p>
             <RefundPolicyField value={refundPolicy} onChange={setRefundPolicy} anchor="PURCHASE" />

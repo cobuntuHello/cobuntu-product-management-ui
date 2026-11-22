@@ -11,7 +11,7 @@ import { ProductForm } from "../components/ProductForm";
  */
 // A PAID product: the refund control only exists when something can be paid.
 const paidTier = { ...blankTier("EUR"), price: "10" };
-const base = { communityTag: "acme", showTiers: true, categories: [] as any[], initialData: { tiers: [paidTier] } as any };
+const base = { communityTag: "acme", showTiers: true, categories: [] as any[], initialData: { price: "10" } as any };
 
 function lastEmit(onChange: ReturnType<typeof vi.fn>) {
   const calls = onChange.mock.calls;
@@ -19,6 +19,10 @@ function lastEmit(onChange: ReturnType<typeof vi.fn>) {
 }
 
 describe("ProductForm — refund policy for a free product", () => {
+  it("still shows it for a product with paid variants", () => {
+    renderWithConfig(<ProductForm communityTag="acme" showTiers categories={[]} onChange={vi.fn()} page="settings" initialData={{ tiers: [paidTier] } as any} />);
+    expect(screen.getByText("Refunds")).toBeInTheDocument();
+  });
   it("shows no Refunds control when nothing can be paid", () => {
     renderWithConfig(<ProductForm communityTag="acme" showTiers categories={[]} onChange={vi.fn()} page="settings" />);
     expect(screen.queryByText("Refunds")).not.toBeInTheDocument();
@@ -55,7 +59,7 @@ describe("ProductForm — refund policy", () => {
         {...base}
         onChange={onChange}
         page="settings"
-        initialData={{ tiers: [paidTier], refundPolicy: { mode: "default", customBuyerWindowDays: 0 } } as any}
+        initialData={{ price: "10", refundPolicy: { mode: "default", customBuyerWindowDays: 0 } } as any}
       />,
     );
     expect(screen.getByRole("button", { name: /No self-service refunds/i })).toHaveAttribute("aria-pressed", "true");
