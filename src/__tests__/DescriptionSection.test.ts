@@ -57,16 +57,26 @@ describe("the description has its own section", () => {
     });
 });
 
-describe("unsaved work is visible and survives a refetch", () => {
-    it("only enables Save once the content differs", () => {
-        expect(section).toContain("const dirty = content !== saved;");
-        expect(section).toContain("disabled={!dirty || saving}");
+describe("it saves itself, and unsaved work survives a refetch", () => {
+    it("has no Save button: the shared autosave does the saving", () => {
+        /*
+         * T-386. A lone Save button sat beside the heading. It made saving a
+         * step to remember on a field written in place, and an edit left
+         * without pressing it was lost. Behaviour is pinned in
+         * DescriptionSection.autosave.test.tsx; this pins the wiring.
+         */
+        expect(section).not.toContain("disabled={!dirty || saving}");
+        expect(section).not.toMatch(/>\s*Save\s*</);
+        expect(section).toContain("useAutosave(");
+        expect(section).toContain("<AutosaveStatus");
+        expect(section).toContain("onBlur={autosave.flush}");
     });
 
     it("adopts a new server value ONLY when nothing is being typed", () => {
         /*
          * Otherwise a refetch mid-paragraph silently resets the editor to the
-         * stored text.
+         * stored text. With autosave a refetch follows every save, so this
+         * matters more now.
          */
         expect(section).toContain("const seededFrom = useRef(saved);");
         expect(section).toContain("prev === seededFrom.current ? saved : prev");
@@ -79,8 +89,9 @@ describe("permissions and read-only", () => {
         expect(section).toContain("const canEdit = useCanEdit();");
     });
 
-    it("hides Save entirely when the viewer cannot edit", () => {
-        expect(section).toContain("{canEdit && (");
+    it("saves nothing and shows no status when the viewer cannot edit", () => {
+        expect(section).toContain("enabled: canEdit,");
+        expect(section).toContain("status={canEdit ? <AutosaveStatus");
     });
 
     it("does not render anything unsafely itself", () => {
@@ -96,6 +107,8 @@ describe("it saves through the same endpoint the modal used", () => {
         // Moving the surface must not move the contract.
         expect(section).toContain("/api/users/me/products/${productId}");
         expect(section).toMatch(/method:\s*"PATCH"/);
-        expect(section).toContain("description: content.trim() || null");
+        // `description` is the trimmed text the autosave compares and sends.
+        expect(section).toContain("value: content.trim(),");
+        expect(section).toContain("description: description || null");
     });
 });

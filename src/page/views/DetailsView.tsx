@@ -288,7 +288,6 @@ export function DetailsView({
         product={product}
         productId={productId}
         onSaved={() => { void onUpdate(); }}
-        showToast={showToast}
       />
 
       {modal === "name" && (
