@@ -1,5 +1,6 @@
 "use client";
 
+import { formVariantsHavePaid } from "../lib/paidProduct";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
@@ -1604,7 +1605,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               control the manage page's refund modal uses (RefundPolicyField).
               Standard = platform default window; None = buyers contact the seller.
               Always on the settings page for every sellable artifact. */}
-          {showSettings && (
+          {showSettings && formVariantsHavePaid(tiers) && (
           <div>
             <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Refunds</p>
             <RefundPolicyField value={refundPolicy} onChange={setRefundPolicy} anchor="PURCHASE" />

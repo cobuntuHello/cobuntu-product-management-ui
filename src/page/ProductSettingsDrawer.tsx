@@ -1,5 +1,6 @@
 "use client";
 
+import { productHasPaidOffer } from "../lib/paidProduct";
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { ProductVisibilityEditModal, type VisibilityAxis } from "../components/ProductVisibilityEditModal";
@@ -428,6 +429,8 @@ export function ProductSettingsDrawer({
               Your settings
             </p>
           )}
+          {/* No row for a free product: nothing was charged, so there is nothing to refund. */}
+          {productHasPaidOffer(product) && (
           <SettingsRow
             label="Refund policy"
             summary={refundPolicySummary(product)}
@@ -439,6 +442,7 @@ export function ProductSettingsDrawer({
               </svg>
             }
           />
+          )}
 
           {!hideAfterCheckout && (
             <SettingsRow
