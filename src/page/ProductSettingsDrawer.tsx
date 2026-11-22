@@ -151,6 +151,16 @@ export function ProductSettingsDrawer({
    * fix/settings-always-visible for the full reasoning.
    */
   const isCommunityOwned = !!product?.communityId;
+  /*
+   * Leader-only settings, shown LOCKED rather than editable (T-376).
+   *
+   * A collaborator may edit a community-owned product, but who can see it, who
+   * can buy it, the landing page and after checkout stay with a leader holding
+   * MARKETPLACE_CREATE in the owning community (assertCanConfigureCommunityScoped
+   * on the server). The product read says so in `viewerCanConfigureCommunity`.
+   * Only an explicit false locks; a payload that never said keeps today's rows.
+   */
+  const lockedCommunity = isCommunityOwned && product?.viewerCanConfigureCommunity === false;
   const [approvalOn, setApprovalOn] = React.useState(!!requiresApproval);
   const [savingApproval, setSavingApproval] = React.useState(false);
   React.useEffect(() => { setApprovalOn(!!requiresApproval); }, [requiresApproval]);
@@ -217,7 +227,7 @@ export function ProductSettingsDrawer({
   // ─── Active sub-modal (mutually exclusive with the drawer) ────────
   // Gated identically to the rows that open them, so a stale `modal` can't
   // surface an editor the backend would 403.
-  if ((modal === "viewability" || modal === "accessibility") && isCommunityOwned) {
+  if ((modal === "viewability" || modal === "accessibility") && isCommunityOwned && !lockedCommunity) {
     return (
       <ProductVisibilityEditModal
         product={product}
@@ -234,7 +244,7 @@ export function ProductSettingsDrawer({
       />
     );
   }
-  if (modal === "distribution" && isCommunityOwned) {
+  if (modal === "distribution" && isCommunityOwned && !lockedCommunity) {
     return (
       <ProductDistributionModal
         product={product}
@@ -248,7 +258,7 @@ export function ProductSettingsDrawer({
   }
   // Gated identically to the row that opens it, so a stale `modal` state
   // cannot surface an editor the backend would 403.
-  if (modal === "after-checkout" && !hideAfterCheckout) {
+  if (modal === "after-checkout" && !hideAfterCheckout && !lockedCommunity) {
     return (
       <ModalShell onClose={closeModalAndReopenDrawer} width="w-[560px]">
         <AfterCheckoutCard
@@ -341,11 +351,17 @@ export function ProductSettingsDrawer({
               Community access
             </p>
           )}
+          {lockedCommunity && (
+            <p className="px-5 pb-2 text-[12px] text-zinc-500 leading-snug" data-testid="community-settings-locked-note">
+              Only community leaders with marketplace permissions can change these.
+            </p>
+          )}
           {isCommunityOwned && (
           <SettingsRow
             label="Visibility"
             summary={viewLabel}
             onClick={() => openModal("viewability")}
+            locked={lockedCommunity}
             icon={
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-zinc-400">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -359,6 +375,7 @@ export function ProductSettingsDrawer({
             label="Access"
             summary={buyLabel}
             onClick={() => openModal("accessibility")}
+            locked={lockedCommunity}
             icon={
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-zinc-400">
                 <rect x="3" y="11" width="18" height="11" rx="2" />
@@ -372,6 +389,7 @@ export function ProductSettingsDrawer({
             label="Distribution"
             summary={landingLabel}
             onClick={() => openModal("distribution")}
+            locked={lockedCommunity}
             icon={
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-zinc-400">
                 <path d="M4 4h16v6H4z" />
@@ -444,8 +462,9 @@ export function ProductSettingsDrawer({
           />
           )}
 
-          {!hideAfterCheckout && (
+          {(!hideAfterCheckout || lockedCommunity) && (
             <SettingsRow
+              locked={lockedCommunity}
               label="After checkout"
               summary={afterCheckoutSummary(product)}
               onClick={() => openModal("after-checkout")}
@@ -485,12 +504,32 @@ function SettingsRow({
   summary,
   onClick,
   icon,
+  locked = false,
 }: {
   label: string;
   summary: string;
   onClick: () => void;
   icon: React.ReactNode;
+  /** Shows the current value with a lock, and does not open (T-376). */
+  locked?: boolean;
 }) {
+  if (locked) {
+    return (
+      <div className="w-full flex items-center gap-3 px-5 py-4 border-b border-zinc-100 text-left" data-locked="true">
+        <span className="shrink-0 w-9 h-9 rounded-lg border border-zinc-200 bg-white flex items-center justify-center opacity-60">
+          {icon}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[14px] font-medium text-zinc-700">{label}</span>
+          <span className="block text-[12px] text-zinc-500 truncate">{summary}</span>
+        </span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-400 shrink-0" aria-hidden>
+          <rect x="4" y="11" width="16" height="10" rx="2" />
+          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        </svg>
+      </div>
+    );
+  }
   return (
     <button
       type="button"
