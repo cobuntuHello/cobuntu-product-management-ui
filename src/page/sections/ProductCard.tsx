@@ -6,6 +6,7 @@ import { useState } from "react";
 import { PencilIcon } from "../helpers";
 import { useProductManagementConfig } from "../../config";
 import { UserAvatarFallback } from "../../ui/user-avatar-fallback";
+import { useCanEdit } from "../../lib/manageAccess";
 
 interface Props {
   product: any;
@@ -44,6 +45,21 @@ export function ProductCard({
   const { UserAvatar: ConfigAvatar } = useProductManagementConfig();
   const UserAvatar = ConfigAvatar ?? UserAvatarFallback;
   const [urlCopied, setUrlCopied] = useState(false);
+  /*
+   * READ-ONLY LOOKS READ-ONLY.
+   *
+   * A viewer who may not change this product (a leader of a community that
+   * CARRIES it, or the superadmin) used to get the owner's card: every row
+   * hovered, swapped its icon for a pencil and looked live. The page's guard
+   * stopped the editor opening, so each click simply did nothing, which reads
+   * as broken rather than as "not yours to change". Rows now render disabled
+   * (no pencil, no hover, muted, not clickable), the image controls go, and
+   * the empty-state prompts stop offering to add things. The values stay
+   * fully readable: reading is what this viewer is here for. Mirrors the
+   * event card's `readOnly`.
+   */
+  const canEdit = useCanEdit();
+  const edit = (fn?: () => void) => (canEdit ? fn : undefined);
   /*
    * NO MEASUREMENT. The media column used to size itself from the RIGHT
    * column's measured height, so a square image matched the rows beside it.
@@ -154,12 +170,14 @@ export function ProductCard({
         */}
         <div className="shrink-0 w-[280px] max-sm:w-full">
           <div className="overflow-hidden rounded-xl relative group w-[280px] aspect-[4/3] max-sm:!w-full">
-            <button
-              onClick={onEditMedia}
-              aria-label={bannerUrl ? "Manage images" : "Add images"}
-              className="absolute inset-0 w-full h-full z-10 cursor-pointer"
-              style={{ bottom: "40px" }}
-            />
+            {canEdit && (
+              <button
+                onClick={onEditMedia}
+                aria-label={bannerUrl ? "Manage images" : "Add images"}
+                className="absolute inset-0 w-full h-full z-10 cursor-pointer"
+                style={{ bottom: "40px" }}
+              />
+            )}
 
             {bannerUrl ? (
               <img src={bannerUrl} alt="" className="w-full h-full object-cover" />
@@ -176,10 +194,16 @@ export function ProductCard({
                   <circle cx="8.5" cy="8.5" r="1.5" />
                   <path d="m21 15-5-5L5 21" />
                 </svg>
-                <span className="text-[12.5px] font-semibold text-zinc-600">Add your first image</span>
-                <span className="text-[11.5px] leading-snug text-zinc-400 max-w-[22ch]">
-                  Listings with a photo are opened far more often.
-                </span>
+                {canEdit ? (
+                  <>
+                    <span className="text-[12.5px] font-semibold text-zinc-600">Add your first image</span>
+                    <span className="text-[11.5px] leading-snug text-zinc-400 max-w-[22ch]">
+                      Listings with a photo are opened far more often.
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-[12.5px] font-semibold text-zinc-500">No images yet</span>
+                )}
               </div>
             )}
 
@@ -196,7 +220,7 @@ export function ProductCard({
               </span>
             )}
 
-            {bannerUrl && (
+            {bannerUrl && canEdit && (
               <div
                 onClick={onEditMedia}
                 className="absolute top-3 right-3 h-8 w-8 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center cursor-pointer hover:bg-black/80 transition-all z-20 opacity-0 group-hover:opacity-100"
@@ -237,7 +261,7 @@ export function ProductCard({
               one means you never find out. */}
           {(
             <div className="flex gap-2 mt-2 overflow-x-auto scrollbar-hide">
-              {railMedia.map((m: any) => (
+              {railMedia.map((m: any) => canEdit ? (
                 <button
                   key={m.id ?? m.url}
                   onClick={onEditMedia}
@@ -246,16 +270,23 @@ export function ProductCard({
                 >
                   <img src={m.url} alt="" className="w-full h-full object-cover" />
                 </button>
+              ) : (
+                <div key={m.id ?? m.url} className="shrink-0 w-[52px] h-[52px] rounded-lg overflow-hidden">
+                  <img src={m.url} alt="" className="w-full h-full object-cover" />
+                </div>
               ))}
-              <button
-                onClick={onEditMedia}
-                aria-label="Add images"
-                className="shrink-0 w-[52px] h-[52px] rounded-lg cursor-pointer grid place-items-center text-[17px] leading-none
-                           text-zinc-400 hover:text-zinc-600 hover:border-zinc-400 transition-colors
-                           border-[1.5px] border-dashed border-zinc-300 bg-zinc-50"
-              >
-                +
-              </button>
+              {/* The add tile is an offer to add: nothing to offer read-only. */}
+              {canEdit && (
+                <button
+                  onClick={onEditMedia}
+                  aria-label="Add images"
+                  className="shrink-0 w-[52px] h-[52px] rounded-lg cursor-pointer grid place-items-center text-[17px] leading-none
+                             text-zinc-400 hover:text-zinc-600 hover:border-zinc-400 transition-colors
+                             border-[1.5px] border-dashed border-zinc-300 bg-zinc-50"
+                >
+                  +
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -264,7 +295,7 @@ export function ProductCard({
         <div className="flex-1 flex flex-col gap-1 min-w-0">
           <div className="flex flex-col gap-1 flex-1">
             {/* Name */}
-            <InfoRow onClick={onEditName}
+            <InfoRow onClick={edit(onEditName)} disabled={!canEdit}
               icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>}>
               <p className="text-sm font-medium text-zinc-900 truncate">{product.name || "Untitled Product"}</p>
             </InfoRow>
@@ -293,7 +324,7 @@ export function ProductCard({
               surface to fill it in.
             */}
             {onEditCta && (
-              <InfoRow onClick={onEditCta}
+              <InfoRow onClick={edit(onEditCta)} disabled={!canEdit}
                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>}>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-zinc-400">Button text</p>
@@ -312,7 +343,7 @@ export function ProductCard({
               they needed the form. Adding them is what lets the drawer go.
             */}
             {onEditCategory && (
-              <InfoRow onClick={onEditCategory}
+              <InfoRow onClick={edit(onEditCategory)} disabled={!canEdit}
                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>}>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-zinc-400">Category</p>
@@ -324,12 +355,12 @@ export function ProductCard({
             )}
 
             {onEditTags && (
-              <InfoRow onClick={onEditTags}
+              <InfoRow onClick={edit(onEditTags)} disabled={!canEdit}
                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>}>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-zinc-400">Tags</p>
                   <p className={`text-sm truncate ${tagNames ? "font-medium text-zinc-900" : "text-zinc-500"}`}>
-                    {tagNames || "Add tags"}
+                    {tagNames || (canEdit ? "Add tags" : "No tags")}
                   </p>
                 </div>
               </InfoRow>
@@ -339,14 +370,14 @@ export function ProductCard({
               const lines: { label: string; value: number }[] = Array.isArray((product as any).valueLines) ? (product as any).valueLines : [];
               const total = lines.reduce((sum, l) => sum + l.value, 0);
               return (
-                <InfoRow onClick={onEditValueLines}
+                <InfoRow onClick={edit(onEditValueLines)} disabled={!canEdit}
                   icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M3 6h.01M3 12h.01M3 18h.01M8 6h13M8 12h13M8 18h13"/></svg>}>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-zinc-400">What buyers get</p>
                     <p className={`text-sm truncate ${lines.length ? "font-medium text-zinc-900" : "text-zinc-500"}`}>
                       {lines.length
                         ? `${lines.length} ${lines.length === 1 ? "line" : "lines"} · ${formatMoney(total, (product as any).currency || "EUR")} total value`
-                        : "Add what buyers get"}
+                        : canEdit ? "Add what buyers get" : "Not set"}
                     </p>
                   </div>
                 </InfoRow>
@@ -417,7 +448,7 @@ function InfoRow({ children, onClick, disabled, icon, customIcon }: {
 }) {
   const Component = onClick ? "button" : "div";
   return (
-    <Component onClick={onClick} disabled={disabled}
+    <Component onClick={onClick} disabled={disabled} aria-disabled={disabled || undefined}
       /*
         * pr-3, because the value TRUNCATES.
         *
@@ -431,8 +462,11 @@ function InfoRow({ children, onClick, disabled, icon, customIcon }: {
       } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}>
       {customIcon || (
         <div className="shrink-0 w-11 h-11 rounded-lg border border-zinc-200 bg-white flex items-center justify-center relative overflow-hidden">
-          <div className="group-hover:opacity-0 transition-opacity">{icon}</div>
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-100"><PencilIcon /></div>
+          {/* The pencil promises an edit: only on a row that opens one. */}
+          <div className={onClick ? "group-hover:opacity-0 transition-opacity" : ""}>{icon}</div>
+          {onClick && (
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-100"><PencilIcon /></div>
+          )}
         </div>
       )}
       {children}

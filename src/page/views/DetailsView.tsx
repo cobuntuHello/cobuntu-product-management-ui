@@ -191,7 +191,9 @@ export function DetailsView({
   const canEdit = useCanEdit();
   const rawSetModal = setModalProp ?? setOwnModal;
   const setModal = (m: ProductModal) => {
-    if (!canEdit && m !== null) return;
+    // "share" only shows the public link, so a read-only viewer may open it.
+    // Every other modal here edits the product and stays shut.
+    if (!canEdit && m !== null && m !== "share") return;
     rawSetModal(m);
   };
   const rawSetShowEditDrawer = setDrawerProp ?? setOwnDrawer;
@@ -260,6 +262,7 @@ export function DetailsView({
         onSettings={() => setSettingsOpen(true)}
         canConfigureSettings={canConfigureSettings}
         onDelete={() => setModal("delete")}
+        readOnly={!canEdit}
       />
 
       <ProductCard
