@@ -30,12 +30,21 @@ interface Props {
    * "how do I unlock it?", a question with no answer.
    */
   canConfigureSettings?: boolean;
+  /**
+   * The viewer may look but not change (a carrying community's leader, the
+   * superadmin). Settings and Delete render DISABLED rather than live: the
+   * page's guard would stop them opening anyway, and a button that silently
+   * does nothing reads as broken. Share stays live, because sharing a link is
+   * not editing the product.
+   */
+  readOnly?: boolean;
 }
 
 export function OverviewActionCards({
   isSellable,
   onShare, onEdit, onSettings, onDelete,
   canConfigureSettings = true,
+  readOnly = false,
 }: Props) {
   const cards: Card[] = [
     {
@@ -72,6 +81,7 @@ export function OverviewActionCards({
       icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
       iconBg: "bg-violet-50",
       iconColor: "text-violet-500",
+      disabled: readOnly,
       onClick: onSettings,
     }] : []),
     /*
@@ -102,6 +112,7 @@ export function OverviewActionCards({
       iconBg: "bg-red-50",
       iconColor: "text-red-500",
       destructive: true,
+      disabled: readOnly,
       onClick: onDelete,
     },
   ];
