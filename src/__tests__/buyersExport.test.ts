@@ -64,4 +64,24 @@ describe("Buyers export", () => {
         expect(csv).toContain("João Cunha");
         expect(csv).toContain("André Barros");
     });
+
+    describe("where the money went (T-397)", () => {
+        const split = { donation: 0, shipping: 0, vat: 0, community: 0, communityName: null, cobuntu: 150, stripe: 52, seller: 2750, sellerExVat: 2750 };
+        const withSplit = { ...input, customers: [{ ...input.customers[0], split }, { ...input.customers[1], split: null }] };
+        const ts = buyersExportTable(withSplit);
+        const c = (h: string) => ts.columns.findIndex((x) => x.header === h);
+
+        it("adds the split for a viewer the Ledger shows it to, zeros for gifts and adds", () => {
+            const heads = ["Community gets", "Cobuntu gets", "Stripe gets", "Seller gets", "VAT", "Seller net (excl. VAT)"];
+            expect(heads.map((h) => ts.rows[0][c(h)])).toEqual([0, 1.5, 0.52, 27.5, 0, 27.5]);
+            expect(heads.map((h) => ts.rows[1][c(h)])).toEqual([null, null, null, null, null, null]);
+            expect(heads.map((h) => ts.rows[2][c(h)])).toEqual([0, 0, 0, 0, 0, 0]);
+            expect(heads.map((h) => ts.rows[4][c(h)])).toEqual([null, null, null, null, null, null]);
+            expect(split.community + split.cobuntu + split.stripe + split.seller).toBe(2952);
+        });
+
+        it("leaves the split out when the backend sent none", () => {
+            expect(col("Seller gets")).toBe(-1);
+        });
+    });
 });
