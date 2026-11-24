@@ -422,7 +422,9 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               description: t.description ?? "",
               licenseTerms: t.licenseTerms ?? "",
               maxDownloads: t.maxDownloads != null ? String(t.maxDownloads) : "",
-              price: String(toDisplay(t.products.price, t.products.currency)),
+              // Pay what you want with no suggestion is stored as 0: show it
+              // as the blank "No suggestion" it was, not as a suggested 0.
+              price: t.priceMode === "pwyw" && !t.products.price ? "" : String(toDisplay(t.products.price, t.products.currency)),
               currency: t.products.currency,
               capacity: t.capacity != null ? String(t.capacity) : "",
               isRecurring: !!t.products.isRecurring,
@@ -676,7 +678,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         // Backend's cloneTier copies licenseTerms + maxDownloads across.
         licenseTerms: newTier.licenseTerms ?? "",
         maxDownloads: newTier.maxDownloads != null ? String(newTier.maxDownloads) : "",
-        price: String(toDisplay(newTier.products.price, newTier.products.currency)),
+        price: newTier.priceMode === "pwyw" && !newTier.products.price ? "" : String(toDisplay(newTier.products.price, newTier.products.currency)),
         currency: newTier.products.currency,
         capacity: newTier.capacity != null ? String(newTier.capacity) : "",
         isRecurring: !!newTier.products.isRecurring,

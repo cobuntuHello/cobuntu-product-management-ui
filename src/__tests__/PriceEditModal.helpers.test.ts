@@ -71,6 +71,39 @@ describe("PriceEditModal helpers (product) — validateTier", () => {
     ).toMatch(/non-negative/);
   });
 
+  // T-399: a seller setting up pay what you want hit "Price required for
+  // Standard" with the suggested price blank, for a number buyers never saw.
+  describe("pay what you want: the suggested price is optional", () => {
+    const pwyw = (over: Partial<ReturnType<typeof blankTier>>) =>
+      validateTier({ ...blankTier(), name: "Standard", priceMode: "pwyw", price: "", pwywMin: "", ...over });
+
+    it("saves with no suggested price and no minimum", () => {
+      expect(pwyw({})).toBeNull();
+    });
+
+    it("saves with only a minimum", () => {
+      expect(pwyw({ pwywMin: "5" })).toBeNull();
+    });
+
+    it("saves a suggestion at or above the minimum", () => {
+      expect(pwyw({ price: "20", pwywMin: "5" })).toBeNull();
+      expect(pwyw({ price: "5", pwywMin: "5" })).toBeNull();
+    });
+
+    it("refuses a suggestion below the minimum (checkout would open on an amount it refuses)", () => {
+      expect(pwyw({ price: "3", pwywMin: "5" })).toMatch(/can't be below its minimum/);
+    });
+
+    it("refuses a negative or non-numeric suggestion", () => {
+      expect(pwyw({ price: "-1" })).toMatch(/Suggested price .* non-negative/);
+      expect(pwyw({ price: "abc" })).toMatch(/Suggested price .* non-negative/);
+    });
+
+    it("still requires a price on a fixed-price tier", () => {
+      expect(validateTier({ ...blankTier(), name: "Standard", priceMode: "fixed", price: "" })).toMatch(/Price required/);
+    });
+  });
+
   // ── Event-ported name/description length rules (TIER_NAME_MAX=80,
   //    TIER_DESCRIPTION_MAX=200). Mirrors the EVENT helpers test. ──
   it("rejects an over-long name (> TIER_NAME_MAX chars)", () => {

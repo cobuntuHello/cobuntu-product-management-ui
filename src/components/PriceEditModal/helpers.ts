@@ -190,14 +190,28 @@ export function validateTier(t: DraftTier): string | null {
       return `Max downloads for "${t.name}" must be a whole number of 1 or more, or blank for unlimited.`;
     }
   }
-  if (t.price === "" || isNaN(parseFloat(t.price))) {
-    return `Price required for "${t.name}"`;
-  }
-  if (t.priceMode === "pwyw" && t.pwywMin.trim()) {
-    const min = parseFloat(t.pwywMin);
-    if (isNaN(min) || min < 0) {
-      return `Minimum amount for "${t.name}" must be a non-negative number.`;
+  // Pay what you want takes no price: the buyer names it. The seller MAY
+  // suggest one, which is where the buyer's amount starts at checkout (T-399).
+  // It used to be required like a fixed price, so a seller who only wanted a
+  // floor (or nothing) could not save, for a number no buyer ever saw.
+  if (t.priceMode === "pwyw") {
+    const suggested = (t.price ?? "").trim();
+    if (suggested && (isNaN(parseFloat(suggested)) || parseFloat(suggested) < 0)) {
+      return `Suggested price for "${t.name}" must be a non-negative number, or blank for none.`;
     }
+    if (t.pwywMin.trim()) {
+      const min = parseFloat(t.pwywMin);
+      if (isNaN(min) || min < 0) {
+        return `Minimum amount for "${t.name}" must be a non-negative number.`;
+      }
+      // The buyer's amount starts at the suggestion, so one under the floor
+      // would open checkout on an amount it then refuses.
+      if (suggested && parseFloat(suggested) > 0 && parseFloat(suggested) < min) {
+        return `Suggested price for "${t.name}" can't be below its minimum amount.`;
+      }
+    }
+  } else if (t.price === "" || isNaN(parseFloat(t.price))) {
+    return `Price required for "${t.name}"`;
   }
   if (t.installmentEnabled) {
     const total = parseFloat(t.installmentTotal);
