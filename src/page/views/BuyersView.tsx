@@ -7,8 +7,10 @@ import { useCanEdit } from "../../lib/manageAccess";
 import {
     PersonPickerModal, ResponsiveDrawer,
     userIdsOf, emailsOf, recipientsToApi, perRecipientMessages,
-    type Recipient, type PersonPickerTierStep,
+    ExportMenu, downloadTable,
+    type Recipient, type PersonPickerTierStep, type ExportFormat,
 } from "@cobuntu/management-ui-shared";
+import { buyersExportTable } from "./buyersExport";
 import { ModalShell } from "../helpers";
 
 /**
@@ -53,7 +55,7 @@ interface Grant {
     kind?: "GIFT" | "ADD";
     /** Set when a buyer PAID for this gift (gift-purchases.md): not the host's. */
     saleId?: string | null;
-    users?: { id: string; name?: string | null; usertag?: string | null; profileImage?: string | null } | null;
+    users?: { id: string; name?: string | null; usertag?: string | null; profileImage?: string | null; email?: string | null } | null;
 }
 
 /** A gift held for an address with no account yet (it turns real when they join). */
@@ -93,7 +95,10 @@ interface Customer {
     currency: string;
     createdAt: string;
     guestEmail: string | null;
-    user: { id: string; name?: string | null; usertag?: string | null; profileImage?: string | null } | null;
+    user: { id: string; name?: string | null; usertag?: string | null; profileImage?: string | null; email?: string | null } | null;
+    /** The tier bought and its form's answers (T-397, for the export). */
+    tier?: { id: string; name: string } | null;
+    formAnswers?: { fields: Array<{ id: string; type?: string; label?: string; options?: Array<{ id: string; label: string }> }>; answer: Record<string, unknown> } | null;
 }
 
 /**
@@ -439,8 +444,30 @@ export function BuyersView({
         }
     }
 
+    /** Everyone with this item, as Excel or CSV (T-397, buyersExport.ts). */
+    function exportBuyers(format: ExportFormat) {
+        const table = buyersExportTable({
+            productName: product?.name || "",
+            customers: customers ?? [],
+            grants: grants ?? [],
+            pending: pendingGrants,
+        });
+        downloadTable(table, format, `${product?.slug || product?.id || "item"}-buyers`);
+    }
+    const hasPeople = (customers?.length ?? 0) + (grants?.length ?? 0) + pendingGrants.length > 0;
+
     return (
         <div>
+            {hasPeople && (
+                <div className="flex justify-end mb-3">
+                    <ExportMenu
+                        label="Export"
+                        onExport={exportBuyers}
+                        data-testid="buyers-export"
+                        className="px-3 py-1.5 text-[12px] font-medium text-zinc-600 border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
+                    />
+                </div>
+            )}
             {/* No "Buyers" title/subtitle here — the tab itself is already
                 labelled "Buyers" in the nav, so a repeat heading right below
                 it said nothing new. Each action button now sits beside the
