@@ -100,7 +100,7 @@ export function BasicsStep({
         </div>
         {t.priceMode === "pwyw" && (
           <p className="text-[11px] text-zinc-500 mt-1.5">
-            Buyer chooses the amount at checkout. The price below acts as a suggested default.
+            Buyers choose the amount at checkout. If you suggest a price, their amount starts there.
           </p>
         )}
       </div>
@@ -108,12 +108,12 @@ export function BasicsStep({
       {/* Price + Currency */}
       <div className="grid grid-cols-[1fr_120px] gap-2.5">
         <div>
-          <Eyebrow>{t.priceMode === "pwyw" ? "Suggested price" : t.vatCategory && t.vatCategory !== "EXEMPT" ? "Price before VAT" : "Price"}</Eyebrow>
+          <Eyebrow>{t.priceMode === "pwyw" ? "Suggested price (optional)" : t.vatCategory && t.vatCategory !== "EXEMPT" ? "Price before VAT" : "Price"}</Eyebrow>
           <div className="mt-1">
             <StepInput
               type="number" min="0" step="0.01" value={t.price}
               onChange={(e) => onUpdate({ price: e.target.value })}
-              placeholder="0.00"
+              placeholder={t.priceMode === "pwyw" ? "No suggestion" : "0.00"}
               locked={locked}
               prefix={sym}
               title={locked ? "Refund all sales first to change price" : undefined}
