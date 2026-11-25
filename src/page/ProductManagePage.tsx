@@ -14,6 +14,7 @@ import { ProductManageHeader, type ProductManageHeaderProps } from "./ProductMan
 import { ManageAccessProvider } from "../lib/manageAccess";
 import { UserAvatarFallback } from "../ui/user-avatar-fallback";
 import type { MemberPricingScope } from "../components/MemberPricingSection";
+import type { RenderProductShareQr } from "../components/ShareModal";
 
 /**
  * THE product manage page. One implementation, both apps.
@@ -291,9 +292,15 @@ export interface ProductManagePageProps {
   syllabusSlot?: React.ReactNode;
   /**
    * Where this product's PUBLIC page lives, e.g. "/learning/". Forwarded to
-   * the Details tab's copy-link. Defaults to the marketplace.
+   * the Details tab's copy-link and its Share modal. Defaults to the marketplace.
    */
   publicUrlBase?: string;
+  /**
+   * The Share modal's QR code block: the host app's branded code for exactly
+   * the link the modal shares (the community app passes its ManageShareQr).
+   * Omitted, the modal has no code, which is what the admin app gets.
+   */
+  renderShareQr?: RenderProductShareQr;
 }
 
 export function ProductManagePage({
@@ -331,6 +338,7 @@ export function ProductManagePage({
   reviewsSlot,
   syllabusSlot,
   publicUrlBase,
+  renderShareQr,
   // Defaults true: every consumer that has not been taught about this renders
   // exactly as before, and read-only is opt-in by the page that knows it is
   // showing someone else's product.
@@ -411,6 +419,7 @@ export function ProductManagePage({
       content = (
         <DetailsView
           publicUrlBase={publicUrlBase}
+          renderShareQr={renderShareQr}
           categories={categories}
           product={product}
           communityTag={communityTag}
