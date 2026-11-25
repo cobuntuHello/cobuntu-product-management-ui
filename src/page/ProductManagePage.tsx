@@ -545,22 +545,33 @@ export function ProductManagePage({
  * community decides whether it carries this and on what terms, and the seller
  * decides what it is.
  */
-function ReadOnlyNotice({ product }: { product: any }) {
-  const sellerName = product?.owner?.name || product?.creator?.name || null;
+export function ReadOnlyNotice({ product }: { product: any }) {
+  const sellerName: string | null = product?.owner?.name || product?.creator?.name || null;
+  const firstName = sellerName ? sellerName.split(/\s+/)[0] : null;
 
+  /*
+   * THE LOOK (24 Nov 2026): a quiet neutral note, not a warning. It was amber
+   * with `dark:` variants, and a host page that is light while the viewer's
+   * system is dark got the dark variant: a brown box with yellow text. No
+   * `dark:` here on purpose; the hosts drawing this page are light.
+   */
   return (
-    <div
-      role="note"
-      className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200"
-    >
-      <p className="font-medium">
-        {sellerName ? `${sellerName} sells this.` : "This product belongs to its seller."}
-      </p>
-      <p className="mt-1 opacity-90">
-        Your community carries it, so you manage the listing — the terms, the commission,
-        and whether it stays on your shelf. Ask the seller through the listing conversation
-        to change the product itself.
-      </p>
+    <div role="note" className="mb-4 flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
+      <span aria-hidden="true" className="mt-0.5 flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-white text-zinc-500 ring-1 ring-inset ring-zinc-200">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+      </span>
+      <div className="min-w-0 text-[13.5px] leading-relaxed text-zinc-600">
+        <p className="font-semibold text-zinc-900">
+          {sellerName ? `${sellerName} sells this` : "This product belongs to its seller"}
+        </p>
+        <p className="mt-0.5">
+          Your community carries it, so you manage the listing: its terms, its commission and whether it
+          stays on your shelf. To change the product itself, ask {firstName ?? "the seller"} in the listing conversation.
+        </p>
+      </div>
     </div>
   );
 }
