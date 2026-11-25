@@ -31,9 +31,11 @@ export interface ProductManagementConfig {
   authHeaders: () => Record<string, string>;
 
   /**
-   * The host app's avatar component. Optional — the package ships
-   * UserAvatarFallback — but passing yours keeps the seeded-persona look
-   * consistent with the rest of that app. Mirrors the event package.
+   * The host app's avatar component. Optional: the package ships
+   * UserAvatarFallback (photo, then Cobuntu's avatar library, then an
+   * initial), but passing yours keeps avatars consistent with the rest of
+   * that app. Mirrors the event package. The read-only seller banner always
+   * uses the package's own, so it never misses the library.
    */
   UserAvatar?: React.ComponentType<{
     user: {

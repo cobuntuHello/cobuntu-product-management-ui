@@ -12,6 +12,7 @@ import { ProductActivityTab } from "../components/activity/ProductActivityTab";
 import { getProductManagementConfig } from "../config";
 import { ProductManageHeader, type ProductManageHeaderProps } from "./ProductManageHeader";
 import { ManageAccessProvider } from "../lib/manageAccess";
+import { UserAvatarFallback } from "../ui/user-avatar-fallback";
 import type { MemberPricingScope } from "../components/MemberPricingSection";
 
 /**
@@ -546,7 +547,8 @@ export function ProductManagePage({
  * decides what it is.
  */
 export function ReadOnlyNotice({ product }: { product: any }) {
-  const sellerName: string | null = product?.owner?.name || product?.creator?.name || null;
+  const seller = product?.owner ?? product?.creator ?? null;
+  const sellerName: string | null = seller?.name || null;
   const firstName = sellerName ? sellerName.split(/\s+/)[0] : null;
 
   /*
@@ -554,15 +556,24 @@ export function ReadOnlyNotice({ product }: { product: any }) {
    * with `dark:` variants, and a host page that is light while the viewer's
    * system is dark got the dark variant: a brown box with yellow text. No
    * `dark:` here on purpose; the hosts drawing this page are light.
+   *
+   * The seller's face, not a generic person icon: the note is about one
+   * person. UserAvatarFallback on purpose, not the app's injected UserAvatar:
+   * it walks Cobuntu's avatar library (photo, the library avatar they were
+   * given, the campfire), which a host's own avatar component may not.
    */
   return (
     <div role="note" className="mb-4 flex items-start gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
-      <span aria-hidden="true" className="mt-0.5 flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-white text-zinc-500 ring-1 ring-inset ring-zinc-200">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-          <circle cx="12" cy="7" r="4" />
-        </svg>
-      </span>
+      {seller ? (
+        <UserAvatarFallback user={seller} className="mt-0.5 h-8 w-8 ring-1 ring-zinc-200" />
+      ) : (
+        <span aria-hidden="true" className="mt-0.5 flex h-8 w-8 flex-none items-center justify-center rounded-full bg-white text-zinc-500 ring-1 ring-inset ring-zinc-200">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+        </span>
+      )}
       <div className="min-w-0 text-[13.5px] leading-relaxed text-zinc-600">
         <p className="font-semibold text-zinc-900">
           {sellerName ? `${sellerName} sells this` : "This product belongs to its seller"}

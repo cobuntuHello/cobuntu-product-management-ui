@@ -30,4 +30,21 @@ describe("the read-only notice", () => {
         expect(screen.getByText("This product belongs to its seller")).toBeTruthy();
         expect(screen.getByRole("note").textContent).toContain("ask the seller in the listing conversation");
     });
+
+    it("shows the seller's own photo when they have one", () => {
+        const { container } = render(<ReadOnlyNotice product={{ owner: { id: "u1", name: "Thiago Vieira", profileImage: "https://img/t.jpg" } }} />);
+        expect(container.querySelector("img")?.getAttribute("src")).toBe("https://img/t.jpg");
+        expect(container.querySelector("svg")).toBeNull();
+    });
+
+    it("shows the library avatar the seller was given when they have no photo", () => {
+        const { container } = render(<ReadOnlyNotice product={{ owner: { id: "u1", name: "Thiago Vieira", profileImage: null } }} />);
+        expect(container.querySelector("img")?.getAttribute("src")).toBe("https://api.cobuntu.com/api/avatars/auto/u1.svg");
+    });
+
+    it("keeps the person icon only when there is no seller at all", () => {
+        const { container } = render(<ReadOnlyNotice product={{}} />);
+        expect(container.querySelector("img")).toBeNull();
+        expect(container.querySelector("svg")).toBeTruthy();
+    });
 });
