@@ -180,6 +180,19 @@ export {
   type ProductModal,
 } from "./page/ProductManagePage";
 export { ProductManageHeader, type ProductManageHeaderProps } from "./page/ProductManageHeader";
+/*
+ * The header's owner line, and the two answers it draws: whose item this is
+ * and what the viewer is to it. Exported apart from the header because the
+ * admin keeps its own PageHeader and renders the same line inside it.
+ */
+export { ManageOwnerLine, ownerImageCandidates, type ManageOwnerLineProps } from "./page/ManageOwnerLine";
+export {
+  productManageOwner,
+  productManageRelationship,
+  type ManageOwner,
+  type ManageRelationship,
+  type ManageViewer,
+} from "./page/manageOwner";
 export { ProductSettingsDrawer, type ProductSettingsDrawerProps } from "./page/ProductSettingsDrawer";
 export { ProductDescriptionEditModal, ProductCtaEditModal } from "./components/ProductDescriptionEditModal";
 export { ProductMediaModal } from "./components/ProductMediaModal";

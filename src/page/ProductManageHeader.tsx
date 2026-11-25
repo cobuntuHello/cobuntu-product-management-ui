@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { ManageOwnerLine } from "./ManageOwnerLine";
+import type { ManageOwner } from "./manageOwner";
 
 /**
  * The product manage page's header — breadcrumbs, identity, Back and Preview.
@@ -20,11 +22,32 @@ import * as React from "react";
  * and /marketplace in the community app, and Preview opens an absolute URL
  * from one and a relative one from the other — a hardcoded
  * <tag>.cobuntu.com is what broke preview on custom domains.
+ *
+ * Under the title: the owner and the viewer's relationship to the item (see
+ * manageOwner.ts), not its status, kind and price.
  */
 
 export interface ProductManageHeaderProps {
   breadcrumbs: Array<{ label: string; onClick?: () => void }>;
   title: string;
+  /**
+   * WHOSE item this is, drawn under the title as a mark and a name: the
+   * community's icon (a rounded square) for a community-owned item, else the
+   * seller's avatar (a circle). `productManageOwner(product)` builds it.
+   */
+  owner?: ManageOwner | null;
+  /**
+   * What the viewer is to it, already worded by the app, e.g. "You manage this
+   * as a collaborator". `productManageRelationship(...)` says which case
+   * applies; the words are the app's, like every other label on this header.
+   */
+  relationship?: string | null;
+  /**
+   * Free text under the title. The manage pages no longer pass one: it carried
+   * the state, the kind and the price, which the page's own bar and Overview
+   * already say, in place of the owner and relationship above. Kept so a
+   * caller on an older pattern still renders.
+   */
   subtitle?: string;
   onBack: () => void;
   backLabel: string;
@@ -37,6 +60,10 @@ export interface ProductManageHeaderProps {
    * confirmations are its own. Taking a product off the shelf used to be three
    * steps deep (Overview, Manage listing, a bottom bar) and PBN could not find
    * it. When set, the host leaves the state out of `subtitle`.
+   *
+   * The manage pages stopped passing it with T-410 (no status in the header);
+   * Pause and Resume stay one click into the Listings tab's listing page.
+   * Kept so a caller on an older pattern still renders.
    */
   statusControl?: React.ReactNode;
 }
@@ -51,6 +78,8 @@ const TagIcon = () => (
 export function ProductManageHeader({
   breadcrumbs,
   title,
+  owner,
+  relationship,
   subtitle,
   onBack,
   backLabel,
@@ -136,6 +165,7 @@ export function ProductManageHeader({
             * the same row and the space is genuinely contested.
             */}
           <h1 className="text-xl font-semibold text-zinc-900 md:truncate">{title}</h1>
+          <ManageOwnerLine owner={owner} relationship={relationship} />
           {statusControl ? (
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
               {statusControl}
