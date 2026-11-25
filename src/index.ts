@@ -21,7 +21,12 @@ export {
   conditionLabel, parcelClassLabel,
   type ProductConditionValue, type ParcelClassValue,
 } from "./components/PhysicalDetailsFields";
-export { ShareModal } from "./components/ShareModal";
+export {
+  ShareModal,
+  productShareImage,
+  type ProductShareQrSlotArgs,
+  type RenderProductShareQr,
+} from "./components/ShareModal";
 export { DeleteModal } from "./components/DeleteModal";
 export {
   ProductDistributionModal,

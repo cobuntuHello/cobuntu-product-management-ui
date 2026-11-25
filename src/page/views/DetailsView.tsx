@@ -7,7 +7,7 @@ import { AfterCheckoutCard } from "../sections/AfterCheckoutCard";
 import { useProductManagementConfig, useJsonHeaders } from "../../config";
 import { PriceEditModal } from "../../components/PriceEditModal";
 import { NameEditModal } from "../../components/NameEditModal";
-import { ShareModal } from "../../components/ShareModal";
+import { ShareModal, type RenderProductShareQr } from "../../components/ShareModal";
 import { DeleteModal } from "../../components/DeleteModal";
 import { ProductDistributionModal } from "../../components/ProductDistributionModal";
 import { ProductSettingsDrawer } from "../ProductSettingsDrawer";
@@ -137,10 +137,14 @@ export interface DetailsViewProps {
 
   /** App-specific cards (sales, donations) rendered under the product card. */
   extras?: React.ReactNode;
+
+  /** The Share modal's QR code block (ProductManagePage's `renderShareQr`). */
+  renderShareQr?: RenderProductShareQr;
 }
 
 export function DetailsView({
   publicUrlBase,
+  renderShareQr,
   product,
   communityTag,
   productId,
@@ -348,6 +352,9 @@ export function DetailsView({
           productId={productId}
           communityTag={communityTag}
           productName={product.name}
+          product={product}
+          publicUrlBase={publicUrlBase}
+          renderQr={renderShareQr}
           onClose={() => setModal(null)}
         />
       )}
