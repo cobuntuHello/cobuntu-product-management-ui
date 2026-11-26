@@ -337,7 +337,17 @@ export interface ProductFormProps {
    * Omitted → byte-identical to before: the form still calls
    * `useStripeStatus` itself and uses its result unchanged.
    */
-  stripeStatusOverride?: { connected: boolean; connectUrl?: string | null };
+  stripeStatusOverride?: {
+    connected: boolean;
+    connectUrl?: string | null;
+    /**
+     * The leave-for-Stripe pop-up's words when the account is not the
+     * viewer's own: a COMMUNITY-owned listing pays out to the community, so the
+     * pop-up says the community needs Stripe and connectUrl opens the
+     * community's Stripe setup. Each field omitted keeps the default wording.
+     */
+    copy?: { title?: string; message?: string; confirm?: string };
+  };
   /**
    * Who the "Paid" / "Free with donations" Stripe gate is actually about.
    *
@@ -1856,9 +1866,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           setConfirmingStripeLeave(false);
           if (stripeStatus.connectUrl) window.location.href = stripeStatus.connectUrl;
         }}
-        title="Connect Stripe to accept payments"
-        message="You'll be taken to Stripe to connect your account. You can come back and finish this listing afterward."
-        confirmLabel="Continue to Stripe"
+        title={stripeStatusOverride?.copy?.title ?? "Connect Stripe to accept payments"}
+        message={stripeStatusOverride?.copy?.message ?? "You'll be taken to Stripe to connect your account. You can come back and finish this listing afterward."}
+        confirmLabel={stripeStatusOverride?.copy?.confirm ?? "Continue to Stripe"}
         cancelLabel="Not now"
       />
     </div>
