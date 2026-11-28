@@ -9,6 +9,7 @@ import {
   EmptyState, PersonPickerModal, userIdsOf, type Recipient,
 } from "@cobuntu/management-ui-shared";
 
+import { useProductT } from "../../i18n/productCopy";
 /**
  * Co-sellers — the product twin of the event page's Hosts tab, built to the
  * same pattern rather than merely doing the same job.
@@ -88,6 +89,7 @@ export function CollaboratorsView({
    */
   communityTag?: string | null;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const { apiBaseUrl, authHeaders, UserAvatar: ConfigAvatar } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
   const UserAvatar = ConfigAvatar ?? UserAvatarFallback;
@@ -178,13 +180,13 @@ export function CollaboratorsView({
       if (res.ok) {
         await load();
         await onUpdate();
-        showToast("Co-seller removed");
+        showToast(tp("collaboratorsView.coSellerRemoved"));
         setConfirmRemove(null);
       } else {
         const err = await res.json().catch(() => ({}));
-        setError(err.error || "Could not remove that co-seller");
+        setError(err.error || tp("common.couldNotRemoveCoSeller"));
       }
-    } catch { setError("Could not remove that co-seller"); }
+    } catch { setError(tp("common.couldNotRemoveCoSeller")); }
     setBusy(false);
   }
 
@@ -196,10 +198,10 @@ export function CollaboratorsView({
       {/* Header — title + subtitle left, actions right. Mirrors HostsView. */}
       <div className="flex flex-col sm:flex-row sm:items-start gap-3 mb-4">
         <div className="flex-1">
-          <h2 className="text-[15px] font-semibold text-zinc-900">Co-sellers</h2>
+          <h2 className="text-[15px] font-semibold text-zinc-900">{tp("collaboratorsView.coSellers")}</h2>
           <p className="text-[12px] text-zinc-400 mt-0.5">
-            People who can manage this product. Payouts still go to the owner.
-            {isUserOwned && " The owner is immutable."}
+            {tp("collaboratorsView.intro")}
+            {isUserOwned && ` ${tp("collaboratorsView.ownerImmutable")}`}
           </p>
         </div>
         {canEdit && (
@@ -208,7 +210,7 @@ export function CollaboratorsView({
               onClick={() => setAddOpen(true)}
               className="flex-1 sm:flex-none px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
             >
-              Add member
+              {tp("collaboratorsView.addMember")}
             </button>
           </div>
         )}
@@ -227,13 +229,13 @@ export function CollaboratorsView({
               <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
           }
-          title="No co-sellers yet"
-          body="Search for a member to add. They appear on the listing beside you."
+          title={tp("collaboratorsView.noCoSellersYet")}
+          body={tp("collaboratorsView.searchForAMemberTo")}
         />
       ) : (
         <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
           {rows === null ? (
-            <p className="px-6 py-12 text-center text-[12px] text-zinc-400">Loading co-sellers…</p>
+            <p className="px-6 py-12 text-center text-[12px] text-zinc-400">{tp("collaboratorsView.loadingCoSellers")}</p>
           ) : (
             <ul className="divide-y divide-zinc-100">
               {rows.map((c) => (
@@ -273,41 +275,41 @@ export function CollaboratorsView({
           /* Single-pick: a co-seller is one person at a time, so the list
              behaves as radios and the footer shows no count. */
           copy={{
-            title: "Add a co-seller",
+            title: tp("collaboratorsView.addACoSeller"),
             searchSubtitle: communityTag
-              ? "Search members of this community. Guests and non-members are filtered out."
-              : "Search people on Cobuntu by name or @usertag.",
-            pickedSubtitle: "They'll appear on the listing beside you and can manage this product.",
-            searchPlaceholder: "Search by name or @usertag",
+              ? tp("collaboratorsView.searchMembersOfThisCommunity")
+              : tp("collaboratorsView.searchPeopleOnCobuntuBy"),
+            pickedSubtitle: tp("collaboratorsView.theyLlAppearOnThe"),
+            searchPlaceholder: tp("collaboratorsView.searchByNameOrUsertag"),
             emptyHint: communityTag
-              ? "No members to show."
-              : "Type at least two characters to search.",
-            searching: "Searching…",
-            noMatches: "No matches.",
-            unknown: "Unknown",
-            consequencesTitle: "What happens next",
-            stepOne: "Choose a person",
-            stepTwo: "Review",
-            back: "Back",
-            cancel: "Cancel",
-            confirm: "Add co-seller",
-            confirming: "Adding…",
-            membersLabel: "Members",
-            showingLabel: "Showing",
-            allMembersLabel: "All members",
-            selectedLabel: (n: number) => `${n} selected`,
+              ? tp("common.noMembersToShow")
+              : tp("collaboratorsView.typeAtLeastTwoCharacters"),
+            searching: tp("common.searching"),
+            noMatches: tp("common.noMatches"),
+            unknown: tp("common.unknown"),
+            consequencesTitle: tp("common.whatHappensNext"),
+            stepOne: tp("collaboratorsView.chooseAPerson"),
+            stepTwo: tp("common.review"),
+            back: tp("common.back"),
+            cancel: tp("common.cancel"),
+            confirm: tp("collaboratorsView.addCoSeller"),
+            confirming: tp("common.adding"),
+            membersLabel: tp("common.members"),
+            showingLabel: tp("common.showing"),
+            allMembersLabel: tp("common.allMembers"),
+            selectedLabel: (n: number) => tp("common.selectedCount", { count: n }),
             /* Single-pick, so the staged strip never renders. The words are
                still required, so a surface that later allows several cannot
                forget to translate them. */
-            selectedTitle: "Selected",
-            clearAll: "Clear",
-            remove: (name: string) => `Remove ${name}`,
+            selectedTitle: tp("common.selected"),
+            clearAll: tp("common.clear"),
+            remove: (name: string) => tp("collaboratorsView.remove", { name: name }),
           }}
           stepTwo={{
             kind: "consequences",
             items: [
-              "They can manage this product and appear on the listing beside you.",
-              "Payouts still go to the owner. No money changes hands.",
+              tp("collaboratorsView.theyCanManageThisProduct"),
+              tp("collaboratorsView.payoutsStillGoToThe"),
             ],
           }}
           onConfirm={addCoSeller}
@@ -315,7 +317,7 @@ export function CollaboratorsView({
             setAddOpen(false);
             await load();
             await onUpdate();
-            showToast("Co-seller added");
+            showToast(tp("collaboratorsView.coSellerAdded"));
           }}
         />
       )}
@@ -362,6 +364,7 @@ function CollaboratorRow({
   UserAvatar: AvatarComponent;
   onRequestRemove: () => void;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   return (
     <div className="flex items-center gap-3 px-6 py-3.5 hover:bg-zinc-50/60 transition-colors">
       <UserAvatar
@@ -374,7 +377,7 @@ function CollaboratorRow({
         className="w-10 h-10 shrink-0"
       />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-zinc-800 truncate">{collaborator.user?.name || "Unknown"}</p>
+        <p className="text-sm font-medium text-zinc-800 truncate">{collaborator.user?.name || tp("common.unknown")}</p>
         {collaborator.user?.usertag && (
           <p className="text-[11px] text-zinc-400 truncate">@{collaborator.user.usertag}</p>
         )}
@@ -383,20 +386,20 @@ function CollaboratorRow({
       {isImmutableOwner ? (
         <span
           className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0"
-          title="Receives payments from this product"
+          title={tp("collaboratorsView.receivesPaymentsFromThisProduct")}
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
             <rect x="3" y="11" width="18" height="11" rx="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
-          Owner
+          {tp("collaboratorsView.owner")}
         </span>
       ) : canManage ? (
         <button
           onClick={onRequestRemove}
           className="text-[12px] font-medium text-zinc-500 hover:text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors shrink-0"
         >
-          {collaborator.hasPurchased ? "Demote to buyer" : "Remove"}
+          {collaborator.hasPurchased ? tp("collaboratorsView.demoteToBuyer") : tp("common.remove")}
         </button>
       ) : null}
     </div>
@@ -425,30 +428,30 @@ function ConfirmRemoveCoSellerModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const name = collaborator.user?.name || collaborator.user?.usertag || "This member";
-  const subject = isSelf ? "You" : name;
-  const verb = isSelf ? "lose" : "loses";
+  const tp = useProductT("marketplaceUi.productUi");
+  const name = collaborator.user?.name || collaborator.user?.usertag || tp("collaboratorsView.thisMember");
+  const subject = isSelf ? tp("collaboratorsView.you") : name;
   const bought = !!collaborator.hasPurchased;
 
   return (
     <ModalShell onClose={onCancel}>
       <h3 className="text-[15px] font-semibold text-zinc-900 mb-2">
-        {bought ? `Demote ${isSelf ? "yourself" : name} to buyer?` : `Remove ${isSelf ? "yourself" : name}?`}
+        {tp(bought ? "collaboratorsView.demoteTitle" : "collaboratorsView.removeTitle", { who: isSelf ? "self" : "other", name })}
       </h3>
       <p className="text-[13px] text-zinc-500 mb-2">
-        {subject} {verb} the ability to manage this product and {isSelf ? "stop" : "stops"} appearing on the listing.
+        {tp("collaboratorsView.loseAbility", { who: isSelf ? "self" : "other", name: subject })}
       </p>
       {bought && (
         <p className="text-[13px] text-zinc-500 mb-2">
-          {isSelf ? "You keep" : `${name} keeps`} everything already purchased — this only ends the selling role.
+          {tp("collaboratorsView.keepsPurchases", { who: isSelf ? "self" : "other", name })}
         </p>
       )}
-      <p className="text-[12px] text-zinc-400 mb-5">This can be undone by adding them again.</p>
+      <p className="text-[12px] text-zinc-400 mb-5">{tp("collaboratorsView.thisCanBeUndoneBy")}</p>
       <div className="flex justify-end gap-2">
-        <button onClick={onCancel} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">Cancel</button>
+        <button onClick={onCancel} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">{tp("common.cancel")}</button>
         <button onClick={onConfirm} disabled={submitting}
           className="px-4 py-2 text-[13px] font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40 cursor-pointer">
-          {submitting ? "Removing..." : bought ? "Demote" : "Remove"}
+          {submitting ? tp("common.removing") : bought ? tp("collaboratorsView.demote") : tp("common.remove")}
         </button>
       </div>
     </ModalShell>

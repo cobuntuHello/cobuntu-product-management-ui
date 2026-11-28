@@ -20,6 +20,7 @@ import { ValueLinesModal } from "@cobuntu/management-ui-shared";
 import type { CategoryOption } from "../../components/CategoryPickerRow";
 import { useCanEdit } from "../../lib/manageAccess";
 
+import { useProductT } from "../../i18n/productCopy";
 /**
  * The DETAILS tab: everything about this product you can change.
  *
@@ -167,6 +168,7 @@ export function DetailsView({
   approvalCopy,
   extras,
 }: DetailsViewProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const { apiBaseUrl } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
 
@@ -252,7 +254,7 @@ export function DetailsView({
         .json()
         .then((d: any) => d?.error)
         .catch(() => null);
-      showToast(message || (res.status === 401 ? "Your session expired. Sign in again." : "Failed to update"));
+      showToast(message || (res.status === 401 ? tp("detailsView.yourSessionExpiredSignIn") : tp("detailsView.failedToUpdate")));
       throw new Error(message || `Failed to update (${res.status})`);
     }
     await onUpdate();

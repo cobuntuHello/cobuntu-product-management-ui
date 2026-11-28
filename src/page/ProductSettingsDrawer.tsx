@@ -11,6 +11,7 @@ import { ModalShell } from "./helpers";
 import { tierAccessSummary, toTierAccessValue, fetchMembershipTiers } from "@cobuntu/management-ui-shared";
 import { useProductManagementConfig } from "../config";
 
+import { useProductT, getProductT } from "../i18n/productCopy";
 /**
  * Settings drawer for the product manage page — the product answer to the
  * event page's SettingsDrawer, same interaction and same chrome.
@@ -110,6 +111,7 @@ export function ProductSettingsDrawer({
   onSaveApproval,
   approvalCopy,
 }: ProductSettingsDrawerProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   /*
    * ── The drawer loads its own tiers ────────────────────────────────
    *
@@ -278,7 +280,7 @@ export function ProductSettingsDrawer({
             onClick={closeModalAndReopenDrawer}
             className="px-4 py-2 text-[13px] font-medium text-zinc-600 bg-zinc-100 rounded-lg hover:bg-zinc-200 cursor-pointer"
           >
-            Close
+            {tp("common.close")}
           </button>
         </div>
       </ModalShell>
@@ -308,7 +310,7 @@ export function ProductSettingsDrawer({
    */
   const viewLabel = tierAccessSummary(toTierAccessValue(product?.viewability ?? "PUBLIC", viewTierIds), membershipTiers);
   const buyLabel = tierAccessSummary(toTierAccessValue(product?.accessibility ?? "PUBLIC", buyTierIds), membershipTiers);
-  const landingLabel = product?.externalDetailUrl ? "Custom landing page" : "Cobuntu product page";
+  const landingLabel = product?.externalDetailUrl ? tp("productSettingsDrawer.customLandingPage") : tp("productSettingsDrawer.cobuntuProductPage");
 
   return createPortal(
     <>
@@ -331,14 +333,14 @@ export function ProductSettingsDrawer({
           <button
             onClick={handleClose}
             className="w-8 h-8 rounded-lg hover:bg-zinc-100 flex items-center justify-center cursor-pointer shrink-0"
-            aria-label="Close settings"
+            aria-label={tp("productSettingsDrawer.closeSettings")}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400">
               <polyline points="13 17 18 12 13 7" />
               <polyline points="6 17 11 12 6 7" />
             </svg>
           </button>
-          <h2 className="text-base font-semibold text-zinc-900">Settings</h2>
+          <h2 className="text-base font-semibold text-zinc-900">{tp("common.settings")}</h2>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -348,17 +350,17 @@ export function ProductSettingsDrawer({
               Approval below is the SELLER's own and stays on both kinds. */}
           {isCommunityOwned && (
             <p className="px-5 pt-4 pb-1 text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
-              Community access
+              {tp("productSettingsDrawer.communityAccess")}
             </p>
           )}
           {lockedCommunity && (
             <p className="px-5 pb-2 text-[12px] text-zinc-500 leading-snug" data-testid="community-settings-locked-note">
-              Only community leaders with marketplace permissions can change these.
+              {tp("productSettingsDrawer.onlyCommunityLeadersWithMarketplace")}
             </p>
           )}
           {isCommunityOwned && (
           <SettingsRow
-            label="Visibility"
+            label={tp("common.visibility")}
             summary={viewLabel}
             onClick={() => openModal("viewability")}
             locked={lockedCommunity}
@@ -372,7 +374,7 @@ export function ProductSettingsDrawer({
           )}
           {isCommunityOwned && (
           <SettingsRow
-            label="Access"
+            label={tp("productSettingsDrawer.access")}
             summary={buyLabel}
             onClick={() => openModal("accessibility")}
             locked={lockedCommunity}
@@ -386,7 +388,7 @@ export function ProductSettingsDrawer({
           )}
           {isCommunityOwned && (
           <SettingsRow
-            label="Distribution"
+            label={tp("productSettingsDrawer.distribution")}
             summary={landingLabel}
             onClick={() => openModal("distribution")}
             locked={lockedCommunity}
@@ -402,7 +404,7 @@ export function ProductSettingsDrawer({
           )}
           {onSaveApproval && (
             <p className="px-5 pt-4 pb-1 text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
-              Your settings
+              {tp("common.yourSettings")}
             </p>
           )}
           {onSaveApproval && (
@@ -414,10 +416,10 @@ export function ProductSettingsDrawer({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[14px] font-medium text-zinc-900">
-                  {approvalCopy?.title ?? "Require approval"}
+                  {approvalCopy?.title ?? tp("common.requireApproval")}
                 </span>
                 <span className="block text-[12px] text-zinc-500 leading-snug">
-                  {approvalCopy?.body ?? "Hold each purchase until you approve it."}
+                  {approvalCopy?.body ?? tp("productSettingsDrawer.holdEachPurchaseUntilYou")}
                 </span>
               </span>
               {/* A switch, not a chevron: this row changes state in place
@@ -427,7 +429,7 @@ export function ProductSettingsDrawer({
                 type="button"
                 role="switch"
                 aria-checked={approvalOn}
-                aria-label={approvalCopy?.title ?? "Require approval"}
+                aria-label={approvalCopy?.title ?? tp("common.requireApproval")}
                 disabled={savingApproval}
                 onClick={() => void toggleApproval(!approvalOn)}
                 className={`relative h-6 w-11 shrink-0 cursor-pointer rounded-full border transition-colors disabled:opacity-50 ${
@@ -444,13 +446,13 @@ export function ProductSettingsDrawer({
               is gated on approval; this row stands on its own when it's absent. */}
           {!onSaveApproval && (
             <p className="px-5 pt-4 pb-1 text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
-              Your settings
+              {tp("common.yourSettings")}
             </p>
           )}
           {/* No row for a free product: nothing was charged, so there is nothing to refund. */}
           {productHasPaidOffer(product) && (
           <SettingsRow
-            label="Refund policy"
+            label={tp("common.refundPolicy")}
             summary={refundPolicySummary(product)}
             onClick={() => openModal("refund-policy")}
             icon={
@@ -465,7 +467,7 @@ export function ProductSettingsDrawer({
           {(!hideAfterCheckout || lockedCommunity) && (
             <SettingsRow
               locked={lockedCommunity}
-              label="After checkout"
+              label={tp("common.afterCheckout")}
               summary={afterCheckoutSummary(product)}
               onClick={() => openModal("after-checkout")}
               icon={
@@ -486,17 +488,17 @@ export function ProductSettingsDrawer({
 /** One-line state, so a row says what it is set to without being opened. */
 function afterCheckoutSummary(product: any): string {
   const mode = product?.afterCheckoutMode;
-  if (mode === "UPSELL") return "Promotes a membership";
-  if (mode === "REDIRECT") return "Redirects to a page";
-  return "Cobuntu confirmation";
+  if (mode === "UPSELL") return getProductT("marketplaceUi.productUi")("productSettingsDrawer.promotesAMembership");
+  if (mode === "REDIRECT") return getProductT("marketplaceUi.productUi")("productSettingsDrawer.redirectsToAPage");
+  return getProductT("marketplaceUi.productUi")("productSettingsDrawer.cobuntuConfirmation");
 }
 
 function refundPolicySummary(product: any): string {
   // Two presets now (standard vs none), matching the RefundPolicyField control.
   // customBuyerWindowDays === 0 is the only lever that changes it.
   return product?.refundPolicy?.customBuyerWindowDays === 0
-    ? "No self-service refunds"
-    : "Standard refunds";
+    ? getProductT("marketplaceUi.productUi")("productSettingsDrawer.noSelfServiceRefunds")
+    : getProductT("marketplaceUi.productUi")("productSettingsDrawer.standardRefunds");
 }
 
 function SettingsRow({

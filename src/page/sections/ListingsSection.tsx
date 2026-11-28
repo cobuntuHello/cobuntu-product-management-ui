@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { API, authHeaders, jsonHeaders, LISTING_STATUS } from "../helpers";
 
+import { useProductT } from "../../i18n/productCopy";
 interface Props {
   productId: string;
   communityTag: string;
@@ -35,6 +36,7 @@ interface Props {
 }
 
 export function ListingsSection({ productId, communityTag, isOpen, onClose, onShowDetail, onListingsChange, showToast, hubs = [], inline = false }: Props) {
+  const tp = useProductT("marketplaceUi.productUi");
   // hubs arrives as a prop — see the Props type.
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,9 +92,9 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
       const res = await fetch(`${API}/api/listings/self-list`, {
         method: "POST", headers: jsonHeaders(), body: JSON.stringify({ productId, communityTag: c.communityTag }),
       });
-      if (res.ok) { showToast("Listed in " + c.communityName); handleRefresh(); setShowAddModal(false); }
-      else { const err = await res.json().catch(() => ({})); showToast(err.error || "Failed to list"); }
-    } catch { showToast("Failed to list"); }
+      if (res.ok) { showToast(tp("listingsSection.listedIn", { name: c.communityName })); handleRefresh(); setShowAddModal(false); }
+      else { const err = await res.json().catch(() => ({})); showToast(err.error || tp("common.failedToList")); }
+    } catch { showToast(tp("common.failedToList")); }
     finally { setSaving(false); }
   }
 
@@ -102,15 +104,16 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
       const res = await fetch(`${API}/api/listings/request`, {
         method: "POST", headers: jsonHeaders(), body: JSON.stringify({ productId, communityTag: c.communityTag }),
       });
-      if (res.ok) { showToast("Listing request sent to " + c.communityName); handleRefresh(); setShowAddModal(false); }
-      else { const err = await res.json().catch(() => ({})); showToast(err.error || "Failed to request"); }
-    } catch { showToast("Failed to request"); }
+      if (res.ok) { showToast(tp("listingsSection.listingRequestSentTo", { name: c.communityName })); handleRefresh(); setShowAddModal(false); }
+      else { const err = await res.json().catch(() => ({})); showToast(err.error || tp("common.failedToRequest")); }
+    } catch { showToast(tp("common.failedToRequest")); }
     finally { setSaving(false); }
   }
 
   function getStatusConfig(l: any) {
-    if (l.status === "ACTIVE" && l.isHidden) return { label: "Hidden", dot: "bg-amber-500" };
-    return LISTING_STATUS[l.status] || LISTING_STATUS.CANCELLED;
+    if (l.status === "ACTIVE" && l.isHidden) return { label: tp("common.hidden"), dot: "bg-amber-500" };
+    const status = LISTING_STATUS[l.status] ? l.status : "CANCELLED";
+    return { ...LISTING_STATUS[status], label: tp(`listingStatus.${status}`) };
   }
 
   const activeListings = listings.filter(l => l.status !== "CANCELLED");
@@ -136,12 +139,12 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
           </button>
           )}
           <div className="flex-1">
-            <h2 className="text-[15px] font-semibold text-zinc-900">Listings</h2>
-            <p className="text-[12px] text-zinc-400">Communities where this product is listed</p>
+            <h2 className="text-[15px] font-semibold text-zinc-900">{tp("listingsSection.listings")}</h2>
+            <p className="text-[12px] text-zinc-400">{tp("listingsSection.communitiesWhereThisProductIs")}</p>
           </div>
           <button onClick={() => setShowAddModal(true)}
             className="px-3 py-1.5 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer">
-            Add Listing
+            {tp("listingsSection.addListing")}
           </button>
         </div>
 
@@ -162,7 +165,7 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-zinc-900">{l.community?.name || "Community"}</p>
+                  <p className="text-sm font-medium text-zinc-900">{l.community?.name || tp("common.community")}</p>
                   <p className="text-[11px] text-zinc-400 mt-0.5">
                     {commissionRate === 0 ? "Self-listed" : `${commissionRate}% commission`}
                   </p>
@@ -184,7 +187,7 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto text-zinc-200 mb-3">
               <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
             </svg>
-            <p className="text-sm text-zinc-500">Not listed in any community yet</p>
+            <p className="text-sm text-zinc-500">{tp("listingsSection.notListedInAnyCommunity")}</p>
           </div>
         )}
       </div>
@@ -193,13 +196,13 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
         <div className="fixed inset-0 z-[120] bg-black/40 flex items-center justify-center" onClick={() => setShowAddModal(false)}>
           <div className="bg-white rounded-xl shadow-xl w-[calc(100vw-2rem)] md:w-[440px] max-h-[70vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-zinc-100">
-              <h3 className="text-[15px] font-semibold text-zinc-900">List in Community</h3>
-              <p className="text-[12px] text-zinc-400 mt-0.5">Choose a community to list your product in.</p>
+              <h3 className="text-[15px] font-semibold text-zinc-900">{tp("listingsSection.listInCommunity")}</h3>
+              <p className="text-[12px] text-zinc-400 mt-0.5">{tp("listingsSection.chooseACommunityToList")}</p>
             </div>
             <div className="flex-1 overflow-y-auto">
               {leaderCommunities.length > 0 && (
                 <div>
-                  <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider px-5 pt-4 pb-2">Your communities</p>
+                  <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider px-5 pt-4 pb-2">{tp("listingsSection.yourCommunities")}</p>
                   {leaderCommunities.map(c => (
                     <button key={c.communityTag} onClick={() => handleLeaderAdd(c)} disabled={saving}
                       className="w-full flex items-center gap-3 px-5 py-3 hover:bg-zinc-50 cursor-pointer text-left disabled:opacity-50">
@@ -212,7 +215,7 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
                         <p className="text-sm font-medium text-zinc-800">{c.communityName}</p>
                         <p className="text-[11px] text-zinc-400 flex items-center gap-1">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-emerald-500"><polyline points="20 6 9 17 4 12"/></svg>
-                          No approval needed
+                          {tp("listingsSection.noApprovalNeeded")}
                         </p>
                       </div>
                     </button>
@@ -222,7 +225,7 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
               {memberCommunities.length > 0 && (
                 <div>
                   {leaderCommunities.length > 0 && <div className="h-px bg-zinc-100 mx-5" />}
-                  <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider px-5 pt-4 pb-2">Member of</p>
+                  <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider px-5 pt-4 pb-2">{tp("listingsSection.memberOf")}</p>
                   {memberCommunities.map(c => (
                     <button key={c.communityTag} onClick={() => handleMemberRequest(c)} disabled={saving}
                       className="w-full flex items-center gap-3 px-5 py-3 hover:bg-zinc-50 cursor-pointer text-left disabled:opacity-50">
@@ -235,7 +238,7 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
                         <p className="text-sm font-medium text-zinc-800">{c.communityName}</p>
                         <p className="text-[11px] text-zinc-400 flex items-center gap-1">
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                          Requires approval
+                          {tp("listingsSection.requiresApproval")}
                         </p>
                       </div>
                     </button>
@@ -243,11 +246,11 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
                 </div>
               )}
               {leaderCommunities.length === 0 && memberCommunities.length === 0 && (
-                <div className="px-5 py-8 text-center"><p className="text-sm text-zinc-400">Already listed in all your communities</p></div>
+                <div className="px-5 py-8 text-center"><p className="text-sm text-zinc-400">{tp("listingsSection.alreadyListedInAllYour")}</p></div>
               )}
             </div>
             <div className="px-6 py-3 border-t border-zinc-100">
-              <button onClick={() => setShowAddModal(false)} className="w-full px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">Close</button>
+              <button onClick={() => setShowAddModal(false)} className="w-full px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">{tp("common.close")}</button>
             </div>
           </div>
         </div>,

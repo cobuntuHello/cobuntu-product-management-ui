@@ -23,6 +23,8 @@
  * docs/features/product-media-direct-upload.md (cobuntu-backend-monorepo)
  */
 
+import { getProductT } from "../i18n/productCopy";
+
 /** 8 MiB. A GCS resumable chunk must be a multiple of 256 KiB. */
 const CHUNK = 8 * 256 * 1024 * 4;
 
@@ -38,7 +40,7 @@ export type UploadProgress = {
 
 export class UploadCancelled extends Error {
     constructor() {
-        super("Upload cancelled");
+        super(getProductT("marketplaceUi.productUi")("common.uploadCancelled"));
         this.name = "UploadCancelled";
     }
 }

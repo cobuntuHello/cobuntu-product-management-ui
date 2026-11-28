@@ -224,7 +224,7 @@ export function VariantEditView({
                   </SelectTrigger>
                   <SelectContent>
                     {VARIANT_ATTR_KEYS.map((k) => (
-                      <SelectItem key={k} value={k}>{k}</SelectItem>
+                      <SelectItem key={k} value={k}>{tp(`variantAttrKeys.${k.replace(/\s+/g, "")}`)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -348,8 +348,8 @@ function PhysicalCore({ t, onUpdate }: { t: DraftTier; onUpdate: (p: Partial<Dra
         >
           <SelectTrigger className="h-[40px] text-[13px]"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {VARIANT_CONDITIONS.map(([val, label]) => (
-              <SelectItem key={val || NONE} value={val || NONE}>{label}</SelectItem>
+            {VARIANT_CONDITIONS.map(([val]) => (
+              <SelectItem key={val || NONE} value={val || NONE}>{val ? tp(`physicalDetailsFields.${val}.label`) : tp("physicalDetailsFields.notSpecified")}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -362,8 +362,8 @@ function PhysicalCore({ t, onUpdate }: { t: DraftTier; onUpdate: (p: Partial<Dra
         >
           <SelectTrigger className="h-[40px] text-[13px]"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {VARIANT_PARCELS.map(([val, label, hint]) => (
-              <SelectItem key={val} value={val}>{label} · {hint}</SelectItem>
+            {VARIANT_PARCELS.map(([val]) => (
+              <SelectItem key={val} value={val}>{tp(`physicalDetailsFields.${val}.label`)} · {tp(`physicalDetailsFields.${val}.weight`)}</SelectItem>
             ))}
           </SelectContent>
         </Select>

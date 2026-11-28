@@ -75,8 +75,8 @@ export function FieldTypePickerFlow({ onPick, onBack }: FieldTypePickerFlowProps
                 <Icon className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <p className="text-[12px] font-medium text-zinc-800">{ft.label}</p>
-                <p className="text-[10px] text-zinc-400 truncate">{ft.desc}</p>
+                <p className="text-[12px] font-medium text-zinc-800">{tp(`formFieldTypes.${ft.type}.label`)}</p>
+                <p className="text-[10px] text-zinc-400 truncate">{tp(`formFieldTypes.${ft.type}.desc`)}</p>
               </div>
             </button>
           );

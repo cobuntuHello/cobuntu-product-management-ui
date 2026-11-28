@@ -8,6 +8,7 @@ import { useProductManagementConfig } from "../../config";
 import { UserAvatarFallback } from "../../ui/user-avatar-fallback";
 import { useCanEdit } from "../../lib/manageAccess";
 
+import { useProductT } from "../../i18n/productCopy";
 interface Props {
   product: any;
   communityTag: string;
@@ -40,6 +41,7 @@ export function ProductCard({
   product, communityTag, listingId,
   onEditName, onEditMedia, onEditCta, onEditTags, onEditCategory, onEditValueLines,
 }: Props) {
+  const tp = useProductT("marketplaceUi.productUi");
   // Injected by the host app; the package ships its own fallback so no host
   // is forced to supply one.
   const { UserAvatar: ConfigAvatar } = useProductManagementConfig();
@@ -173,7 +175,7 @@ export function ProductCard({
             {canEdit && (
               <button
                 onClick={onEditMedia}
-                aria-label={bannerUrl ? "Manage images" : "Add images"}
+                aria-label={bannerUrl ? tp("productCard.manageImages") : tp("productCard.addImages")}
                 className="absolute inset-0 w-full h-full z-10 cursor-pointer"
                 style={{ bottom: "40px" }}
               />
@@ -196,13 +198,13 @@ export function ProductCard({
                 </svg>
                 {canEdit ? (
                   <>
-                    <span className="text-[12.5px] font-semibold text-zinc-600">Add your first image</span>
+                    <span className="text-[12.5px] font-semibold text-zinc-600">{tp("productCard.addYourFirstImage")}</span>
                     <span className="text-[11.5px] leading-snug text-zinc-400 max-w-[22ch]">
-                      Listings with a photo are opened far more often.
+                      {tp("productCard.listingsWithAPhotoAre")}
                     </span>
                   </>
                 ) : (
-                  <span className="text-[12.5px] font-semibold text-zinc-500">No images yet</span>
+                  <span className="text-[12.5px] font-semibold text-zinc-500">{tp("productCard.noImagesYet")}</span>
                 )}
               </div>
             )}
@@ -243,7 +245,7 @@ export function ProductCard({
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="opacity-80"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 )}
               </div>
-              <span className="text-sm font-medium text-white/90">{urlCopied ? "Link copied!" : "Copy product link"}</span>
+              <span className="text-sm font-medium text-white/90">{urlCopied ? tp("productCard.linkCopied") : tp("productCard.copyProductLink")}</span>
             </button>
           </div>
 
@@ -265,7 +267,7 @@ export function ProductCard({
                 <button
                   key={m.id ?? m.url}
                   onClick={onEditMedia}
-                  aria-label="Manage images"
+                  aria-label={tp("productCard.manageImages")}
                   className="shrink-0 w-[52px] h-[52px] rounded-lg overflow-hidden cursor-pointer"
                 >
                   <img src={m.url} alt="" className="w-full h-full object-cover" />
@@ -279,7 +281,7 @@ export function ProductCard({
               {canEdit && (
                 <button
                   onClick={onEditMedia}
-                  aria-label="Add images"
+                  aria-label={tp("productCard.addImages")}
                   className="shrink-0 w-[52px] h-[52px] rounded-lg cursor-pointer grid place-items-center text-[17px] leading-none
                              text-zinc-400 hover:text-zinc-600 hover:border-zinc-400 transition-colors
                              border-[1.5px] border-dashed border-zinc-300 bg-zinc-50"
@@ -297,7 +299,7 @@ export function ProductCard({
             {/* Name */}
             <InfoRow onClick={edit(onEditName)} disabled={!canEdit}
               icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>}>
-              <p className="text-sm font-medium text-zinc-900 truncate">{product.name || "Untitled Product"}</p>
+              <p className="text-sm font-medium text-zinc-900 truncate">{product.name || tp("productCard.untitledProduct")}</p>
             </InfoRow>
 
             {/* No price row.
@@ -327,9 +329,9 @@ export function ProductCard({
               <InfoRow onClick={edit(onEditCta)} disabled={!canEdit}
                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>}>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-zinc-400">Button text</p>
+                  <p className="text-xs text-zinc-400">{tp("common.buttonText")}</p>
                   <p className={`text-sm font-medium truncate ${product.ctaText ? "text-zinc-900" : "text-zinc-500"}`}>
-                    {product.ctaText || "Buy now (default)"}
+                    {product.ctaText || tp("productCard.buyNowDefault")}
                   </p>
                 </div>
               </InfoRow>
@@ -346,9 +348,9 @@ export function ProductCard({
               <InfoRow onClick={edit(onEditCategory)} disabled={!canEdit}
                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>}>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-zinc-400">Category</p>
+                  <p className="text-xs text-zinc-400">{tp("common.category")}</p>
                   <p className={`text-sm truncate ${categoryLabel ? "font-medium text-zinc-900" : "text-zinc-500"}`}>
-                    {categoryLabel || "Uncategorised"}
+                    {categoryLabel || tp("productCard.uncategorised")}
                   </p>
                 </div>
               </InfoRow>
@@ -358,9 +360,9 @@ export function ProductCard({
               <InfoRow onClick={edit(onEditTags)} disabled={!canEdit}
                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>}>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-zinc-400">Tags</p>
+                  <p className="text-xs text-zinc-400">{tp("common.tags")}</p>
                   <p className={`text-sm truncate ${tagNames ? "font-medium text-zinc-900" : "text-zinc-500"}`}>
-                    {tagNames || (canEdit ? "Add tags" : "No tags")}
+                    {tagNames || (canEdit ? tp("common.addTags") : tp("productCard.noTags"))}
                   </p>
                 </div>
               </InfoRow>
@@ -373,11 +375,11 @@ export function ProductCard({
                 <InfoRow onClick={edit(onEditValueLines)} disabled={!canEdit}
                   icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-400"><path d="M3 6h.01M3 12h.01M3 18h.01M8 6h13M8 12h13M8 18h13"/></svg>}>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-zinc-400">What buyers get</p>
+                    <p className="text-xs text-zinc-400">{tp("common.whatBuyersGet")}</p>
                     <p className={`text-sm truncate ${lines.length ? "font-medium text-zinc-900" : "text-zinc-500"}`}>
                       {lines.length
                         ? `${lines.length} ${lines.length === 1 ? "line" : "lines"} · ${formatMoney(total, (product as any).currency || "EUR")} total value`
-                        : canEdit ? "Add what buyers get" : "Not set"}
+                        : canEdit ? tp("common.addWhatBuyersGet") : tp("common.notSet")}
                     </p>
                   </div>
                 </InfoRow>
@@ -395,7 +397,7 @@ export function ProductCard({
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <UserAvatar user={owner} className="h-7 w-7" />
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-zinc-900 truncate">{owner.name || "Unknown"}</p>
+                      <p className="text-sm font-medium text-zinc-900 truncate">{owner.name || tp("common.unknown")}</p>
                       {owner.usertag && <p className="text-[11px] text-zinc-400">@{owner.usertag}</p>}
                     </div>
                   </div>

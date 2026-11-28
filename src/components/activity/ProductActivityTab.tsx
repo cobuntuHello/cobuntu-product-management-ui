@@ -10,6 +10,7 @@ import {
   type ProductActivityEntryForRender,
 } from "./productActivitySentences";
 
+import { useProductT } from "../../i18n/productCopy";
 /**
  * Activity tab on the product manage page — reverse-chronological feed of
  * every manager-visible action on the product, paged through
@@ -44,6 +45,7 @@ interface ActivityEntry {
 }
 
 export function ProductActivityTab({ product, communityTag, pageSize = 25 }: ProductActivityTabProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const config = useProductManagementConfig();
   const API = config.apiBaseUrl;
   const UserAvatar = config.UserAvatar ?? UserAvatarFallback;
@@ -113,7 +115,7 @@ export function ProductActivityTab({ product, communityTag, pageSize = 25 }: Pro
         setCursor(data.nextCursor);
         if (!data.nextCursor) setExhausted(true);
       } catch (err: any) {
-        setError(err?.message ?? "Couldn't load activity");
+        setError(err?.message ?? tp("productActivityTab.couldnTLoadActivity"));
       } finally {
         inFlight.current = false;
         setLoading(false);
@@ -149,9 +151,9 @@ export function ProductActivityTab({ product, communityTag, pageSize = 25 }: Pro
        with its own header. */
     <section>
       <div className="mb-4">
-        <h2 className="text-[15px] font-semibold text-zinc-900">Activity</h2>
+        <h2 className="text-[15px] font-semibold text-zinc-900">{tp("productActivityTab.activity")}</h2>
         <p className="text-[12px] text-zinc-400 mt-0.5">
-          Every meaningful change to this product. Newest first.
+          {tp("productActivityTab.everyMeaningfulChangeToThis")}
         </p>
       </div>
 
@@ -175,7 +177,7 @@ export function ProductActivityTab({ product, communityTag, pageSize = 25 }: Pro
               onClick={() => void loadPage(cursor)}
               className="px-3 py-1.5 text-[12px] font-medium text-zinc-700 border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
             >
-              Retry
+              {tp("productActivityTab.retry")}
             </button>
           </div>
         )}
@@ -183,7 +185,7 @@ export function ProductActivityTab({ product, communityTag, pageSize = 25 }: Pro
         {cursor && !exhausted && !error && <div ref={sentinelRef} className="h-6" aria-hidden />}
 
         {exhausted && entries.length > 0 && (
-          <p className="px-6 py-4 text-center text-[11px] text-zinc-400">End of activity.</p>
+          <p className="px-6 py-4 text-center text-[11px] text-zinc-400">{tp("productActivityTab.endOfActivity")}</p>
         )}
         </div>
       )}
@@ -254,6 +256,7 @@ function LoadingRow() {
 }
 
 function EmptyState() {
+  const tp = useProductT("marketplaceUi.productUi");
   return (
     <SharedEmptyState
       icon={
@@ -263,8 +266,8 @@ function EmptyState() {
           <path d="M12 7v5l3 2" />
         </svg>
       }
-      title="No activity yet"
-      body="Edits, listing decisions, and co-seller changes will show up here."
+      title={tp("productActivityTab.noActivityYet")}
+      body={tp("productActivityTab.editsListingDecisionsAndCo")}
     />
   );
 }

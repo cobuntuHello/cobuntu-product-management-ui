@@ -6,6 +6,7 @@ import { MarkdownEditor } from "../../ui/markdown-editor";
 import { useProductManagementConfig, useJsonHeaders } from "../../config";
 import { useCanEdit } from "../../lib/manageAccess";
 
+import { useProductT } from "../../i18n/productCopy";
 /**
  * The product's description, edited where it is read. Courses render this
  * too: the course manage page is the product manage page plus a Syllabus tab.
@@ -44,6 +45,7 @@ interface Props {
 }
 
 export function DescriptionSection({ product, productId, onSaved }: Props) {
+  const tp = useProductT("marketplaceUi.productUi");
     const { apiBaseUrl } = useProductManagementConfig();
     const jsonHeaders = useJsonHeaders();
     /*
@@ -104,9 +106,9 @@ export function DescriptionSection({ product, productId, onSaved }: Props) {
     return (
         <div>
             <div className="mb-3 min-w-0">
-                <h2 className="text-[15px] font-semibold text-zinc-900">Description</h2>
+                <h2 className="text-[15px] font-semibold text-zinc-900">{tp("common.description")}</h2>
                 <p className="text-[12px] text-zinc-400 mt-0.5">
-                    What buyers read on the product page.
+                    {tp("descriptionSection.whatBuyersReadOnThe")}
                 </p>
             </div>
 
@@ -123,7 +125,7 @@ export function DescriptionSection({ product, productId, onSaved }: Props) {
                     value={content}
                     onChange={setContent}
                     onBlur={autosave.flush}
-                    placeholder={canEdit ? "Describe your product..." : ""}
+                    placeholder={canEdit ? tp("descriptionSection.describeYourProduct") : ""}
                     status={canEdit ? <AutosaveStatus state={autosave.state} onRetry={autosave.retry} /> : undefined}
                 />
             </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { API, authHeaders } from "../helpers";
 
+import { useProductT } from "../../i18n/productCopy";
 /**
  * "After checkout" config card (Phase 3.3) for the product manage page.
  *
@@ -28,6 +29,7 @@ export function AfterCheckoutCard(props: {
   };
   showToast: (message: string, type?: "success" | "error" | "info") => void;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const { communityTag, productId, initial, showToast } = props;
 
   const [open, setOpen] = useState(false);
@@ -55,14 +57,14 @@ export function AfterCheckoutCard(props: {
 
   const summary =
     mode === "MEMBERSHIP_UPSELL"
-      ? `Membership upsell${segments.find((s) => s.id === segmentId)?.name ? " · " + segments.find((s) => s.id === segmentId)!.name : ""}`
+      ? tp("afterCheckoutCard.membershipUpsell", { value: segments.find((s) => s.id === segmentId)?.name ? " · " + segments.find((s) => s.id === segmentId)!.name : "" })
       : mode === "EXTERNAL"
-        ? "External redirect"
-        : "Normal confirmation";
+        ? tp("common.externalRedirect")
+        : tp("common.normalConfirmation");
 
   async function save() {
-    if (mode === "MEMBERSHIP_UPSELL" && !segmentId) { showToast("Choose a membership tier to promote", "error"); return; }
-    if (mode === "EXTERNAL" && !/^https:\/\/[^\s]+$/.test(postCheckoutUrl.trim())) { showToast("Enter a valid https:// URL", "error"); return; }
+    if (mode === "MEMBERSHIP_UPSELL" && !segmentId) { showToast(tp("afterCheckoutCard.chooseAMembershipTierTo"), "error"); return; }
+    if (mode === "EXTERNAL" && !/^https:\/\/[^\s]+$/.test(postCheckoutUrl.trim())) { showToast(tp("afterCheckoutCard.enterAValidHttpsUrl"), "error"); return; }
     setSaving(true);
     try {
       const res = await fetch(`${API}/api/communities/${communityTag}/products/${productId}/after-checkout`, {
@@ -80,10 +82,10 @@ export function AfterCheckoutCard(props: {
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.error || "Failed to save");
       }
-      showToast("After-checkout updated", "success");
+      showToast(tp("afterCheckoutCard.afterCheckoutUpdated"), "success");
       setOpen(false);
     } catch (e: any) {
-      showToast(e?.message || "Failed to save", "error");
+      showToast(e?.message || tp("common.failedToSave"), "error");
     } finally {
       setSaving(false);
     }
@@ -101,16 +103,16 @@ export function AfterCheckoutCard(props: {
             </svg>
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-zinc-900">After checkout</p>
+            <p className="text-sm font-medium text-zinc-900">{tp("common.afterCheckout")}</p>
             <p className="text-[13px] text-zinc-500 leading-snug mt-0.5">
-              What buyers see after paying. Currently: <span className="font-medium text-zinc-700">{summary}</span>
+              {tp("afterCheckoutCard.whatBuyersSeeAfterPaying")} <span className="font-medium text-zinc-700">{summary}</span>
             </p>
           </div>
         </div>
         {!open && (
           <button type="button" onClick={() => setOpen(true)}
             className="shrink-0 rounded-lg border border-zinc-200 px-3 py-1.5 text-[13px] font-medium text-zinc-700 hover:bg-zinc-50 cursor-pointer">
-            Configure
+            {tp("afterCheckoutCard.configure")}
           </button>
         )}
       </div>
@@ -119,9 +121,9 @@ export function AfterCheckoutCard(props: {
         <div className="mt-4 space-y-3 border-t border-zinc-100 pt-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {([
-              { v: "NATIVE", label: "Normal confirmation" },
-              { v: "MEMBERSHIP_UPSELL", label: "Membership upsell" },
-              { v: "EXTERNAL", label: "External redirect" },
+              { v: "NATIVE", label: tp("common.normalConfirmation") },
+              { v: "MEMBERSHIP_UPSELL", label: tp("common.membershipUpsell") },
+              { v: "EXTERNAL", label: tp("common.externalRedirect") },
             ] as const).map((opt) => (
               <button key={opt.v} type="button" onClick={() => setMode(opt.v)}
                 className={`rounded-lg border px-3 py-2 text-[13px] text-left transition-colors cursor-pointer ${mode === opt.v ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-200 text-zinc-700 hover:bg-zinc-50"}`}>
@@ -133,11 +135,11 @@ export function AfterCheckoutCard(props: {
           {mode === "MEMBERSHIP_UPSELL" && (
             <div className="space-y-2">
               <select value={segmentId} onChange={(e) => setSegmentId(e.target.value)} className={inputCls}>
-                <option value="">Choose a membership tier to promote…</option>
+                <option value="">{tp("afterCheckoutCard.chooseAMembershipTierTo2")}</option>
                 {segments.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
-              <input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Headline (optional)" maxLength={140} className={inputCls} />
-              <input value={ctaLabel} onChange={(e) => setCtaLabel(e.target.value)} placeholder="Button label (optional)" maxLength={40} className={inputCls} />
+              <input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder={tp("afterCheckoutCard.headlineOptional")} maxLength={140} className={inputCls} />
+              <input value={ctaLabel} onChange={(e) => setCtaLabel(e.target.value)} placeholder={tp("afterCheckoutCard.buttonLabelOptional")} maxLength={40} className={inputCls} />
             </div>
           )}
 
@@ -148,11 +150,11 @@ export function AfterCheckoutCard(props: {
           <div className="flex items-center gap-2 pt-1">
             <button type="button" disabled={saving} onClick={save}
               className="rounded-lg bg-zinc-900 px-4 py-2 text-[13px] font-semibold text-white hover:bg-zinc-800 disabled:opacity-50 cursor-pointer">
-              {saving ? "Saving…" : "Save"}
+              {saving ? tp("common.saving") : tp("common.save")}
             </button>
             <button type="button" onClick={() => setOpen(false)}
               className="rounded-lg border border-zinc-200 px-4 py-2 text-[13px] font-medium text-zinc-600 hover:bg-zinc-50 cursor-pointer">
-              Cancel
+              {tp("common.cancel")}
             </button>
           </div>
         </div>
