@@ -6,6 +6,7 @@ import { Input } from "./input";
 import { cn } from "./utils";
 import { useProductManagementConfig } from "../config";
 
+import { getProductT } from "../i18n/productCopy";
 function getTagColor(name: string): { bg: string; text: string } {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
@@ -34,7 +35,7 @@ function useDebounce(value: string, delay: number) {
 }
 
 export const EventTags = React.forwardRef<HTMLInputElement, EventTagsProps>(
-  ({ selectedTags, onTagsChange, placeholder = "Add tags...", disabled = false }, ref) => {
+  ({ selectedTags, onTagsChange, placeholder, disabled = false }, ref) => {
     const { apiBaseUrl, authHeaders } = useProductManagementConfig();
     const [inputValue, setInputValue] = useState("");
     const [suggestions, setSuggestions] = useState<Tag[]>([]);
@@ -146,7 +147,7 @@ export const EventTags = React.forwardRef<HTMLInputElement, EventTagsProps>(
           onFocus={() => { if (availableSuggestions.length > 0) setIsOpen(true); }}
           onBlur={e => { if (!suggestionsRef.current?.contains(e.relatedTarget as Node)) { setIsOpen(false); setSelectedIndex(-1); } }}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          placeholder={placeholder ?? getProductT("marketplaceUi.productUi")("eventTags.addTags")}
           className="w-full text-sm"
           disabled={disabled}
         />

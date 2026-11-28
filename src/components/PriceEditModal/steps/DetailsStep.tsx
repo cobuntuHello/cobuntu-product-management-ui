@@ -4,6 +4,7 @@ import { TIER_NAME_MAX, TIER_DESCRIPTION_MAX, type DraftTier } from "../types";
 import { isTierLocked } from "../helpers";
 import { Eyebrow, StepInput, StepTextarea } from "../_primitives";
 
+import { useProductT } from "../../../i18n/productCopy";
 export interface DetailsStepProps {
   t: DraftTier;
   onUpdate: (patch: Partial<DraftTier>) => void;
@@ -19,6 +20,7 @@ export interface DetailsStepProps {
  * same here as in every other step.
  */
 export function DetailsStep({ t, onUpdate }: DetailsStepProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const locked = isTierLocked(t);
 
   return (
@@ -30,7 +32,7 @@ export function DetailsStep({ t, onUpdate }: DetailsStepProps) {
           count={t.name.length}
           max={TIER_NAME_MAX}
         >
-          Tier name
+          {tp("common.tierName")}
         </Eyebrow>
         <div className="mt-1">
           <StepInput
@@ -38,7 +40,7 @@ export function DetailsStep({ t, onUpdate }: DetailsStepProps) {
             value={t.name}
             maxLength={TIER_NAME_MAX}
             onChange={(e) => onUpdate({ name: e.target.value })}
-            placeholder="Standard, VIP, Early-bird…"
+            placeholder={tp("common.tierNamePlaceholder")}
           />
         </div>
       </div>
@@ -50,14 +52,14 @@ export function DetailsStep({ t, onUpdate }: DetailsStepProps) {
           count={t.description.length}
           max={TIER_DESCRIPTION_MAX}
         >
-          Description (optional)
+          {tp("common.descriptionOptional")}
         </Eyebrow>
         <div className="mt-1">
           <StepTextarea
             value={t.description}
             maxLength={TIER_DESCRIPTION_MAX}
             onChange={(e) => onUpdate({ description: e.target.value })}
-            placeholder="What's included"
+            placeholder={tp("common.whatsIncluded")}
             rows={3}
           />
         </div>
@@ -67,7 +69,7 @@ export function DetailsStep({ t, onUpdate }: DetailsStepProps) {
           can't drop below sold. */}
       <div>
         <Eyebrow help="The maximum number of units sold for this tier. Leave blank for unlimited.">
-          Capacity (optional)
+          {tp("common.capacityOptional")}
         </Eyebrow>
         <div className="mt-1">
           <StepInput
@@ -76,11 +78,11 @@ export function DetailsStep({ t, onUpdate }: DetailsStepProps) {
             step="1"
             value={t.capacity}
             onChange={(e) => onUpdate({ capacity: e.target.value })}
-            placeholder="Unlimited"
+            placeholder={tp("common.unlimited")}
           />
         </div>
         {locked && (
-          <p className="text-[10px] text-zinc-400 mt-1">Min {t.salesCount} (already sold).</p>
+          <p className="text-[10px] text-zinc-400 mt-1">{tp("common.minAlreadySold", { count: t.salesCount })}</p>
         )}
       </div>
     </div>

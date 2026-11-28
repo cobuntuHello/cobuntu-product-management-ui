@@ -64,6 +64,7 @@ import {
   type MemberPricesSegmentsStatus,
 } from "./MemberPricesStep";
 
+import { useProductT, getProductT } from "../i18n/productCopy";
 // draftMode makes ZERO API calls (mount fetch, member-pricing fetch, and
 // FormStep's load/persist are all gated on `!draftMode` or a saved tier id),
 // so the create-time wizard needs only a stub config to satisfy
@@ -102,13 +103,13 @@ function getCurrencySymbol(code: string): string {
  * present, so a bare free variant stays a one-liner.
  */
 function variantPriceLabel(t: DraftTier): string {
-  if (t.priceMode === "pwyw") return "Pay what you want";
+  if (t.priceMode === "pwyw") return getProductT("marketplaceUi.productUi")("common.payWhatYouWant");
   // A BLANK price is not free: it is unfinished, and Save refuses it ("Price
   // required for ..."). Reading "Free" hid the one variant that needed a
   // price (PBN Bug 1, 2026-11-05).
-  if ((t.price ?? "").trim() === "") return "Price needed";
+  if ((t.price ?? "").trim() === "") return getProductT("marketplaceUi.productUi")("productForm.priceNeeded");
   const p = parseFloat(t.price);
-  if (Number.isNaN(p) || p <= 0) return "Free";
+  if (Number.isNaN(p) || p <= 0) return getProductT("marketplaceUi.productUi")("common.free");
   const base = `${getCurrencySymbol(t.currency)}${t.price}`;
   return t.isRecurring ? `${base}/${t.recurringInterval || "mo"}` : base;
 }
@@ -130,23 +131,23 @@ function variantFacts(t: DraftTier, isPhysical: boolean): { k: string; v: string
 
   // ── Curated — always shown, so buyers discover the knob even when it's unset.
   const cap = parseInt(t.capacity, 10);
-  out.push({ k: "Capacity", v: (t.capacity && !Number.isNaN(cap) && cap > 0) ? String(cap) : "Unlimited" });
+  out.push({ k: getProductT("marketplaceUi.productUi")("productForm.capacity"), v: (t.capacity && !Number.isNaN(cap) && cap > 0) ? String(cap) : getProductT("marketplaceUi.productUi")("common.unlimited") });
 
   if (!isPhysical) {
     const fileCount = (t.files?.length ?? 0) + (t.links?.length ?? 0);
-    out.push({ k: "Files", v: fileCount > 0 ? String(fileCount) : "None" });
-    out.push({ k: "Licence", v: (t.licenseTerms && t.licenseTerms.trim()) ? "Set" : "Not set" });
+    out.push({ k: getProductT("marketplaceUi.productUi")("productForm.files"), v: fileCount > 0 ? String(fileCount) : getProductT("marketplaceUi.productUi")("productForm.none") });
+    out.push({ k: getProductT("marketplaceUi.productUi")("productForm.licence"), v: (t.licenseTerms && t.licenseTerms.trim()) ? getProductT("marketplaceUi.productUi")("productForm.set") : getProductT("marketplaceUi.productUi")("common.notSet") });
   }
 
   const formCount = t.draftForm?.fields?.length ?? t.formFieldCount ?? 0;
-  out.push({ k: "Sign-up form", v: formCount > 0 ? `${formCount} question${formCount === 1 ? "" : "s"}` : "Not set" });
+  out.push({ k: getProductT("marketplaceUi.productUi")("productForm.signUpForm"), v: formCount > 0 ? getProductT("marketplaceUi.productUi")("productForm.questionCount", { count: formCount }) : getProductT("marketplaceUi.productUi")("common.notSet") });
 
   // ── Niche / type-specific — only once set, to keep the strip from bloating.
   const dl = parseInt(t.maxDownloads, 10);
-  if (!isPhysical && t.maxDownloads && !Number.isNaN(dl) && dl > 0) out.push({ k: "Downloads", v: `${dl} max` });
-  if (isPhysical && t.condition && t.condition.trim()) out.push({ k: "Condition", v: t.condition });
-  if (isPhysical && t.parcelSize && t.parcelSize.trim()) out.push({ k: "Postage", v: t.parcelSize });
-  if (t.attrs && t.attrs.length > 0) out.push({ k: "Attributes", v: String(t.attrs.length) });
+  if (!isPhysical && t.maxDownloads && !Number.isNaN(dl) && dl > 0) out.push({ k: getProductT("marketplaceUi.productUi")("productForm.downloads"), v: getProductT("marketplaceUi.productUi")("productForm.downloadsMax", { count: dl }) });
+  if (isPhysical && t.condition && t.condition.trim()) out.push({ k: getProductT("marketplaceUi.productUi")("productForm.condition"), v: t.condition });
+  if (isPhysical && t.parcelSize && t.parcelSize.trim()) out.push({ k: getProductT("marketplaceUi.productUi")("productForm.postage"), v: t.parcelSize });
+  if (t.attrs && t.attrs.length > 0) out.push({ k: getProductT("marketplaceUi.productUi")("productForm.attributes"), v: String(t.attrs.length) });
   return out;
 }
 
@@ -210,6 +211,19 @@ const DEFAULT_LABELS: Required<Pick<ProductFormLabels,
   tagsHint: "Add tags to help people discover your product.",
   ctaHint: "The action button on your product card. Default: \u201cBuy Now\u201d. Max 15 characters.",
 };
+
+/** DEFAULT_LABELS in the host's language (its English stays the fallback). */
+function defaultLabels(tp: (key: string) => string): typeof DEFAULT_LABELS {
+  return {
+    namePlaceholder: tp("productForm.namePlaceholder"),
+    descriptionTitle: tp("productForm.descriptionTitle"),
+    descriptionHint: tp("productForm.descriptionHint"),
+    descriptionPlaceholder: tp("productForm.descriptionPlaceholder"),
+    tagsTitle: tp("productForm.tagsTitle"),
+    tagsHint: tp("productForm.tagsHint"),
+    ctaHint: tp("productForm.ctaHint"),
+  };
+}
 
 export interface ProductFormData {
   name: string;
@@ -485,9 +499,10 @@ export interface ProductFormProps {
 // ─── Component ─────────────────────────────────────────────────
 
 export function ProductForm({ communityTag, initialData, onChange, showErrors, showTiers, hideVisibility, hideApproval, hideRepeatPurchase, categories, membershipTiers = [], initialViewTierIds, initialBuyTierIds, productType = "DIGITAL", showLinkDeliverables = true, page = "all", showMemberPricing = false, memberPricingScope, memberPricesStep = false, labels, stripeStatusOverride, ownership = "community" }: ProductFormProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   /* Merged once rather than at each use, so a partial override cannot leave
    * one string reading "course" beside another still reading "product". */
-  const L = { ...DEFAULT_LABELS, ...(labels ?? {}) };
+  const L = { ...defaultLabels(tp), ...(labels ?? {}) };
   /*
    * The product/course copy-swap mechanism, reused rather than reinvented.
    *
@@ -500,12 +515,12 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
    * needing to know every caller's phrasing.
    */
   const noun = productType === "COURSE" ? "course" : "product";
-  const basicsBannerTitle = labels?.basicsBannerTitle ?? "Let's start with the basics";
-  const basicsBannerSubtitle = labels?.basicsBannerSubtitle ?? `Give your ${noun} a name people will recognize`;
-  const pricingBannerTitle = labels?.pricingBannerTitle ?? `Configure your ${noun}'s business model`;
-  const pricingBannerSubtitle = labels?.pricingBannerSubtitle ?? "Choose how people can get access. You can change these later.";
-  const settingsBannerTitle = labels?.settingsBannerTitle ?? `Set your ${noun}'s policies`;
-  const settingsBannerSubtitle = labels?.settingsBannerSubtitle ?? "Choose how buyers interact with it. You can change these later.";
+  const basicsBannerTitle = labels?.basicsBannerTitle ?? tp("productForm.letSStartWithThe");
+  const basicsBannerSubtitle = labels?.basicsBannerSubtitle ?? tp("productForm.giveYourANamePeople", { noun: noun });
+  const pricingBannerTitle = labels?.pricingBannerTitle ?? tp("productForm.configureYourSBusinessModel", { noun: noun });
+  const pricingBannerSubtitle = labels?.pricingBannerSubtitle ?? tp("productForm.chooseHowPeopleCanGet");
+  const settingsBannerTitle = labels?.settingsBannerTitle ?? tp("productForm.setYourSPolicies", { noun: noun });
+  const settingsBannerSubtitle = labels?.settingsBannerSubtitle ?? tp("productForm.chooseHowBuyersInteractWith");
   // Form state
   const [name, setName] = useState(initialData?.name || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -1107,7 +1122,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         {showErrors && !name.trim() && (
           <p className="inline-flex items-center gap-1.5 mt-2 rounded-full bg-amber-50 px-3 py-1.5 text-[13px] text-amber-700">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-            Give your product a name so people know what they&apos;re looking at
+            {tp("productForm.giveYourProductAName")}
           </p>
         )}
         {/*
@@ -1134,7 +1149,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         onChange={setMediaItems}
         aspect={4 / 3}
         maxItems={5}
-        hint={`Best at ${COVER_SIZE_HINT}`}
+        hint={tp("productForm.bestAt", { size: COVER_SIZE_HINT })}
         commit={commitPhoto}
       />
       </>)}
@@ -1157,7 +1172,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full bg-amber-100 text-amber-600 shrink-0"><FileText className="h-4 w-4" /></span>
           )}
           <span className="flex-1 min-w-0">
-            <span className={`block text-sm truncate ${descriptionPreview ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{descriptionPreview ? "Description" : "Add description"}</span>
+            <span className={`block text-sm truncate ${descriptionPreview ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{descriptionPreview ? tp("common.description") : tp("productForm.addDescription")}</span>
             {/* Subtitle in BOTH states — L.descriptionHint explains what the
                 field is for when unanswered, so an empty row isn't bare. */}
             <span className={`block text-[12.5px] truncate ${descriptionPreview ? "text-zinc-500" : "text-zinc-400"}`}>
@@ -1190,7 +1205,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full bg-purple-100 text-purple-600 shrink-0"><TagIcon className="h-4 w-4" /></span>
           )}
           <span className="flex-1 min-w-0">
-            <span className={`block text-sm truncate ${tags.length > 0 ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{tags.length > 0 ? "Tags" : "Add tags"}</span>
+            <span className={`block text-sm truncate ${tags.length > 0 ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{tags.length > 0 ? tp("common.tags") : tp("productForm.addTags")}</span>
             <span className={`block text-[12.5px] truncate ${tags.length > 0 ? "text-zinc-500" : "text-zinc-400"}`}>
               {tags.length > 0 ? tags.map(t => t.name).join(" · ") : L.tagsHint}
             </span>
@@ -1209,11 +1224,11 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full bg-emerald-100 text-emerald-600 shrink-0"><ListChecks className="h-4 w-4" /></span>
           )}
           <span className="flex-1 min-w-0">
-            <span className={`block text-sm truncate ${valueLines.length > 0 ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{valueLines.length > 0 ? "What buyers get" : "Add what buyers get"}</span>
+            <span className={`block text-sm truncate ${valueLines.length > 0 ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{valueLines.length > 0 ? tp("productForm.whatBuyersGet") : tp("productForm.addWhatBuyersGet")}</span>
             <span className={`block text-[12.5px] truncate ${valueLines.length > 0 ? "text-zinc-500" : "text-zinc-400"}`}>
               {valueLines.length > 0
                 ? `${valueLines.length} ${valueLines.length === 1 ? "line" : "lines"} · ${formatMoney(sumValueLines(valueLines), currency)} total value`
-                : "List what's included and what each part is worth."}
+                : tp("productForm.listWhatSIncludedAnd")}
             </span>
           </span>
           <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
@@ -1227,7 +1242,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full bg-blue-100 text-blue-600 shrink-0"><MousePointerClick className="h-4 w-4" /></span>
           )}
           <span className="flex-1 min-w-0">
-            <span className={`block text-sm truncate ${ctaText.trim() ? "font-medium text-zinc-800" : "text-zinc-500"}`}>Call to Action Label<span className="font-normal text-zinc-400 text-[12.5px]">{ctaText.trim() ? "" : " · optional"}</span></span>
+            <span className={`block text-sm truncate ${ctaText.trim() ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{tp("productForm.callToActionLabel")}<span className="font-normal text-zinc-400 text-[12.5px]">{ctaText.trim() ? "" : ` · ${tp("common.optional")}`}</span></span>
             {/* L.ctaHint is long — truncate rather than shorten, matching how
                 the answered-state summary line already truncates. */}
             <span className={`block text-[12.5px] truncate ${ctaText.trim() ? "text-zinc-500" : "text-zinc-400"}`}>
@@ -1292,20 +1307,20 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-stretch">
                 {([
                   {
-                    kind: "free" as const, label: "Free", icon: Gift,
-                    desc: `No payment required to get it.`,
+                    kind: "free" as const, label: tp("common.free"), icon: Gift,
+                    desc: tp("productForm.noPaymentRequiredToGet"),
                     cardSelected: "cursor-pointer border-emerald-300 bg-emerald-50",
                     badgeSelected: "bg-emerald-100 text-emerald-600",
                   },
                   {
-                    kind: "paid" as const, label: "Paid", icon: Wallet,
-                    desc: `Buyers pay to get access.`,
+                    kind: "paid" as const, label: tp("productForm.paid"), icon: Wallet,
+                    desc: tp("productForm.buyersPayToGetAccess"),
                     cardSelected: "cursor-pointer border-blue-300 bg-blue-50",
                     badgeSelected: "bg-blue-100 text-blue-600",
                   },
                   {
-                    kind: "donations" as const, label: "Free with donations", icon: CreditCard,
-                    desc: `Free, with an optional tip at checkout.`,
+                    kind: "donations" as const, label: tp("productForm.freeWithDonations"), icon: CreditCard,
+                    desc: tp("productForm.freeWithAnOptionalTip"),
                     cardSelected: "cursor-pointer border-violet-300 bg-violet-50",
                     badgeSelected: "bg-violet-100 text-violet-600",
                   },
@@ -1361,7 +1376,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                       </span>
                       <p className={cn("text-[13px] font-semibold", needsStripe ? "text-zinc-500" : "text-zinc-800")}>{label}</p>
                       <p className={cn("text-[11.5px] mt-0.5 leading-snug", needsStripe ? "text-zinc-400" : "text-zinc-500")}>
-                        {needsStripe ? "Connect Stripe to sell for a price." : desc}
+                        {needsStripe ? tp("productForm.connectStripeToSellFor") : desc}
                       </p>
                     </button>
                   );
@@ -1388,7 +1403,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                           <Layers className="h-3.5 w-3.5" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[14px] font-semibold text-zinc-800 truncate">{t.name.trim() || "Unnamed variant"}</p>
+                          <p className="text-[14px] font-semibold text-zinc-800 truncate">{t.name.trim() || tp("productForm.unnamedVariant")}</p>
                           <p className="text-[12px] text-zinc-400 mt-0.5 truncate">{variantPriceLabel(t)}</p>
                         </div>
                         <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
@@ -1410,7 +1425,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 onMouseLeave={e => { e.currentTarget.style.color = ""; e.currentTarget.style.borderColor = ""; e.currentTarget.style.background = ""; }}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[13px] font-medium text-zinc-500 border border-dashed border-zinc-200 rounded-xl cursor-pointer transition-all duration-150">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Add variant
+                {tp("common.addVariant")}
               </button>
 
               {/* ── Member prices ── on the step itself (reported 2026-11-10:
@@ -1424,8 +1439,8 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                   {memberPricedTiers.map((t) => {
                     const summary = memberPricingSummary(t, pricingSegments);
                     const title = memberPricedTiers.length > 1
-                      ? `Member prices · ${t.name.trim()}`
-                      : summary ? "Member prices" : "Add member prices";
+                      ? tp("productForm.memberPrices", { name: t.name.trim() })
+                      : summary ? tp("common.memberPrices") : tp("common.addMemberPrices");
                     return (
                       <button key={t.localId} type="button" onClick={() => openTierEditor(t.localId, true)}
                         className="group w-full flex items-center gap-3 px-4 py-3 text-left transition-colors duration-150 hover:bg-zinc-100 cursor-pointer">
@@ -1438,8 +1453,8 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                           <span className={`block text-sm truncate ${summary ? "font-medium text-zinc-800" : "text-zinc-500"}`}>{title}</span>
                           <span className={`block text-[12.5px] truncate ${summary ? "text-zinc-500" : "text-zinc-400"}`}>
                             {summary ?? (effectiveMemberPricingScope === "seller"
-                              ? "Optional. A lower price for this community's members, approved with your listing."
-                              : "Optional. A lower price for members of your tiers.")}
+                              ? tp("productForm.optionalALowerPriceFor")
+                              : tp("productForm.optionalALowerPriceFor2"))}
                           </span>
                         </span>
                         <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
@@ -1487,7 +1502,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               describe a product or course. */}
           {showCommerce && showTiers && !pricingTipDismissed && (
             <DismissibleTipBanner
-              body="You can always add more variants, upload files, set a licence or track stock for each one later."
+              body={tp("productForm.youCanAlwaysAddMore")}
               onDismiss={() => setPricingTipDismissed(true)}
             />
           )}
@@ -1511,7 +1526,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               product may set it. Its own card, never the community one. */}
           {showSettings && !hideApproval && (
             <div>
-              <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Approval</p>
+              <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">{tp("productForm.approval")}</p>
               <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
 
               {/* Buyer applies, seller approves; the payment is held meanwhile.
@@ -1535,7 +1550,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                     <ShieldCheck className="h-[18px] w-[18px]" />
                   </span>
                   <div className="min-w-0">
-                    <span className="text-sm font-medium text-zinc-800">Require approval</span>
+                    <span className="text-sm font-medium text-zinc-800">{tp("productForm.requireApproval")}</span>
                     {/*
                       * What is true RIGHT NOW, not what the feature is.
                       *
@@ -1548,11 +1563,11 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                       */}
                     <p className="text-[11px] text-zinc-400 mt-0.5">
                       {requiresApproval
-                        ? "Buyers apply and you approve. Their payment is held until you decide."
-                        : "Anyone can buy straight away"}
+                        ? tp("productForm.buyersApplyAndYouApprove")
+                        : tp("productForm.anyoneCanBuyStraightAway")}
                     </p>
                     <span className="inline-flex items-center mt-1.5 px-2 py-0.5 rounded-full bg-zinc-100 text-[10px] font-medium text-zinc-500">
-                      Recommended for private {noun}s
+                      {tp("productForm.recommendedForPrivate", { noun })}
                     </span>
                   </div>
                 </div>
@@ -1570,7 +1585,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               the "Policies & access" step with Approval, not commerce. */}
           {showSettings && !hideRepeatPurchase && (
           <div>
-            <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Purchases</p>
+            <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">{tp("productForm.purchases")}</p>
             <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
               <div
                 onClick={() => setAllowRepeatPurchase(!repeatShown)}
@@ -1582,7 +1597,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                     <Repeat className="h-[18px] w-[18px]" />
                   </span>
                   <div className="min-w-0">
-                    <span className="text-sm font-medium text-zinc-800">Can be bought more than once</span>
+                    <span className="text-sm font-medium text-zinc-800">{tp("productForm.canBeBoughtMoreThan")}</span>
                     {/*
                       * The longest line on the step, replaced by the outcome.
                       *
@@ -1600,8 +1615,8 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                       */}
                     <p className="text-[11px] text-zinc-400 mt-0.5">
                       {repeatShown
-                        ? "Buyers can buy it again, like a session or a consultation."
-                        : "Owners are sent to what they already bought."}
+                        ? tp("productForm.buyersCanBuyItAgain")
+                        : tp("productForm.ownersAreSentToWhat")}
                     </p>
                   </div>
                 </div>
@@ -1617,7 +1632,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               Always on the settings page for every sellable artifact. */}
           {showSettings && (multiTier ? formVariantsHavePaid(tiers) : Number(price) > 0) && (
           <div>
-            <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Refunds</p>
+            <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">{tp("productForm.refunds")}</p>
             <RefundPolicyField value={refundPolicy} onChange={setRefundPolicy} anchor="PURCHASE" />
           </div>
           )}
@@ -1635,7 +1650,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
               groups, and the label IS the explanation. */}
           {showCommerce && !hideVisibility && (
             <div>
-              <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">Community access</p>
+              <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider mb-2">{tp("productForm.communityAccess")}</p>
               <div className="rounded-2xl bg-zinc-50 ring-1 ring-zinc-100/0 divide-y divide-zinc-100 overflow-hidden">
 
                 {/* Who can SEE it. Public and All members are shortcuts that
@@ -1661,7 +1676,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                       level={tierAccessLevel(viewAccess)}
                     />
                     <div className="min-w-0 flex-1">
-                      <span className="text-sm font-medium text-zinc-800">Who can see it</span>
+                      <span className="text-sm font-medium text-zinc-800">{tp("productForm.whoCanSeeIt")}</span>
                       <p className="text-[11px] text-zinc-400 mt-0.5">{tierAccessSummary(viewAccess, membershipTiers)}</p>
                     </div>
                     <AudienceMeter level={tierAccessLevel(viewAccess)} />
@@ -1670,7 +1685,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                     value={viewAccess}
                     onChange={changeViewAccess}
                     tiers={membershipTiers}
-                    publicLabel="Anyone, including people who are not members"
+                    publicLabel={tp("productForm.anyoneIncludingPeopleWhoAre")}
                   />
                 </div>
 
@@ -1684,7 +1699,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                       level={tierAccessLevel(buyAccess)}
                     />
                     <div className="min-w-0 flex-1">
-                      <span className="text-sm font-medium text-zinc-800">Who can buy it</span>
+                      <span className="text-sm font-medium text-zinc-800">{tp("productForm.whoCanBuyIt")}</span>
                       <p className="text-[11px] text-zinc-400 mt-0.5">{tierAccessSummary(buyAccess, membershipTiers)}</p>
                     </div>
                     <AudienceMeter level={tierAccessLevel(buyAccess)} />
@@ -1693,7 +1708,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                     value={buyAccess}
                     onChange={setBuyAccess}
                     tiers={membershipTiers}
-                    publicLabel="Anyone can buy it, members or not"
+                    publicLabel={tp("productForm.anyoneCanBuyItMembers")}
                     ceiling={buyCeiling}
                   />
                 </div>
@@ -1708,7 +1723,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
                 </p>
               )}
               <p className="text-[11px] text-zinc-400 mt-2 px-1">
-                Available because this community owns this product.
+                {tp("productForm.availableBecauseThisCommunityOwns")}
               </p>
             </div>
           )}
@@ -1742,7 +1757,7 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
         subtitle={L.descriptionHint}
         value={description}
         placeholder={L.descriptionPlaceholder}
-        cancelLabel="Cancel"
+        cancelLabel={tp("common.cancel")}
         doneLabel="Done"
         onCancel={() => setIsDescriptionOpen(false)}
         onDone={(next) => { setDescription(next); setIsDescriptionOpen(false); }}
@@ -1767,9 +1782,9 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
             <DialogTitle>{L.tagsTitle}</DialogTitle>
             <DialogDescription>{L.tagsHint}</DialogDescription>
           </DialogHeader>
-          <EventTags selectedTags={tags} onTagsChange={setTags} placeholder="Search or create tags..." />
+          <EventTags selectedTags={tags} onTagsChange={setTags} placeholder={tp("common.searchTags")} />
           <DialogFooter>
-            <Button onClick={() => setIsTagsOpen(false)}>Done</Button>
+            <Button onClick={() => setIsTagsOpen(false)}>{tp("common.done")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1783,12 +1798,12 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
       <Dialog open={isCtaOpen} onOpenChange={setIsCtaOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Call to Action Label</DialogTitle>
+            <DialogTitle>{tp("productForm.callToActionLabel")}</DialogTitle>
             <DialogDescription>{L.ctaHint}</DialogDescription>
           </DialogHeader>
-          <Input value={ctaText} onChange={e => setCtaText(e.target.value)} placeholder="Buy Now" maxLength={15} />
+          <Input value={ctaText} onChange={e => setCtaText(e.target.value)} placeholder={tp("productForm.buyNow")} maxLength={15} />
           <DialogFooter>
-            <Button onClick={() => setIsCtaOpen(false)}>Done</Button>
+            <Button onClick={() => setIsCtaOpen(false)}>{tp("common.done")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1853,10 +1868,10 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           if (pendingPreset) applyPricingPreset(pendingPreset);
           setPendingPreset(null);
         }}
-        title="Replace your pricing setup?"
-        message="Switching to this preset will overwrite the price and donation settings you configured manually."
-        confirmLabel="Use preset"
-        cancelLabel="Keep my setup"
+        title={tp("productForm.replaceYourPricingSetup")}
+        message={tp("productForm.switchingToThisPresetWill")}
+        confirmLabel={tp("productForm.usePreset")}
+        cancelLabel={tp("productForm.keepMySetup")}
       />
 
       <ConfirmLeaveModal
@@ -1866,10 +1881,10 @@ export function ProductForm({ communityTag, initialData, onChange, showErrors, s
           setConfirmingStripeLeave(false);
           if (stripeStatus.connectUrl) window.location.href = stripeStatus.connectUrl;
         }}
-        title={stripeStatusOverride?.copy?.title ?? "Connect Stripe to accept payments"}
-        message={stripeStatusOverride?.copy?.message ?? "You'll be taken to Stripe to connect your account. You can come back and finish this listing afterward."}
-        confirmLabel={stripeStatusOverride?.copy?.confirm ?? "Continue to Stripe"}
-        cancelLabel="Not now"
+        title={stripeStatusOverride?.copy?.title ?? tp("productForm.connectStripeToAcceptPayments")}
+        message={stripeStatusOverride?.copy?.message ?? tp("productForm.youLlBeTakenTo")}
+        confirmLabel={stripeStatusOverride?.copy?.confirm ?? tp("productForm.continueToStripe")}
+        cancelLabel={tp("productForm.notNow")}
       />
     </div>
   );

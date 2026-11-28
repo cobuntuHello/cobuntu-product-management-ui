@@ -11,6 +11,7 @@ import {
   type TierAccessValue,
 } from "@cobuntu/management-ui-shared";
 
+import { useProductT } from "../i18n/productCopy";
 /**
  * The two visibility axes on a product, in one component.
  *
@@ -93,9 +94,15 @@ export function ProductVisibilityEditModal({
   onSaved: () => void;
   showToast: (msg: string) => void;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const { apiBaseUrl } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
-  const copy = COPY[axis];
+  // The axis' words in the host's language; COPY above is the English fallback.
+  const copyKey = (f: keyof (typeof COPY)[VisibilityAxis]) => tp(`productVisibilityEditModal.${axis}.${f}`);
+  const copy = {
+    title: copyKey("title"), blurb: copyKey("blurb"), publicTitle: copyKey("publicTitle"), publicBody: copyKey("publicBody"),
+    membersTitle: copyKey("membersTitle"), membersBody: copyKey("membersBody"), savedToast: copyKey("savedToast"), failedToast: copyKey("failedToast"),
+  };
 
   /*
    * MEMBERS_ONLY with no granted tiers reads as "all members", never as an
@@ -169,14 +176,14 @@ export function ProductVisibilityEditModal({
 
       <div className="flex justify-end gap-2">
         <button onClick={onClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">
-          Cancel
+          {tp("common.cancel")}
         </button>
         <button
           onClick={save}
           disabled={saving}
           className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer"
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? tp("common.saving") : tp("common.save")}
         </button>
       </div>
     </ModalShell>

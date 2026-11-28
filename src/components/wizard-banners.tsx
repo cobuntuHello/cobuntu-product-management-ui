@@ -3,6 +3,7 @@
 import * as React from "react";
 import { X } from "lucide-react";
 
+import { useProductT } from "../i18n/productCopy";
 /**
  * Decorative step banner for the create wizard (feat/wizard-presets-and-banners).
  *
@@ -87,7 +88,7 @@ export function WizardStepBanner({
 const CLOSE_TRANSITION_MS = 180;
 
 export function DismissibleTipBanner({
-  title = "Good to know",
+  title: titleProp,
   body,
   onDismiss,
 }: {
@@ -95,6 +96,8 @@ export function DismissibleTipBanner({
   body: string;
   onDismiss: () => void;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
+  const title = titleProp ?? tp("wizardBanners.goodToKnow");
   const dragStartY = React.useRef<number | null>(null);
   const [dragOffsetY, setDragOffsetY] = React.useState(0);
   const [isClosing, setIsClosing] = React.useState(false);
@@ -187,7 +190,7 @@ export function DismissibleTipBanner({
       <button
         type="button"
         onClick={close}
-        aria-label="Dismiss"
+        aria-label={tp("wizardBanners.dismiss")}
         className="w-7 h-7 rounded-full bg-blue-100 hover:bg-blue-200 flex items-center justify-center shrink-0 cursor-pointer transition-colors"
       >
         <X className="h-3.5 w-3.5 text-blue-600" />

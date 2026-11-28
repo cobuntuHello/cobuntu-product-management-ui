@@ -5,6 +5,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "./utils";
 
+import { getProductT } from "../i18n/productCopy";
 const Dialog = DialogPrimitive.Root;
 const DialogTrigger = DialogPrimitive.Trigger;
 const DialogPortal = DialogPrimitive.Portal;
@@ -50,7 +51,7 @@ const DialogContent = React.forwardRef<
       {!hideClose && (
         <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 cursor-pointer">
           <X className="h-4 w-4" />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">{getProductT("marketplaceUi.productUi")("common.close")}</span>
         </DialogPrimitive.Close>
       )}
     </DialogPrimitive.Content>

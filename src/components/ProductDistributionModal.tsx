@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ModalShell } from "../ui/modal-shell";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
 
+import { useProductT } from "../i18n/productCopy";
 export interface ProductDistributionModalProps {
   product: any;
   communityTag: string;
@@ -74,6 +75,7 @@ export function ProductDistributionModal({
   showToast,
   onSave,
 }: ProductDistributionModalProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const { apiBaseUrl } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
 
@@ -99,7 +101,7 @@ export function ProductDistributionModal({
 
   async function save() {
     if (!urlValid) {
-      showToast("Custom landing URL must be a valid https:// URL");
+      showToast(tp("productDistributionModal.customLandingUrlMustBe"));
       return;
     }
     setSaving(true);
@@ -120,7 +122,7 @@ export function ProductDistributionModal({
         );
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          showToast(err.error || "Failed to update featured status");
+          showToast(err.error || tp("productDistributionModal.failedToUpdateFeaturedStatus"));
           ok = false;
         }
       }
@@ -137,18 +139,18 @@ export function ProductDistributionModal({
           });
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            showToast(err.error || "Failed to update detail page");
+            showToast(err.error || tp("productDistributionModal.failedToUpdateDetailPage"));
             ok = false;
           }
         }
       }
 
       if (ok) {
-        showToast("Distribution updated");
+        showToast(tp("productDistributionModal.distributionUpdated"));
         onSaved();
       }
     } catch {
-      showToast("Failed to update");
+      showToast(tp("productDistributionModal.failedToUpdate"));
     } finally {
       setSaving(false);
     }
@@ -156,9 +158,9 @@ export function ProductDistributionModal({
 
   return (
     <ModalShell onClose={onClose}>
-      <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">Distribution</h3>
+      <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">{tp("productDistributionModal.distribution")}</h3>
       <p className="text-[12px] text-zinc-400 mb-4">
-        Where members land when they click this product, and whether it&apos;s the featured &ldquo;big frame&rdquo; slot in your marketplace.
+        {tp("productDistributionModal.whereMembersLandWhenThey")}
       </p>
 
       {/* ─── Featured ───────────────────────────────────────── */}
@@ -171,16 +173,16 @@ export function ProductDistributionModal({
           className="mt-0.5 w-4 h-4 cursor-pointer accent-zinc-900"
         />
         <label htmlFor="featured" className="flex-1 cursor-pointer">
-          <div className="text-[13px] font-medium text-zinc-900">Featured product</div>
+          <div className="text-[13px] font-medium text-zinc-900">{tp("productDistributionModal.featuredProduct")}</div>
           <div className="text-[12px] text-zinc-500 mt-0.5">
-            Pin this product to the hero slot on your community&apos;s marketplace. Only one product per community can be featured at a time — selecting this will auto-unfeature whichever product was previously featured.
+            {tp("productDistributionModal.pinThisProductToThe")}
           </div>
         </label>
       </div>
 
       {/* ─── Detail source ──────────────────────────────────── */}
       <div className="py-3 border-b border-zinc-100">
-        <div className="text-[13px] font-medium text-zinc-900 mb-2">Product detail page</div>
+        <div className="text-[13px] font-medium text-zinc-900 mb-2">{tp("productDistributionModal.productDetailPage")}</div>
         <div className="space-y-2">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
@@ -191,8 +193,8 @@ export function ProductDistributionModal({
               className="mt-0.5 w-4 h-4 cursor-pointer accent-zinc-900"
             />
             <div className="flex-1">
-              <div className="text-[13px] text-zinc-900">Use cobuntu&apos;s standard product page</div>
-              <div className="text-[12px] text-zinc-500 mt-0.5">The default — cobuntu renders the detail page with your title, media, description, and the Buy flow.</div>
+              <div className="text-[13px] text-zinc-900">{tp("productDistributionModal.useCobuntuSStandardProduct")}</div>
+              <div className="text-[12px] text-zinc-500 mt-0.5">{tp("productDistributionModal.theDefaultCobuntuRendersThe")}</div>
             </div>
           </label>
           <label className="flex items-start gap-3 cursor-pointer">
@@ -204,15 +206,15 @@ export function ProductDistributionModal({
               className="mt-0.5 w-4 h-4 cursor-pointer accent-zinc-900"
             />
             <div className="flex-1">
-              <div className="text-[13px] text-zinc-900">Use a custom landing page</div>
-              <div className="text-[12px] text-zinc-500 mt-0.5">cobuntu&apos;s /marketplace/{productId} URL 302-redirects to your URL. Payments still flow through cobuntu via the public API.</div>
+              <div className="text-[13px] text-zinc-900">{tp("productDistributionModal.useACustomLandingPage")}</div>
+              <div className="text-[12px] text-zinc-500 mt-0.5">{tp("productDistributionModal.customRedirect", { productId })}</div>
             </div>
           </label>
         </div>
 
         {detailSource === "EXTERNAL" && (
           <div className="mt-3">
-            <label className="block text-[12px] font-medium text-zinc-700 mb-1.5">Custom landing URL</label>
+            <label className="block text-[12px] font-medium text-zinc-700 mb-1.5">{tp("productDistributionModal.customLandingUrl")}</label>
             <input
               type="url"
               value={externalDetailUrl}
@@ -223,23 +225,23 @@ export function ProductDistributionModal({
               }`}
             />
             {externalDetailUrl && !urlValid && (
-              <p className="text-[11px] text-red-600 mt-1">Must be a valid https:// URL.</p>
+              <p className="text-[11px] text-red-600 mt-1">{tp("productDistributionModal.mustBeAValidHttps")}</p>
             )}
             <p className="text-[11px] text-zinc-400 mt-1.5">
-              Your custom page should call cobuntu&apos;s public API for live prices and the Buy button. See Integrations → Documentation.
+              {tp("productDistributionModal.yourCustomPageShouldCall")}
             </p>
           </div>
         )}
       </div>
 
       <div className="flex justify-end gap-2 mt-4">
-        <button onClick={onClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">Cancel</button>
+        <button onClick={onClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">{tp("common.cancel")}</button>
         <button
           onClick={save}
           disabled={saving || !urlValid}
           className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer"
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? tp("common.saving") : tp("common.save")}
         </button>
       </div>
     </ModalShell>

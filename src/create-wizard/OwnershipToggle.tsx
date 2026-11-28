@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { useWizardT } from "./i18n";
 
+import { useProductT } from "../i18n/productCopy";
 /**
  * Who sells what a leader is about to create: the community, or themselves.
  * Lifted from the community app (components/marketplace/OwnershipToggle.tsx)
@@ -35,6 +36,7 @@ export function OwnershipToggle({
   platformFeeRate?: number;
   copyNamespace?: string;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const t = useWizardT(copyNamespace);
   const rich = (key: string, values?: Record<string, string>) =>
     t.rich(key, { ...values, b: (c: ReactNode) => <b className="font-semibold">{c}</b> });
@@ -68,7 +70,7 @@ export function OwnershipToggle({
         rich("personalStripe"),
         rich("personalOptions"),
       ],
-      avatar: <OwnerAvatar shape="round" src={viewer?.profileImage ?? null} name={viewer?.name || "You"} />,
+      avatar: <OwnerAvatar shape="round" src={viewer?.profileImage ?? null} name={viewer?.name || tp("ownershipToggle.you")} />,
     },
   ];
 

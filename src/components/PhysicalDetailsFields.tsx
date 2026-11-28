@@ -1,4 +1,5 @@
 "use client";
+import { getProductT, useProductT } from "../i18n/productCopy";
 
 /**
  * The two questions only a physical item answers: its condition, and how big a
@@ -51,12 +52,17 @@ export const PARCEL_CLASS_OPTIONS: { value: ParcelClassValue; label: string; wei
   { value: "HEAVY", label: "Large or heavy", weight: "2–20 kg", hint: "A rug, a chair, a console" },
 ];
 
+/** An option's words in the host's language; the English lists above are the fallback. */
+function physicalCopy(value: string, field: "label" | "hint" | "weight"): string {
+  return getProductT("marketplaceUi.productUi")(`physicalDetailsFields.${value}.${field}`);
+}
+
 export function conditionLabel(value: ProductConditionValue | null): string | null {
-  return CONDITION_OPTIONS.find(o => o.value === value)?.label ?? null;
+  return value && CONDITION_OPTIONS.some(o => o.value === value) ? physicalCopy(value, "label") : null;
 }
 
 export function parcelClassLabel(value: ParcelClassValue): string {
-  return PARCEL_CLASS_OPTIONS.find(o => o.value === value)?.label ?? value;
+  return PARCEL_CLASS_OPTIONS.some(o => o.value === value) ? physicalCopy(value, "label") : value;
 }
 
 interface Props {
@@ -69,25 +75,26 @@ interface Props {
 export function PhysicalDetailsFields(
   { condition, parcelClass, onConditionChange, onParcelClassChange }: Props,
 ) {
+  const tp = useProductT("marketplaceUi.productUi");
   const conditionHint = condition === null
-    ? "For new stock sold by a shop, where condition does not apply"
-    : (CONDITION_OPTIONS.find(o => o.value === condition)?.hint ?? "");
+    ? tp("physicalDetailsFields.forNewStockSoldBy")
+    : (condition && CONDITION_OPTIONS.some(o => o.value === condition) ? physicalCopy(condition, "hint") : "");
 
   return (
     <div className="flex flex-col gap-4">
       {/* Condition — a compact dropdown. Five grades + a named empty answer;
           the selected grade's plain-language hint sits under it. */}
       <div>
-        <label htmlFor="product-condition" className="block text-[13px] font-medium text-zinc-800 mb-1.5">Condition</label>
+        <label htmlFor="product-condition" className="block text-[13px] font-medium text-zinc-800 mb-1.5">{tp("physicalDetailsFields.condition")}</label>
         <select
           id="product-condition"
           value={condition ?? ""}
           onChange={e => onConditionChange(e.target.value === "" ? null : (e.target.value as ProductConditionValue))}
           className="w-full px-3 py-2.5 text-[13.5px] text-zinc-800 bg-white rounded-xl ring-1 ring-zinc-200 focus:outline-none focus:ring-zinc-400 cursor-pointer"
         >
-          <option value="">Not specified</option>
+          <option value="">{tp("physicalDetailsFields.notSpecified")}</option>
           {CONDITION_OPTIONS.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
+            <option key={opt.value} value={opt.value}>{physicalCopy(opt.value, "label")}</option>
           ))}
         </select>
         {conditionHint && <p className="text-[12px] text-zinc-500 mt-1.5">{conditionHint}</p>}
@@ -95,8 +102,8 @@ export function PhysicalDetailsFields(
 
       {/* Parcel size — two segmented options, each with its weight anchor. */}
       <div>
-        <label className="block text-[13px] font-medium text-zinc-800 mb-1.5">Parcel size</label>
-        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Parcel size">
+        <label className="block text-[13px] font-medium text-zinc-800 mb-1.5">{tp("physicalDetailsFields.parcelSize")}</label>
+        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={tp("physicalDetailsFields.parcelSize")}>
           {PARCEL_CLASS_OPTIONS.map(opt => {
             const active = parcelClass === opt.value;
             return (
@@ -110,9 +117,9 @@ export function PhysicalDetailsFields(
                   active ? "ring-zinc-900 bg-zinc-50" : "ring-zinc-200 hover:bg-zinc-50"
                 }`}
               >
-                <span className="block text-[13.5px] font-medium text-zinc-800">{opt.label}</span>
-                <span className="block text-[12.5px] font-medium text-zinc-600 mt-0.5">{opt.weight}</span>
-                <span className="block text-[11.5px] text-zinc-400 mt-0.5">{opt.hint}</span>
+                <span className="block text-[13.5px] font-medium text-zinc-800">{physicalCopy(opt.value, "label")}</span>
+                <span className="block text-[12.5px] font-medium text-zinc-600 mt-0.5">{physicalCopy(opt.value, "weight")}</span>
+                <span className="block text-[11.5px] text-zinc-400 mt-0.5">{physicalCopy(opt.value, "hint")}</span>
               </button>
             );
           })}

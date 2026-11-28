@@ -3,6 +3,7 @@ import { ModalShell } from "../page/helpers";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
 import { RefundPolicyField, type RefundPolicyValue } from "@cobuntu/management-ui-shared";
 
+import { useProductT } from "../i18n/productCopy";
 /**
  * Seller-facing editor for a product's refund policy, on the manage page. Shares
  * the SAME control as the create wizard's "Policies & access" step
@@ -25,6 +26,7 @@ export function ProductRefundPolicyEditModal({
     onSaved: () => void;
     showToast: (msg: string) => void;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
     const { apiBaseUrl } = useProductManagementConfig();
     const jsonHeaders = useJsonHeaders();
 
@@ -43,10 +45,10 @@ export function ProductRefundPolicyEditModal({
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.error || "Couldn't save the refund policy.");
             }
-            showToast("Refund policy saved");
+            showToast(tp("productRefundPolicyEditModal.refundPolicySaved"));
             onSaved();
         } catch (e: any) {
-            showToast(e?.message || "Couldn't save the refund policy.");
+            showToast(e?.message || tp("productRefundPolicyEditModal.couldnTSaveTheRefund"));
         } finally {
             setSaving(false);
         }
@@ -54,10 +56,9 @@ export function ProductRefundPolicyEditModal({
 
     return (
         <ModalShell onClose={onClose}>
-            <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">Refund policy</h3>
+            <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">{tp("productRefundPolicyEditModal.refundPolicy")}</h3>
             <p className="text-[12px] text-zinc-500 mb-4">
-                Choose whether buyers can refund this themselves. Refunds are always processed by Stripe;
-                money already paid out to your community is handled from your Stripe dashboard.
+                {tp("productRefundPolicyEditModal.chooseWhetherBuyersCanRefund")}
             </p>
 
             <div className="mb-4">
@@ -66,14 +67,14 @@ export function ProductRefundPolicyEditModal({
 
             <div className="flex justify-end gap-2">
                 <button onClick={onClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">
-                    Cancel
+                    {tp("common.cancel")}
                 </button>
                 <button
                     onClick={save}
                     disabled={saving}
                     className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer"
                 >
-                    {saving ? "Saving..." : "Save"}
+                    {saving ? tp("common.saving") : tp("common.save")}
                 </button>
             </div>
         </ModalShell>

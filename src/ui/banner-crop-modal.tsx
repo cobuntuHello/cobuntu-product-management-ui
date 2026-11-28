@@ -11,6 +11,7 @@ import { cn } from "./utils";
 import { drawFitted, fitWithin, IMAGE_QUALITY } from "@cobuntu/management-ui-shared";
 import { COVER_ASPECT, COVER_SIZE_HINT } from "../lib/coverFormat";
 
+import { useProductT } from "../i18n/productCopy";
 type CroppedAreaPixels = { width: number; height: number; x: number; y: number };
 
 export interface BannerCropResult {
@@ -34,9 +35,11 @@ interface BannerCropModalProps {
 }
 
 export function BannerCropModal({
-  open, onOpenChange, initialImageSrc = null, onSave, title = "Edit Banner", hideStockPhotos = false,
+  open, onOpenChange, initialImageSrc = null, onSave, title: titleProp, hideStockPhotos = false,
   directCropSrc = null,
 }: BannerCropModalProps) {
+  const tp = useProductT("marketplaceUi.productUi");
+  const title = titleProp ?? tp("bannerCropModal.editBanner");
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [optionsOpen, setOptionsOpen] = React.useState(false);
   const [stockPhotoOpen, setStockPhotoOpen] = React.useState(false);
@@ -217,7 +220,7 @@ export function BannerCropModal({
        * Said, not swallowed. A failed crop used to stop the spinner and leave
        * the dialog exactly as it was, which reads as Save doing nothing.
        */
-      setSaveError("This image could not be saved. Try Change image and pick it again from your device.");
+      setSaveError(tp("bannerCropModal.thisImageCouldNotBe"));
     } finally { setIsSaving(false); }
   };
 
@@ -269,7 +272,7 @@ export function BannerCropModal({
                 "flex min-h-[96px] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-6 py-4 text-sm font-medium text-zinc-800 transition-colors cursor-pointer",
                 dragging ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 bg-zinc-100 hover:bg-zinc-200",
               )}>
-              <span>{dragging ? "Drop to use this image" : "Upload new image"}</span>
+              <span>{dragging ? tp("bannerCropModal.dropToUseThisImage") : tp("bannerCropModal.uploadNewImage")}</span>
               <span className="text-xs font-normal text-zinc-500">
                 {dragging ? COVER_SIZE_HINT : `or drag it here · best at ${COVER_SIZE_HINT}`}
               </span>
@@ -278,19 +281,19 @@ export function BannerCropModal({
               <button type="button" onClick={() => { setOptionsOpen(false); setStockPhotoOpen(true); }}
                 className="flex min-h-[48px] items-center justify-center rounded-xl bg-zinc-100 px-6 py-3 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-200 cursor-pointer">
                 <ImageIcon className="h-4 w-4 mr-2" />
-                Add Stock Photo
+                {tp("bannerCropModal.addStockPhoto")}
               </button>
             )}
             {initialImageSrc && (
               <button type="button" onClick={handleClear} disabled={isSaving}
                 className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-red-50 px-6 py-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 cursor-pointer">
                 <Trash2 className="h-4 w-4" />
-                Remove image
+                {tp("common.removeImage")}
               </button>
             )}
             <button type="button" onClick={() => { setOptionsOpen(false); onOpenChange(false); }}
               className="flex min-h-[48px] items-center justify-center rounded-xl px-6 py-3 text-sm text-zinc-500 transition-colors hover:bg-zinc-100 cursor-pointer">
-              Cancel
+              {tp("common.cancel")}
             </button>
           </div>
         </DialogContent>
@@ -309,8 +312,8 @@ export function BannerCropModal({
                 is dragged over it, so it is said once here or nobody finds it. */}
             <p className="text-sm mt-1" style={{ color: "color-mix(in srgb, var(--text-color, #18181b) 55%, transparent)" }}>
               {dragging
-                ? "Drop to use this image instead"
-                : `Frame it as cards show it. Best at ${COVER_SIZE_HINT}. You can also drop a new image here.`}
+                ? tp("bannerCropModal.dropToUseThisImage2")
+                : tp("bannerCropModal.frameItAsCardsShow", { size: COVER_SIZE_HINT })}
             </p>
           </DialogHeader>
 
@@ -349,7 +352,7 @@ export function BannerCropModal({
                 <div className="flex h-full w-full items-center justify-center text-zinc-400">
                   <div className="text-center space-y-2">
                     <ImageIcon className="h-12 w-12 mx-auto opacity-50" />
-                    <p className="text-sm">Select an image to start</p>
+                    <p className="text-sm">{tp("bannerCropModal.selectAnImageToStart")}</p>
                   </div>
                 </div>
               )}
@@ -361,7 +364,7 @@ export function BannerCropModal({
                     actions, so the zoom row is just its label. */}
                 <div className="flex items-center gap-2">
                   <ImageIcon className="h-4 w-4 text-zinc-400" />
-                  <label className="text-sm font-medium text-zinc-800">Zoom</label>
+                  <label className="text-sm font-medium text-zinc-800">{tp("bannerCropModal.zoom")}</label>
                 </div>
                 {/*
                   * Floor of 100%, not 50%.
@@ -398,16 +401,16 @@ export function BannerCropModal({
               Save = primary. */}
           <div className="px-6 py-4 border-t border-zinc-100 bg-zinc-50 grid grid-cols-2 sm:grid-cols-4 gap-2 flex-shrink-0">
             <Button variant="destructive" onClick={handleClear} disabled={isSaving} className="w-full px-2">
-              <Trash2 className="h-4 w-4 mr-1.5" /> Remove
+              <Trash2 className="h-4 w-4 mr-1.5" /> {tp("common.remove")}
             </Button>
             <Button variant="secondary" onClick={handleChangeImage} disabled={isSaving} className="w-full px-2">
-              Change image
+              {tp("bannerCropModal.changeImage")}
             </Button>
             <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={isSaving} className="w-full px-2">
-              Cancel
+              {tp("common.cancel")}
             </Button>
             <Button onClick={handleSave} disabled={!imageSrc || !croppedAreaPixels || isSaving} className="w-full px-2">
-              {isSaving ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Saving…</> : "Save"}
+              {isSaving ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />{tp("common.saving")}</> : tp("common.save")}
             </Button>
           </div>
         </DialogContent>

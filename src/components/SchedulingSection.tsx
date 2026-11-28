@@ -4,6 +4,7 @@ import type { DraftTier } from "./PriceEditModal/types";
 import { DateTimePicker } from "./PriceEditModal/_datetime-picker";
 import { Switch } from "./PriceEditModal/_primitives";
 
+import { useProductT } from "../i18n/productCopy";
 /**
  * Auto-schedule sales-window editor for a single tier (lives in the
  * OptionsStep).
@@ -52,6 +53,7 @@ export function deriveScheduleState(
 }
 
 export function SchedulingSection({ draft, onChange }: SchedulingSectionProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const published = !!draft.publishedAt;
 
   // Cross-field validation: end must be strictly after start when both set.
@@ -72,9 +74,9 @@ export function SchedulingSection({ draft, onChange }: SchedulingSectionProps) {
     <div className="pt-3 border-t border-zinc-100">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[12px] font-medium text-zinc-700">Auto-schedule sales window</p>
+          <p className="text-[12px] font-medium text-zinc-700">{tp("schedulingSection.autoScheduleSalesWindow")}</p>
           <p className="text-[11px] text-zinc-500 mt-0.5">
-            Sales open and close automatically based on the dates below. Useful for date-driven price ladders (Batch 1 → Batch 2 → Batch 3).
+            {tp("schedulingSection.salesOpenAndCloseAutomatically")}
           </p>
         </div>
         <Switch
@@ -88,43 +90,43 @@ export function SchedulingSection({ draft, onChange }: SchedulingSectionProps) {
               ...(!next && { salesStartAt: "", salesEndAt: "" }),
             })
           }
-          label="Auto-schedule sales window"
+          label={tp("schedulingSection.autoScheduleSalesWindow")}
         />
       </div>
 
       {draft.autoScheduleEnabled && (
         <div className="mt-3 grid grid-cols-2 gap-3">
           <div>
-            <p className="text-[11px] text-zinc-600 mb-1">Sales open</p>
+            <p className="text-[11px] text-zinc-600 mb-1">{tp("schedulingSection.salesOpen")}</p>
             <DateTimePicker
               value={draft.salesStartAt}
               onChange={(iso) => onChange({ salesStartAt: iso })}
               ariaLabel="Sales open"
-              placeholder="Opens on publish"
+              placeholder={tp("schedulingSection.opensOnPublish")}
             />
           </div>
           <div>
-            <p className="text-[11px] text-zinc-600 mb-1">Sales close</p>
+            <p className="text-[11px] text-zinc-600 mb-1">{tp("schedulingSection.salesClose")}</p>
             <DateTimePicker
               value={draft.salesEndAt}
               onChange={(iso) => onChange({ salesEndAt: iso })}
               ariaLabel="Sales close"
-              placeholder="Open-ended"
+              placeholder={tp("schedulingSection.openEnded")}
             />
           </div>
           {invalidWindow && (
             <p className="col-span-2 text-[11px] text-red-600">
-              Sales close must be after sales open.
+              {tp("schedulingSection.salesCloseMustBeAfter")}
             </p>
           )}
           {noDates && (
             <p className="col-span-2 text-[11px] text-amber-600">
-              Set a sales-open or sales-close date, or turn off auto-schedule.
+              {tp("schedulingSection.setASalesOpenOr")}
             </p>
           )}
           {!published && (
             <p className="col-span-2 text-[11px] text-amber-600">
-              This window takes effect once the tier is published.
+              {tp("schedulingSection.thisWindowTakesEffectOnce")}
             </p>
           )}
         </div>

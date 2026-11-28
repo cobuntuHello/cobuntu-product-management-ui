@@ -7,6 +7,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { DraftTier } from "./types";
 import { getSymbol, isTierLocked } from "./helpers";
 
+import { useProductT } from "../../i18n/productCopy";
 export interface TierRowProps {
   t: DraftTier & { _idx: number };
   /** Click anywhere on the row → modal enters Level 2 (per-tier hub).
@@ -33,6 +34,7 @@ export function TierRow({
   dragAttributes,
   dragListeners,
 }: TierRowProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const sym = getSymbol(t.currency);
   const locked = isTierLocked(t);
   const capCap = t.capacity ? parseInt(t.capacity, 10) : null;
@@ -59,7 +61,7 @@ export function TierRow({
         {dragListeners && (
           <button
             type="button"
-            aria-label="Drag to reorder"
+            aria-label={tp("common.dragToReorder")}
             className="p-1 -ml-2 -my-1 text-zinc-300 hover:text-zinc-600 cursor-grab active:cursor-grabbing shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
             {...dragAttributes}
             {...dragListeners}
@@ -73,29 +75,29 @@ export function TierRow({
         )}
         <div className="flex-1 min-w-0">
           <p className="text-[14px] font-semibold text-zinc-900 truncate">
-            {t.name || <span className="text-zinc-400 font-normal">Unnamed tier</span>}
+            {t.name || <span className="text-zinc-400 font-normal">{tp("tierRow.unnamedTier")}</span>}
           </p>
         </div>
         {t.hasForm && (
           <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full shrink-0">
-            Form Enabled
+            {tp("tierRow.formEnabled")}
           </span>
         )}
         {t.priceMode === "pwyw" && (
           <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full shrink-0">
-            PWYW
+            {tp("tierRow.pwyw")}
           </span>
         )}
         {/* Product subscriptions: surface the recurring nature in the list
             so a glance distinguishes one-time products from subscriptions. */}
         {t.isRecurring && (
           <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full shrink-0">
-            Recurring
+            {tp("common.recurring")}
           </span>
         )}
         {t.installmentEnabled && (
           <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full shrink-0">
-            Installments
+            {tp("tierRow.installments")}
           </span>
         )}
         {soldLabel && (
@@ -104,7 +106,7 @@ export function TierRow({
           </span>
         )}
         <span className="text-[13px] font-semibold text-zinc-700 tabular-nums shrink-0">
-          {t.price && parseFloat(t.price) > 0 ? `${sym}${t.price}` : "Free"}
+          {t.price && parseFloat(t.price) > 0 ? `${sym}${t.price}` : tp("common.free")}
         </span>
         {/* Chevron is a decorative affordance only — the whole row is the
             click target (onSelect). Delete + Duplicate moved to the L2

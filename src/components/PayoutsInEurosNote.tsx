@@ -5,11 +5,13 @@
  * paid out in euros at the rate Stripe converted it at (Terms of Service
  * 12.1). Nothing under the euro.
  */
+import { useProductT } from "../i18n/productCopy";
 export function PayoutsInEurosNote({ currency }: { currency?: string | null }) {
+  const tp = useProductT("marketplaceUi.productUi");
   if (!currency || currency.toUpperCase() === "EUR") return null;
   return (
     <p className="mt-1.5 text-[11.5px] leading-snug text-zinc-500" data-testid="payouts-in-euros-note">
-      Paid out in euros at Stripe&rsquo;s rate on the day of each sale.
+      {tp("payoutsInEurosNote.paidOutInEurosAt")}
     </p>
   );
 }

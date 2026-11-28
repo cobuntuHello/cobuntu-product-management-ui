@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { FIELD_TYPES, type FieldType } from "../_form-types";
 
+import { useProductT } from "../../../i18n/productCopy";
 const FIELD_ICONS: Record<FieldType, React.ComponentType<{ className?: string }>> = {
   SHORT_TEXT: Type,
   LONG_TEXT: AlignLeft,
@@ -45,6 +46,7 @@ export interface FieldTypePickerFlowProps {
  * own step - not be an expandable section."
  */
 export function FieldTypePickerFlow({ onPick, onBack }: FieldTypePickerFlowProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
@@ -52,13 +54,13 @@ export function FieldTypePickerFlow({ onPick, onBack }: FieldTypePickerFlowProps
           type="button"
           onClick={onBack}
           className="p-1 -ml-1 text-zinc-500 hover:text-zinc-900 cursor-pointer rounded"
-          aria-label="Back to form fields"
+          aria-label={tp("common.backToFormFields")}
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
-        <h5 className="text-[13px] font-semibold text-zinc-900">Add a question</h5>
+        <h5 className="text-[13px] font-semibold text-zinc-900">{tp("fieldTypePickerFlow.addAQuestion")}</h5>
       </div>
-      <p className="text-[12px] text-zinc-500 mb-3">Choose a field type.</p>
+      <p className="text-[12px] text-zinc-500 mb-3">{tp("fieldTypePickerFlow.chooseAFieldType")}</p>
       <div className="grid grid-cols-2 gap-2">
         {FIELD_TYPES.map((ft) => {
           const Icon = FIELD_ICONS[ft.type];

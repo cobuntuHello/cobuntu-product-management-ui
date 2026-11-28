@@ -8,6 +8,7 @@ import { BasicsStep } from "./steps/BasicsStep";
 import type { StepId } from "./steps";
 import type { MemberPricingRow, MemberPricingTierState } from "./member-pricing";
 
+import { useProductT } from "../../i18n/productCopy";
 export interface TierEditViewProps {
   t: DraftTier;
   onUpdate: (patch: Partial<DraftTier>) => void;
@@ -68,13 +69,14 @@ export function TierEditView({
   publishToggling,
   draftMode,
 }: TierEditViewProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const locked = isTierLocked(t);
 
   // Saved tiers report the server's copy via hasForm/formFieldCount; a draft
   // tier reports what is staged locally. Same row, two sources.
   const formFieldCount = t.id ? (t.hasForm ? t.formFieldCount : 0) : (t.draftForm?.fields?.length ?? 0);
   const fieldCountLabel =
-    formFieldCount > 0 ? `${formFieldCount} field${formFieldCount !== 1 ? "s" : ""}` : "None";
+    formFieldCount > 0 ? `${formFieldCount} field${formFieldCount !== 1 ? "s" : ""}` : tp("common.none");
 
   // publishedAt is the source of truth; the switch is just its presence.
   const published = !!t.publishedAt;
@@ -95,24 +97,24 @@ export function TierEditView({
       <div>
         <Eyebrow count={t.name.length} max={TIER_NAME_MAX}
           help="The public label buyers see at checkout, e.g. “Early bird” or “VIP”.">
-          Tier name
+          {tp("common.tierName")}
         </Eyebrow>
         <div className="mt-1">
           <StepInput type="text" value={t.name} maxLength={TIER_NAME_MAX}
             onChange={(e) => onUpdate({ name: e.target.value })}
-            placeholder="Standard, VIP, Early-bird…" />
+            placeholder={tp("common.tierNamePlaceholder")} />
         </div>
       </div>
 
       <div>
         <Eyebrow count={t.description.length} max={TIER_DESCRIPTION_MAX}
           help="Shown on the public product card — a short note on what this tier includes.">
-          Description (optional)
+          {tp("common.descriptionOptional")}
         </Eyebrow>
         <div className="mt-1">
           <StepTextarea value={t.description} maxLength={TIER_DESCRIPTION_MAX}
             onChange={(e) => onUpdate({ description: e.target.value })}
-            placeholder="What's included" rows={2} />
+            placeholder={tp("common.whatsIncluded")} rows={2} />
         </div>
       </div>
 
@@ -126,23 +128,23 @@ export function TierEditView({
           <div>
             <Eyebrow count={t.licenseTerms.length} max={TIER_LICENSE_TERMS_MAX}
               help="What the buyer of this tier is licensed to do — e.g. personal use only, or commercial use with attribution. Leave blank for no licence.">
-              License terms (optional)
+              {tp("tierEditView.licenseTermsOptional")}
             </Eyebrow>
             <div className="mt-1">
               <StepTextarea value={t.licenseTerms} maxLength={TIER_LICENSE_TERMS_MAX}
                 onChange={(e) => onUpdate({ licenseTerms: e.target.value })}
-                placeholder="e.g. Personal use only. No resale or redistribution." rows={3} />
+                placeholder={tp("tierEditView.eGPersonalUseOnly")} rows={3} />
             </div>
           </div>
 
           <div>
             <Eyebrow help="Cap how many times a buyer of this tier can download each file. Leave blank for unlimited.">
-              Max downloads per file (optional)
+              {tp("tierEditView.maxDownloadsPerFileOptional")}
             </Eyebrow>
             <div className="mt-1">
               <StepInput type="number" min={1} value={t.maxDownloads}
                 onChange={(e) => onUpdate({ maxDownloads: e.target.value })}
-                placeholder="Unlimited" />
+                placeholder={tp("common.unlimited")} />
             </div>
           </div>
         </>
@@ -151,7 +153,7 @@ export function TierEditView({
       {/* Pricing — the full pricing surface, inline (model, price, billing,
           installment schedule, and member pricing when enabled). */}
       <div>
-        <Eyebrow>Pricing</Eyebrow>
+        <Eyebrow>{tp("common.pricing")}</Eyebrow>
         <div className="mt-2">
           <BasicsStep
             t={t}
@@ -167,7 +169,7 @@ export function TierEditView({
       {/* Advanced — one hairline-divided card of rows that drill into a
           sub-screen. Matches the approved mockup. */}
       <div>
-        <Eyebrow>Advanced</Eyebrow>
+        <Eyebrow>{tp("common.advanced")}</Eyebrow>
         {/* border, not ring: a ring is an OUTSET box-shadow that the modal's
             overflow-y scroll container clips at the card's left/right edges and
             rounded corners (the "hidden border" bug). A border lives inside the
@@ -175,19 +177,19 @@ export function TierEditView({
         <div className="mt-1.5 rounded-2xl border border-zinc-100 divide-y divide-zinc-100 overflow-hidden">
           <AdvancedRow
             icon={<Package className="h-[17px] w-[17px]" />}
-            label="Capacity"
-            value={t.capacity ? `${t.capacity} spots` : "Unlimited"}
+            label={tp("common.capacity")}
+            value={t.capacity ? `${t.capacity} spots` : tp("common.unlimited")}
             onClick={() => onEnterStep("capacity")}
           />
           <AdvancedRow
             icon={<Calendar className="h-[17px] w-[17px]" />}
-            label="Sales window"
-            value={t.autoScheduleEnabled ? "Scheduled" : "Always on"}
+            label={tp("common.salesWindow")}
+            value={t.autoScheduleEnabled ? tp("common.scheduled") : tp("common.alwaysOn")}
             onClick={() => onEnterStep("config")}
           />
           <AdvancedRow
             icon={<ClipboardList className="h-[17px] w-[17px]" />}
-            label="Registration form"
+            label={tp("common.registrationForm")}
             /*
              * Reachable on an UNSAVED tier since 2026-08-08. A form used to
              * need a tierId to key on, so during create the row read
@@ -206,25 +208,25 @@ export function TierEditView({
           switch in the modal footer. */}
       {onTogglePublish && (
         <div>
-          <Eyebrow>Availability</Eyebrow>
+          <Eyebrow>{tp("common.availability")}</Eyebrow>
           <div className="mt-1.5 rounded-2xl border border-zinc-100 overflow-hidden">
             <div className="flex items-center gap-3 px-4 py-3.5">
               <span className="text-zinc-400 shrink-0">
                 {published ? <Eye className="h-[17px] w-[17px]" /> : <EyeOff className="h-[17px] w-[17px]" />}
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-zinc-700">{published ? "Published" : "Draft"}</p>
+                <p className="text-sm text-zinc-700">{published ? tp("common.published") : tp("common.draft")}</p>
                 <p className="text-[11px] text-zinc-400 mt-0.5">
                   {published
-                    ? "Buyers can see and choose this tier."
-                    : "Hidden from buyers. Only you can see it."}
+                    ? tp("tierEditView.buyersCanSeeAndChoose")
+                    : tp("common.hiddenFromBuyers")}
                 </p>
               </div>
               <Switch
                 checked={published}
                 disabled={!!publishToggling}
                 onChange={() => onTogglePublish()}
-                label="Published"
+                label={tp("common.published")}
               />
             </div>
 
@@ -242,8 +244,8 @@ export function TierEditView({
               <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: "var(--brand-color, #71717a)" }} />
               <p className="text-[11.5px] text-zinc-600 leading-relaxed">
                 {draftMode
-                  ? `This choice is saved with the product — nothing goes live until you create it.`
-                  : "Changes here take effect immediately."}
+                  ? tp("tierEditView.thisChoiceIsSavedWith")
+                  : tp("common.changesTakeEffectNow")}
               </p>
             </div>
           </div>

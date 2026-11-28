@@ -12,6 +12,7 @@ import { BannerCropModal, type BannerCropResult } from "./banner-crop-modal";
 import { replaceWithCrop } from "../lib/replaceWithCrop";
 import { COVER_SIZE_HINT } from "../lib/coverFormat";
 
+import { useProductT } from "../i18n/productCopy";
 /** A point on an image, as percentages of its own width and height. */
 export interface FocalPoint {
   x: number;
@@ -60,6 +61,7 @@ function FilledTile({
   onRemove: () => void;
   onFilledClick: () => void;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -78,7 +80,7 @@ function FilledTile({
         {...listeners}
         onClick={() => { if (!isDragging && item.type === "image") onFilledClick(); }}
         className={`w-full h-full ${item.type === "image" ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"}`}
-        title={item.type === "image" ? "Click to crop · drag to reorder" : "Drag to reorder"}
+        title={item.type === "image" ? tp("sortableMediaGallery.clickToCropDragTo") : tp("common.dragToReorder")}
       >
         {item.type === "video" ? (
           <div className="w-full h-full flex items-center justify-center" style={{ background: "color-mix(in srgb, currentColor 8%, transparent)" }}>
@@ -118,7 +120,7 @@ function FilledTile({
 
       {isCover && (
         <div className="absolute top-1.5 left-1.5 bg-black/70 text-white text-[10px] font-semibold px-2 py-0.5 rounded-md pointer-events-none">
-          Cover
+          {tp("sortableMediaGallery.cover")}
         </div>
       )}
 
@@ -126,7 +128,7 @@ function FilledTile({
         type="button"
         onClick={(e) => { e.stopPropagation(); onRemove(); }}
         className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/60 hover:bg-red-600 text-white flex items-center justify-center cursor-pointer transition-colors"
-        title="Remove"
+        title={tp("common.remove")}
       >
         <X className="h-3.5 w-3.5" />
       </button>
@@ -148,6 +150,7 @@ function FilledTile({
 function DropSection({
   count, max, dragging, onClick,
 }: { count: number; max: number; dragging: boolean; onClick: () => void }) {
+  const tp = useProductT("marketplaceUi.productUi");
   return (
     <button
       type="button"
@@ -167,16 +170,17 @@ function DropSection({
         <Upload className="h-4 w-4" />
       </span>
       <span className="text-[13px] font-medium opacity-90">
-        {dragging ? "Drop to add" : "Drag photos here or click to choose"}
+        {dragging ? tp("sortableMediaGallery.dropToAdd") : tp("sortableMediaGallery.dragPhotosHereOrClick")}
       </span>
       <span className="text-[11px] opacity-55">
-        Best at {COVER_SIZE_HINT} · {count}/{max}
+        {tp("sortableMediaGallery.bestAtCount", { size: COVER_SIZE_HINT, count, max })}
       </span>
     </button>
   );
 }
 
 export function SortableMediaGallery({ items, onChange, maxItems = 5 }: SortableMediaGalleryProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [cropOpen, setCropOpen] = React.useState(false);
   const [cropIndex, setCropIndex] = React.useState<number | null>(null);
@@ -352,9 +356,9 @@ export function SortableMediaGallery({ items, onChange, maxItems = 5 }: Sortable
 
         <p className="text-[11px] text-zinc-400">
           {filledCount === 0
-            ? `Add up to ${maxItems} photos · the first is the cover`
+            ? tp("sortableMediaGallery.addUpToPhotosThe", { maxItems: maxItems })
             : canAdd
-              ? "First photo is the cover · drag to reorder"
+              ? tp("sortableMediaGallery.firstPhotoIsTheCover")
               : `${filledCount}/${maxItems} · remove one to add another · drag to reorder`}
         </p>
       </div>
@@ -364,7 +368,7 @@ export function SortableMediaGallery({ items, onChange, maxItems = 5 }: Sortable
         onOpenChange={setCropOpen}
         directCropSrc={cropSrc}
         onSave={handleCropSave}
-        title="Crop Image"
+        title={tp("sortableMediaGallery.cropImage")}
         hideStockPhotos
       />
     </div>

@@ -9,6 +9,7 @@ import { useProductManagementConfig } from "../config";
 import { uploadNewGalleryItems } from "../lib/productMediaUpload";
 import { COVER_SIZE_HINT } from "../lib/coverFormat";
 
+import { useProductT } from "../i18n/productCopy";
 /**
  * Manage a product's images in one place: reorder, add, remove.
  *
@@ -49,6 +50,7 @@ export function ProductMediaModal({
   onSaved: () => void;
   showToast: (msg: string) => void;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const { apiBaseUrl, authHeaders } = useProductManagementConfig();
 
   const initial = React.useMemo<MediaItem[]>(
@@ -134,7 +136,7 @@ export function ProductMediaModal({
         if (!statusRes.ok) continue;
         const status = await statusRes.json();
         if (status.status === "completed") {
-          showToast("Images updated");
+          showToast(tp("productMediaModal.imagesUpdated"));
           onSaved();
           return;
         }
@@ -142,7 +144,7 @@ export function ProductMediaModal({
       }
       throw new Error("Saving images timed out");
     } catch (e: any) {
-      showToast(e?.message || "Failed to save images");
+      showToast(e?.message || tp("productMediaModal.failedToSaveImages"));
     } finally {
       setSaving(false);
     }
@@ -150,13 +152,12 @@ export function ProductMediaModal({
 
   return (
     <ModalShell onClose={onClose} width="w-full sm:w-[640px]">
-      <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">Images</h3>
+      <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">{tp("productMediaModal.images")}</h3>
       {/* The size is said here, not only in the drop section: the section
           goes away once the gallery is full, and a seller replacing a cover
           then still needs to know what to make. */}
       <p className="text-[12px] text-zinc-500 mb-4">
-        Drag to reorder. The first image is the cover, shown on cards and at the top of the product page.
-        Design covers at {COVER_SIZE_HINT}, the shape every card shows.
+        {tp("productMediaModal.reorderHint", { size: COVER_SIZE_HINT })}
       </p>
 
       <div className="mb-4 max-h-[55vh] overflow-y-auto">
@@ -167,7 +168,7 @@ export function ProductMediaModal({
           onChange={setItems}
           aspect={4 / 3}
           maxItems={5}
-          hint={`Best at ${COVER_SIZE_HINT}`}
+          hint={tp("productMediaModal.bestAt", { size: COVER_SIZE_HINT })}
           commit={(photo: FramedPhoto, replacing?: MediaItem): MediaItem =>
             replacing
               ? replaceWithCrop(replacing, photo.dataUrl)
@@ -178,14 +179,14 @@ export function ProductMediaModal({
 
       <div className="flex justify-end gap-2">
         <button onClick={onClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">
-          Cancel
+          {tp("common.cancel")}
         </button>
         <button
           onClick={save}
           disabled={saving}
           className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer"
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? tp("common.saving") : tp("common.save")}
         </button>
       </div>
     </ModalShell>

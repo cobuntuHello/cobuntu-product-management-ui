@@ -5,6 +5,7 @@ import type { DraftTier } from "../types";
 import { getSymbol } from "../helpers";
 import type { MemberPricingRow, MemberPricingTierState } from "../member-pricing";
 
+import { useProductT } from "../../../i18n/productCopy";
 export interface MembersStepProps {
   t: DraftTier;
   /** Per-tier slot from the modal-level state map. Undefined when the
@@ -46,6 +47,7 @@ export function MembersStep({
   onMemberPricingRowChange,
   draftMode,
 }: MembersStepProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const sym = getSymbol(t.currency);
   const tierId = t.id;
 
@@ -56,9 +58,9 @@ export function MembersStep({
   if (!tierId && !draftMode) {
     return (
       <div className="px-4 py-6 rounded-lg border border-dashed border-zinc-300 text-center">
-        <p className="text-[12px] font-medium text-zinc-700">Save tier first</p>
+        <p className="text-[12px] font-medium text-zinc-700">{tp("common.saveTierFirst")}</p>
         <p className="text-[11px] text-zinc-500 mt-1">
-          Member-pricing overrides need a saved tier id. Save once, then come back here.
+          {tp("membersStep.memberPricingOverridesNeedA")}
         </p>
       </div>
     );

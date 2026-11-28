@@ -6,6 +6,7 @@ import { Calendar, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
 import { LAYERS } from "@cobuntu/management-ui-shared";
 
+import { useProductT } from "../../i18n/productCopy";
 /**
  * Self-contained date + time picker for the tier auto-schedule window.
  *
@@ -43,9 +44,11 @@ export interface DateTimePickerProps {
 export function DateTimePicker({
   value,
   onChange,
-  placeholder = "Select date & time",
+  placeholder: placeholderProp,
   ariaLabel,
 }: DateTimePickerProps) {
+  const tp = useProductT("marketplaceUi.productUi");
+  const placeholder = placeholderProp ?? tp("_datetimePicker.selectDateTime");
   const parsed = value ? new Date(value) : null;
   const valid = !!parsed && !Number.isNaN(parsed.getTime());
   const [open, setOpen] = React.useState(false);
@@ -143,7 +146,7 @@ export function DateTimePicker({
           <span
             role="button"
             tabIndex={0}
-            aria-label="Clear date"
+            aria-label={tp("_datetimePicker.clearDate")}
             onClick={(e) => {
               e.stopPropagation();
               onChange("");
@@ -179,7 +182,7 @@ export function DateTimePicker({
               type="button"
               onClick={() => setView(month === 0 ? { year: year - 1, month: 11 } : { year, month: month - 1 })}
               className="p-1 rounded hover:bg-zinc-100 cursor-pointer"
-              aria-label="Previous month"
+              aria-label={tp("_datetimePicker.previousMonth")}
             >
               <ChevronLeft className="w-4 h-4 text-zinc-500" />
             </button>
@@ -188,7 +191,7 @@ export function DateTimePicker({
               type="button"
               onClick={() => setView(month === 11 ? { year: year + 1, month: 0 } : { year, month: month + 1 })}
               className="p-1 rounded hover:bg-zinc-100 cursor-pointer"
-              aria-label="Next month"
+              aria-label={tp("_datetimePicker.nextMonth")}
             >
               <ChevronRight className="w-4 h-4 text-zinc-500" />
             </button>
@@ -231,9 +234,9 @@ export function DateTimePicker({
               dropdown content takes LAYERS.popoverChild, which is above this
               popover for the same reason this popover is above the modal. */}
           <div className="flex items-center gap-2 mt-3 pt-3 border-t border-zinc-100">
-            <span className="text-[11px] text-zinc-400">Time</span>
+            <span className="text-[11px] text-zinc-400">{tp("_datetimePicker.time")}</span>
             <Select value={String(hours)} onValueChange={(v) => setTime(parseInt(v, 10), minutes)}>
-              <SelectTrigger className="h-8 w-[60px] px-2 py-1 bg-white text-[12px]" aria-label="Hour">
+              <SelectTrigger className="h-8 w-[60px] px-2 py-1 bg-white text-[12px]" aria-label={tp("_datetimePicker.hour")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent style={{ zIndex: LAYERS.popoverChild }}>
@@ -244,7 +247,7 @@ export function DateTimePicker({
             </Select>
             <span className="text-zinc-400">:</span>
             <Select value={String(minutes)} onValueChange={(v) => setTime(hours, parseInt(v, 10))}>
-              <SelectTrigger className="h-8 w-[60px] px-2 py-1 bg-white text-[12px]" aria-label="Minute">
+              <SelectTrigger className="h-8 w-[60px] px-2 py-1 bg-white text-[12px]" aria-label={tp("_datetimePicker.minute")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent style={{ zIndex: LAYERS.popoverChild }}>
@@ -258,7 +261,7 @@ export function DateTimePicker({
               onClick={() => setOpen(false)}
               className="ml-auto text-[12px] font-medium text-zinc-900 hover:text-zinc-600 cursor-pointer"
             >
-              Done
+              {tp("common.done")}
             </button>
           </div>
         </div>,

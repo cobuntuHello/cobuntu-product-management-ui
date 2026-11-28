@@ -5,6 +5,7 @@ import { ModalShell } from "../ui/modal-shell";
 import { EventTags } from "../ui/event-tags";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
 
+import { useProductT } from "../i18n/productCopy";
 type Tag = { id: string; name: string };
 
 /**
@@ -32,6 +33,7 @@ export function TagsEditModal({
   onSaved: () => void;
   showToast: (msg: string) => void;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const { apiBaseUrl } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
   const [tags, setTags] = useState<Tag[]>(currentTags ?? []);
@@ -51,10 +53,10 @@ export function TagsEditModal({
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Failed to update tags");
       }
-      showToast("Tags updated");
+      showToast(tp("tagsEditModal.tagsUpdated"));
       onSaved();
     } catch (e: any) {
-      showToast(e?.message || "Failed to update tags");
+      showToast(e?.message || tp("tagsEditModal.failedToUpdateTags"));
     } finally {
       setSaving(false);
     }
@@ -62,23 +64,23 @@ export function TagsEditModal({
 
   return (
     <ModalShell onClose={onClose} width="w-full sm:w-[520px]">
-      <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">Tags</h3>
+      <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">{tp("common.tags")}</h3>
       <p className="text-[12px] text-zinc-500 mb-4">
-        How buyers find this when they are browsing rather than searching.
+        {tp("tagsEditModal.howBuyersFindThisWhen")}
       </p>
       <div className="mb-4">
-        <EventTags selectedTags={tags} onTagsChange={setTags} placeholder="Search or create tags..." />
+        <EventTags selectedTags={tags} onTagsChange={setTags} placeholder={tp("common.searchTags")} />
       </div>
       <div className="flex justify-end gap-2">
         <button onClick={onClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">
-          Cancel
+          {tp("common.cancel")}
         </button>
         <button
           onClick={save}
           disabled={saving}
           className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer"
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? tp("common.saving") : tp("common.save")}
         </button>
       </div>
     </ModalShell>

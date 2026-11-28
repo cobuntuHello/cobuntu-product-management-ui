@@ -8,6 +8,7 @@ import {
 } from "../ui/dialog";
 import { Button } from "../ui/button";
 
+import { useProductT } from "../i18n/productCopy";
 /**
  * Sub-categories carry the same icon fields as their parent — iconId
  * (Iconify), iconColor and imageUrl — which is MORE than Atlas gives its own
@@ -111,6 +112,7 @@ export interface CategoryPickerRowProps {
 export function CategoryPickerRow({
   categories, categoryId, subCategoryId, onChange, noun = "listing",
 }: CategoryPickerRowProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const [open, setOpen] = useState(false);
   // Staged inside the dialog so Cancel actually cancels — committing on every
   // tap would make the row change under a user who then backs out.
@@ -179,13 +181,13 @@ export function CategoryPickerRow({
         )}
         <span className="flex-1 min-w-0">
           <span className={`block text-sm truncate ${summary ? "font-medium text-zinc-800" : "text-zinc-500"}`}>
-            {summary ? "Category" : "Choose a category"}
+            {summary ? tp("common.category") : tp("categoryPickerRow.chooseACategory")}
           </span>
           {/* Subtitle in BOTH states — a hint when unanswered, the chosen
               value once set — so the row never shows a bare title with
               nothing explaining what it's for. */}
           <span className={`block text-[12.5px] truncate ${summary ? "text-zinc-500" : "text-zinc-400"}`}>
-            {summary ?? `Help people discover this ${noun}`}
+            {summary ?? tp("categoryPickerRow.helpPeopleDiscoverThis", { noun: noun })}
           </span>
         </span>
         <ChevronRight className="h-4 w-4 shrink-0 text-zinc-300 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-zinc-400" />
@@ -194,10 +196,9 @@ export function CategoryPickerRow({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Category</DialogTitle>
+            <DialogTitle>{tp("common.category")}</DialogTitle>
             <DialogDescription>
-              Choose where this {noun} belongs so people can find it. Your
-              community's admins decide the list.
+              {tp("categoryPickerRow.chooseWhereThisBelongs", { noun })}
             </DialogDescription>
           </DialogHeader>
 
@@ -226,7 +227,7 @@ export function CategoryPickerRow({
             {draftCat && draftSubs.length > 0 && (
               <div>
                 <p className="text-[12px] font-medium text-zinc-500 mb-2">
-                  Sub-category <span className="font-normal">· optional</span>
+                  {tp("categoryPickerRow.subCategory")} <span className="font-normal">{tp("categoryPickerRow.optional")}</span>
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {draftSubs.map((s) => (
@@ -258,7 +259,7 @@ export function CategoryPickerRow({
               onClick={() => setOpen(false)}
               className="px-4 py-2 text-[13px] font-medium text-zinc-600 rounded-lg hover:bg-zinc-100 cursor-pointer"
             >
-              Cancel
+              {tp("common.cancel")}
             </button>
             <Button
               type="button"
@@ -273,7 +274,7 @@ export function CategoryPickerRow({
                 setOpen(false);
               }}
             >
-              Done
+              {tp("common.done")}
             </Button>
           </DialogFooter>
         </DialogContent>

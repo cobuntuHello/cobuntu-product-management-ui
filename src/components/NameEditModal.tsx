@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ModalShell } from "../ui/modal-shell";
 
+import { useProductT } from "../i18n/productCopy";
 interface Props {
   currentName: string;
   onSave: (name: string) => Promise<void>;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function NameEditModal({ currentName, onSave, onClose }: Props) {
+  const tp = useProductT("marketplaceUi.productUi");
   const [name, setName] = useState(currentName);
   const [saving, setSaving] = useState(false);
 
@@ -26,7 +28,7 @@ export function NameEditModal({ currentName, onSave, onClose }: Props) {
 
   return (
     <ModalShell onClose={onClose}>
-      <h3 className="text-[15px] font-semibold text-zinc-900 mb-4">Edit Name</h3>
+      <h3 className="text-[15px] font-semibold text-zinc-900 mb-4">{tp("nameEditModal.editName")}</h3>
       <input
         value={name}
         onChange={e => setName(e.target.value)}
@@ -34,13 +36,13 @@ export function NameEditModal({ currentName, onSave, onClose }: Props) {
         autoFocus
       />
       <div className="flex justify-end gap-2">
-        <button onClick={onClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">Cancel</button>
+        <button onClick={onClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">{tp("common.cancel")}</button>
         <button
           onClick={handleSave}
           disabled={saving || !name.trim()}
           className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer"
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? tp("common.saving") : tp("common.save")}
         </button>
       </div>
     </ModalShell>
