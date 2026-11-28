@@ -353,6 +353,7 @@ export const PRODUCT_WIZARD_MESSAGES_EN = {
         "loading": "Loading…",
         "loadingMemberPricing": "Loading member pricing…",
         "locale": "en-US",
+        "membersOnly": "Members only",
         "memberPrices": "Member prices",
         "members": "Members",
         "membershipUpsell": "Membership upsell",
