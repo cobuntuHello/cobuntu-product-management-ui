@@ -35,10 +35,11 @@ interface BannerCropModalProps {
 }
 
 export function BannerCropModal({
-  open, onOpenChange, initialImageSrc = null, onSave, title = tp("bannerCropModal.editBanner"), hideStockPhotos = false,
+  open, onOpenChange, initialImageSrc = null, onSave, title: titleProp, hideStockPhotos = false,
   directCropSrc = null,
 }: BannerCropModalProps) {
   const tp = useProductT("marketplaceUi.productUi");
+  const title = titleProp ?? tp("bannerCropModal.editBanner");
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [optionsOpen, setOptionsOpen] = React.useState(false);
   const [stockPhotoOpen, setStockPhotoOpen] = React.useState(false);

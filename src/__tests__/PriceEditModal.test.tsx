@@ -120,7 +120,7 @@ describe("PriceEditModal", () => {
     // L1 → click row → editor. Name lives at the top of the scroll.
     await user.click(await screen.findByRole("button", { name: /Pro/ }));
     const input = (await screen.findByPlaceholderText(
-      "e.g. Blue / M — or Personal",
+      "e.g. Blue / M, or Personal",
     )) as HTMLInputElement;
     await user.clear(input);
 

@@ -44,10 +44,11 @@ export interface DateTimePickerProps {
 export function DateTimePicker({
   value,
   onChange,
-  placeholder = tp("_datetimePicker.selectDateTime"),
+  placeholder: placeholderProp,
   ariaLabel,
 }: DateTimePickerProps) {
   const tp = useProductT("marketplaceUi.productUi");
+  const placeholder = placeholderProp ?? tp("_datetimePicker.selectDateTime");
   const parsed = value ? new Date(value) : null;
   const valid = !!parsed && !Number.isNaN(parsed.getTime());
   const [open, setOpen] = React.useState(false);

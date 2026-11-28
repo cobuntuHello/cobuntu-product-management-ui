@@ -88,7 +88,7 @@ export function WizardStepBanner({
 const CLOSE_TRANSITION_MS = 180;
 
 export function DismissibleTipBanner({
-  title = tp("wizardBanners.goodToKnow"),
+  title: titleProp,
   body,
   onDismiss,
 }: {
@@ -97,6 +97,7 @@ export function DismissibleTipBanner({
   onDismiss: () => void;
 }) {
   const tp = useProductT("marketplaceUi.productUi");
+  const title = titleProp ?? tp("wizardBanners.goodToKnow");
   const dragStartY = React.useRef<number | null>(null);
   const [dragOffsetY, setDragOffsetY] = React.useState(0);
   const [isClosing, setIsClosing] = React.useState(false);
