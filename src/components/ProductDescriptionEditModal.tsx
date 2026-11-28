@@ -5,6 +5,7 @@ import { ModalShell } from "../page/helpers";
 import { DescriptionDialog } from "@cobuntu/management-ui-shared";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
 
+import { useProductT } from "../i18n/productCopy";
 /**
  * Edit a product's description — the counterpart of the event page's
  * DescriptionEditModal, and the same editor.
@@ -32,6 +33,7 @@ export function ProductDescriptionEditModal({
   onSaved: () => void;
   showToast: (msg: string) => void;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const { apiBaseUrl } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
   const [saving, setSaving] = React.useState(false);
@@ -48,10 +50,10 @@ export function ProductDescriptionEditModal({
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Failed to update description");
       }
-      showToast("Description updated");
+      showToast(tp("productDescriptionEditModal.descriptionUpdated"));
       onSaved();
     } catch (e: any) {
-      showToast(e?.message || "Failed to update description");
+      showToast(e?.message || tp("productDescriptionEditModal.failedToUpdateDescription"));
     } finally {
       setSaving(false);
     }
@@ -60,10 +62,10 @@ export function ProductDescriptionEditModal({
   return (
     <DescriptionDialog
       open
-      title="Edit description"
+      title={tp("productDescriptionEditModal.editDescription")}
       value={product?.description || ""}
-      placeholder="Describe your product..."
-      cancelLabel="Cancel"
+      placeholder={tp("productDescriptionEditModal.describeYourProduct")}
+      cancelLabel={tp("common.cancel")}
       doneLabel="Save"
       busy={saving}
       busyLabel="Saving..."
@@ -93,6 +95,7 @@ export function ProductCtaEditModal({
   onSaved: () => void;
   showToast: (msg: string) => void;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const { apiBaseUrl } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
   const [value, setValue] = React.useState<string>(product?.ctaText || "");
@@ -112,10 +115,10 @@ export function ProductCtaEditModal({
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Failed to update button text");
       }
-      showToast("Button text updated");
+      showToast(tp("productDescriptionEditModal.buttonTextUpdated"));
       onSaved();
     } catch (e: any) {
-      showToast(e?.message || "Failed to update button text");
+      showToast(e?.message || tp("productDescriptionEditModal.failedToUpdateButtonText"));
     } finally {
       setSaving(false);
     }
@@ -123,27 +126,27 @@ export function ProductCtaEditModal({
 
   return (
     <ModalShell onClose={onClose}>
-      <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">Button text</h3>
+      <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">{tp("productDescriptionEditModal.buttonText")}</h3>
       <p className="text-[12px] text-zinc-500 mb-4">
-        What the checkout button says. Leave it empty to use the default.
+        {tp("productDescriptionEditModal.whatTheCheckoutButtonSays")}
       </p>
       <input
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="Buy now"
+        placeholder={tp("productDescriptionEditModal.buyNow")}
         maxLength={40}
         className="w-full px-3 py-2 text-[14px] border border-zinc-200 rounded-lg focus:outline-none focus:border-zinc-400 mb-4"
       />
       <div className="flex justify-end gap-2">
         <button onClick={onClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">
-          Cancel
+          {tp("common.cancel")}
         </button>
         <button
           onClick={save}
           disabled={saving}
           className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer"
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? tp("common.saving") : tp("common.save")}
         </button>
       </div>
     </ModalShell>

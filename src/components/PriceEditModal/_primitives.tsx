@@ -4,6 +4,7 @@ import * as React from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { Info, Minus, Plus } from "lucide-react";
 
+import { useProductT } from "../../i18n/productCopy";
 /**
  * Small UI primitives local to the PriceEditModal layout. Intentionally
  * kept in this directory (not promoted to @cobuntu/management-ui-shared)
@@ -20,12 +21,13 @@ import { Info, Minus, Plus } from "lucide-react";
  * uppercase/tracked, so the content resets to normal-case body text.
  */
 export function HelpTip({ text, label }: { text: string; label?: string }) {
+  const tp = useProductT("marketplaceUi.productUi");
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
         <button
           type="button"
-          aria-label={label ? `Help: ${label}` : "Help"}
+          aria-label={label ? tp("_primitives.help", { label: label }) : tp("_primitives.help2")}
           onClick={(e) => e.stopPropagation()}
           className="inline-flex items-center justify-center text-zinc-300 hover:text-zinc-500 transition-colors cursor-pointer align-middle"
         >
@@ -244,6 +246,7 @@ export function Stepper({
   min?: number;
   ariaLabel?: string;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const bump = (dir: number) => {
     const current = parseInt(value, 10);
     const base = Number.isFinite(current) ? current : min;
@@ -261,10 +264,10 @@ export function Stepper({
         onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, ""))}
         className="w-24 text-center text-[13px] border border-zinc-200 rounded-lg px-2 py-2 text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 focus:ring-1 focus:ring-zinc-200"
       />
-      <button type="button" className={pill} onClick={() => bump(-1)} aria-label="Decrease">
+      <button type="button" className={pill} onClick={() => bump(-1)} aria-label={tp("_primitives.decrease")}>
         <Minus className="h-4 w-4" />
       </button>
-      <button type="button" className={pill} onClick={() => bump(1)} aria-label="Increase">
+      <button type="button" className={pill} onClick={() => bump(1)} aria-label={tp("_primitives.increase")}>
         <Plus className="h-4 w-4" />
       </button>
     </div>

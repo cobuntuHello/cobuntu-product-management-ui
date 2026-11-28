@@ -14,6 +14,7 @@ import { Eyebrow } from "./_primitives";
 import { toSmallestUnit, fromSmallestUnit } from "./helpers";
 import type { DraftTier, VatCategory, VatOptions } from "./types";
 
+import { useProductT } from "../../i18n/productCopy";
 export interface VatSectionProps {
   t: DraftTier;
   onUpdate: (patch: Partial<DraftTier>) => void;
@@ -51,12 +52,13 @@ export function vatRateFor(options: VatOptions | null | undefined, category: Vat
 }
 
 export function VatSection({ t, onUpdate, options, locked }: VatSectionProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   if (options === undefined || options === null) return null;
   if (!options.available) {
     if (!options.reasonText) return null;
     return (
       <div>
-        <Eyebrow>VAT</Eyebrow>
+        <Eyebrow>{tp("vatSection.vat")}</Eyebrow>
         <p className="text-[12px] text-zinc-500 mt-1.5 leading-relaxed" data-testid="vat-unavailable">{options.reasonText}</p>
       </div>
     );
@@ -82,36 +84,34 @@ export function VatSection({ t, onUpdate, options, locked }: VatSectionProps) {
 
   return (
     <div>
-      <Eyebrow>VAT</Eyebrow>
+      <Eyebrow>{tp("vatSection.vat")}</Eyebrow>
       <p className="text-[12px] text-zinc-500 mt-1.5 leading-relaxed">
-        Enter the price before VAT. Buyers in the EU pay {options.jurisdiction?.name ?? "your country"}&rsquo;s
-        {" "}{label} on top at checkout, buyers outside the EU pay none, and it is paid to you for you to declare.
+        {tp("vatSection.intro", { country: options.jurisdiction?.name ?? tp("vatSection.yourCountry"), label })}
       </p>
-      <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="VAT">
+      <div className="mt-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label={tp("vatSection.vat")}>
         <button type="button" role="radio" aria-checked={!t.vatCategory} disabled={locked} onClick={() => choose(null)} className={chip(!t.vatCategory)}>
-          No VAT
+          {tp("vatSection.noVat")}
         </button>
         {options.options.map((o) => {
           const active = t.vatCategory === o.category;
           return (
             <button key={o.category} type="button" role="radio" aria-checked={active} disabled={locked} onClick={() => choose(o.category)} className={chip(active)}>
-              {o.category === "EXEMPT" ? "Exempt (0%)" : `${label} ${o.rate}%`}
-              {o.category !== "EXEMPT" && <span className="opacity-60"> · {CATEGORY_NAME[o.category]}</span>}
+              {o.category === "EXEMPT" ? tp("vatSection.exempt0") : `${label} ${o.rate}%`}
+              {o.category !== "EXEMPT" && <span className="opacity-60"> · {tp(`vatSection.category.${o.category}`) || CATEGORY_NAME[o.category]}</span>}
             </button>
           );
         })}
       </div>
       {t.vatCategory && !exempt && !pwyw && net != null && rate != null && (
         <p className="text-[12px] text-zinc-600 mt-2 leading-relaxed" data-testid="vat-preview">
-          Buyers see {money(net, t.currency)} and pay {money(net + vat, t.currency)} at checkout, with {label} {rate}% of{" "}
-          {money(vat, t.currency)} added.
+          {tp("vatSection.previewAdded", { net: money(net, t.currency), gross: money(net + vat, t.currency), label, rate, vat: money(vat, t.currency) })}
         </p>
       )}
       {t.vatCategory && !exempt && pwyw && (
-        <p className="text-[12px] text-zinc-500 mt-2">Buyers choose an amount before VAT; {label} is added at checkout.</p>
+        <p className="text-[12px] text-zinc-500 mt-2">{tp("vatSection.pwywAdded", { label })}</p>
       )}
-      {exempt && <p className="text-[12px] text-zinc-600 mt-2">Exempt from {label}: buyers pay the price as it is.</p>}
-      {locked && <p className="text-[11px] text-zinc-400 mt-1.5">This option has sales, so its VAT is locked.</p>}
+      {exempt && <p className="text-[12px] text-zinc-600 mt-2">{tp("vatSection.exemptFrom", { label })}</p>}
+      {locked && <p className="text-[11px] text-zinc-400 mt-1.5">{tp("vatSection.thisOptionHasSalesSo")}</p>}
     </div>
   );
 }

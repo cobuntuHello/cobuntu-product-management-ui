@@ -4,6 +4,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { useProductManagementConfig } from "../config";
 
+import { useProductT } from "../i18n/productCopy";
 /**
  * Stripe-status helper for the price-edit + create surfaces.
  *
@@ -93,6 +94,7 @@ export function StripeRequiredWarning({
   communityTag: string;
   onClose: () => void;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const { stripeConnectUrl } = useProductManagementConfig();
   if (typeof document === "undefined") return null;
   return createPortal(
@@ -110,26 +112,25 @@ export function StripeRequiredWarning({
             <line x1="1" y1="10" x2="23" y2="10" />
           </svg>
         </div>
-        <h3 className="text-[15px] font-semibold text-zinc-900 mb-2">Connect Stripe</h3>
+        <h3 className="text-[15px] font-semibold text-zinc-900 mb-2">{tp("stripeStatus.connectStripe")}</h3>
         <p className="text-[13px] text-zinc-500 mb-1">
-          This community doesn&apos;t have a payment account configured yet.
+          {tp("stripeStatus.thisCommunityDoesnTHave")}
         </p>
         <p className="text-[13px] text-zinc-500 mb-5">
-          We use Stripe to process payments. Connect or set up a Stripe account to start
-          accepting payments. It usually takes less than 5 minutes.
+          {tp("stripeStatus.weUseStripeToProcess")}
         </p>
         <div className="flex justify-end gap-2">
           <button
             onClick={onClose}
             className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer"
           >
-            Cancel
+            {tp("common.cancel")}
           </button>
           <a
             href={stripeConnectUrl(communityTag)}
             className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 no-underline cursor-pointer"
           >
-            Connect Stripe
+            {tp("stripeStatus.connectStripe")}
           </a>
         </div>
       </div>

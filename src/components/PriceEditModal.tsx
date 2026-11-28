@@ -54,6 +54,7 @@ import { StepView } from "./PriceEditModal/StepView";
 import { STEP_TITLES, STEP_SUBTITLES } from "./PriceEditModal/steps";
 import { FooterSlotContext } from "./PriceEditModal/footer-slot";
 import { DonationsSection } from "./PriceEditModal/DonationsSection";
+import { useProductT, getProductT } from "../i18n/productCopy";
 // Backwards-compat export — the original module exported CURRENCIES
 // directly. The constant lives on the new types module now; re-export
 // it here so admin/community-app call sites importing from
@@ -226,12 +227,13 @@ export interface PriceEditModalProps {
  */
 function stripeNotConnectedMessage(e: unknown): string | null {
   if (e && typeof e === "object" && (e as { code?: unknown }).code === "STRIPE_NOT_CONNECTED") {
-    return "Connect Stripe to receive payment for this listing, then try saving again.";
+    return getProductT("marketplaceUi.productUi")("priceEditModal.connectStripeToReceivePayment");
   }
   return null;
 }
 
 export function PriceEditModal({ product, communityTag, productId, onClose, onSaved, showToast, manageDetailsUrl, showMemberPricing, memberPricingScope = "community", draftMode, initialDraftTiers, initialDraftDonation, onDraftCommit, openTierLocalId, openNewTier, focusMemberPricing, productType = "DIGITAL", ownerType = "community" }: PriceEditModalProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const isDigital = productType !== "PHYSICAL";
   const { apiBaseUrl, authHeaders } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
@@ -575,7 +577,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         } catch (e: any) {
           setMemberPricingByTier((prev) => {
             const next = new Map(prev);
-            next.set(tierId, { loading: false, error: e?.message || "Failed to load", rows: [] as never[] });
+            next.set(tierId, { loading: false, error: e?.message || tp("priceEditModal.failedToLoad"), rows: [] as never[] });
             return next;
           });
         }
@@ -619,10 +621,10 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         const e = await res.json().catch(() => ({}));
         throw new Error(e.error || "Failed to update publish state");
       }
-      showToast(nextPublishedAt ? "Tier published" : "Tier unpublished");
+      showToast(nextPublishedAt ? tp("priceEditModal.tierPublished") : tp("priceEditModal.tierUnpublished"));
     } catch (e: any) {
       updateDraft(idx, { publishedAt: prevPublishedAt }); // revert optimistic flip
-      showToast(e.message || "Failed to update publish state");
+      showToast(e.message || tp("priceEditModal.failedToUpdatePublishState"));
     } finally {
       setPublishToggling(false);
     }
@@ -657,7 +659,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   async function duplicateTier(idx: number) {
     const src = drafts[idx];
     if (!src?.id) {
-      showToast("Save the tier before duplicating it");
+      showToast(tp("priceEditModal.saveTheTierBeforeDuplicating"));
       return;
     }
     try {
@@ -707,7 +709,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
         salesEndAt: newTier.salesEndAt ?? "",
       }]);
     } catch (e: any) {
-      showToast(e.message || "Failed to duplicate tier");
+      showToast(e.message || tp("priceEditModal.failedToDuplicateTier"));
     }
   }
 
@@ -874,7 +876,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
           return { ...d, draftMemberPricing: memberPricing.length ? memberPricing : null };
         });
         onDraftCommit?.({ tiers: foldedDrafts, donation });
-        showToast("Pricing saved");
+        showToast(tp("priceEditModal.pricingSaved"));
         onSaved();
         return;
       }
@@ -1007,11 +1009,11 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
       }
 
       showToast(sentForReview
-        ? "Pricing updated. Your listing is back with the community for review, and goes live again once they approve it."
-        : "Pricing updated");
+        ? tp("priceEditModal.pricingUpdatedYourListingIs")
+        : tp("priceEditModal.pricingUpdated"));
       onSaved();
     } catch (e: any) {
-      const msg = e?.message || "Failed to save";
+      const msg = e?.message || tp("priceEditModal.failedToSave");
       setSaveError(msg);
       showToast(msg);
     }
@@ -1043,23 +1045,23 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   //                      pricing" / "Add pricing" · descriptive subtitle.
   //   Variant editor:    breadcrumb [Pricing tiers] (unless opened direct) ·
   //                      title = variant name · "Buyers pick one at checkout."
-  const tierName = activeDraft?.name?.trim() || "Untitled variant";
+  const tierName = activeDraft?.name?.trim() || tp("priceEditModal.untitledVariant");
   const title =
     activeDraft && activeStep
       ? STEP_TITLES[activeStep]
       : activeDraft
         ? tierName
         : isEmpty
-          ? "Add pricing"
+          ? tp("priceEditModal.addPricing")
           : visible.length === 1
-            ? "Edit pricing"
-            : "Pricing tiers";
+            ? tp("priceEditModal.editPricing")
+            : tp("priceEditModal.pricingTiers");
   const subtitle =
     activeDraft && activeStep
       ? STEP_SUBTITLES[activeStep]
       : activeDraft
-        ? "Buyers pick one at checkout."
-        : "Tiers, donations, and per-tier registration forms.";
+        ? tp("priceEditModal.buyersPickOneAtCheckout")
+        : tp("priceEditModal.tiersDonationsAndPerTier");
 
   // Breadcrumb — "Pricing tiers" returns to the list (unless opened directly
   // on a variant, where the list lives in the form so there is nothing to
@@ -1069,7 +1071,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   if (activeDraft) {
     if (!openedDirect) {
       crumbs.push({
-        label: "Pricing tiers",
+        label: tp("priceEditModal.pricingTiers"),
         onClick: () => {
           setActiveStep(null);
           setActiveTier(null);
@@ -1121,7 +1123,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
       <button
         type="button"
         onClick={onClose}
-        aria-label="Close"
+        aria-label={tp("common.close")}
         className="absolute -top-1 -right-1 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 hover:bg-zinc-200 transition-colors cursor-pointer"
       >
         <X className="h-[18px] w-[18px]" />
@@ -1129,7 +1131,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
       {/* ─── Header ─── ONE breadcrumb + ONE title + ONE subtitle. */}
       <div className="shrink-0 mb-4 pr-9">
         {crumbs.length > 0 && (
-          <nav className="flex items-center flex-wrap gap-1 mb-1.5 text-[12px]" aria-label="Breadcrumb">
+          <nav className="flex items-center flex-wrap gap-1 mb-1.5 text-[12px]" aria-label={tp("priceEditModal.breadcrumb")}>
             {crumbs.map((c, i) => (
               <span key={i} className="flex items-center gap-1">
                 {i > 0 && <span className="text-zinc-300" aria-hidden>›</span>}
@@ -1157,7 +1159,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
           each navigation re-mounts and animates in (see StepFade). */}
       <StepFade stepKey={`${activeTier ?? "list"}:${activeStep ?? "editor"}:${loading ? "loading" : "ready"}`}>
       {loading ? (
-        <div className="py-12 text-center text-[13px] text-zinc-400">Loading…</div>
+        <div className="py-12 text-center text-[13px] text-zinc-400">{tp("common.loading")}</div>
       ) : activeDraft && activeStep ? (
         // Drill-in sub-step: a focused sub-screen (Sales window / Registration
         // form) INSIDE the modal, swapped in for the variant editor. Edits the
@@ -1243,11 +1245,11 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               }}
               className="flex items-center gap-1.5 text-[12px] font-medium text-zinc-700 hover:text-zinc-900 cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5" /> Add variant
+              <Plus className="w-3.5 h-3.5" /> {tp("common.addVariant")}
             </button>
             {manageDetailsUrl && (
               <a href={manageDetailsUrl} className="text-[12px] text-zinc-500 hover:text-zinc-900 no-underline">
-                Manage details →
+                {tp("priceEditModal.manageDetails")}
               </a>
             )}
           </div>
@@ -1260,7 +1262,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               list, never inside a variant editor). */}
           <div className="flex items-center gap-2 pt-2">
             <div className="h-px flex-1 bg-zinc-100" />
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Whole listing</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">{tp("priceEditModal.wholeListing")}</span>
             <div className="h-px flex-1 bg-zinc-100" />
           </div>
 
@@ -1310,16 +1312,16 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             onClick={() => setActiveStep(null)}
             className="px-4 py-2 text-[13px] font-medium text-zinc-700 bg-zinc-100 rounded-lg hover:bg-zinc-200 cursor-pointer transition-colors"
           >
-            Back
+            {tp("common.back")}
           </button>
           <button
             type="button"
             onClick={save}
             disabled={saving || loading || memberPricingPending}
-            title={memberPricingPending ? "Loading member pricing…" : undefined}
+            title={memberPricingPending ? tp("common.loadingMemberPricing") : undefined}
             className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer transition-colors"
           >
-            {saving ? "Saving…" : "Save"}
+            {saving ? tp("common.saving") : tp("common.save")}
           </button>
         </div>
       ) : activeDraft ? (
@@ -1332,7 +1334,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             onClick={() => (openedDirect ? onClose() : setActiveTier(null))}
             className="flex-1 basis-0 px-4 py-2 text-[13px] font-medium text-center bg-zinc-100 text-zinc-700 rounded-lg hover:bg-zinc-200 cursor-pointer transition-colors"
           >
-            Cancel
+            {tp("common.cancel")}
           </button>
           {visible.length > 1 && (
             <button
@@ -1340,7 +1342,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               onClick={() => {
                 // Locked (has sales) → explain via toast rather than delete.
                 if (isTierLocked(activeDraft)) {
-                  showToast("Refund all sales before deleting this variant.");
+                  showToast(tp("priceEditModal.refundAllSalesBeforeDeleting"));
                   return;
                 }
                 const idx = activeIdx();
@@ -1351,7 +1353,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
               }}
               className="flex-1 basis-0 px-4 py-2 text-[13px] font-medium text-center bg-red-600 text-white rounded-lg hover:bg-red-700 cursor-pointer transition-colors"
             >
-              Delete
+              {tp("common.delete")}
             </button>
           )}
           {/* Form builder actions portal here (see footer-slot.tsx). */}
@@ -1360,10 +1362,10 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             type="button"
             onClick={save}
             disabled={saving || loading || memberPricingPending}
-            title={memberPricingPending ? "Loading member pricing…" : undefined}
+            title={memberPricingPending ? tp("common.loadingMemberPricing") : undefined}
             className="flex-1 basis-0 px-4 py-2 text-[13px] font-medium text-center bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer transition-colors"
           >
-            {saving ? "Saving…" : "Save"}
+            {saving ? tp("common.saving") : tp("common.save")}
           </button>
         </div>
       ) : (
@@ -1373,7 +1375,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             onClick={onClose}
             className="px-4 py-2 text-[13px] font-medium text-zinc-600 hover:text-zinc-900 cursor-pointer"
           >
-            Cancel
+            {tp("common.cancel")}
           </button>
           <div className="flex-1" />
           <div ref={setFooterSlot} className="contents" />
@@ -1381,10 +1383,10 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             type="button"
             onClick={save}
             disabled={saving || loading || memberPricingPending}
-            title={memberPricingPending ? "Loading member pricing…" : undefined}
+            title={memberPricingPending ? tp("common.loadingMemberPricing") : undefined}
             className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer transition-colors"
           >
-            {saving ? "Saving…" : "Save"}
+            {saving ? tp("common.saving") : tp("common.save")}
           </button>
         </div>
       )}

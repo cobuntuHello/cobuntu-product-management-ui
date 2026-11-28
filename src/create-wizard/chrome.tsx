@@ -4,6 +4,7 @@ import type * as React from "react";
 import { WizardLink } from "./navigation";
 import { useWizardT } from "./i18n";
 
+import { useProductT } from "../i18n/productCopy";
 /**
  * The page chrome above the wizard: the back-nav breadcrumb and the "How it
  * works" pill. Lifted from the community app (components/layout/Breadcrumb.tsx,
@@ -28,11 +29,12 @@ export function Breadcrumb({
   onBack?: () => boolean | void;
   shouldUseHistoryBack?: () => boolean;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   return (
     <div className={`hidden md:flex items-center gap-2 mx-auto ${maxWidthClass} px-4 md:px-8 pt-6 pb-2`}>
       <WizardLink
         href={parentHref}
-        aria-label={`Back to ${parentLabel}`}
+        aria-label={tp("chrome.backTo", { parentLabel: parentLabel })}
         onClick={(e) => {
           if (onBack?.() === true) {
             e.preventDefault();

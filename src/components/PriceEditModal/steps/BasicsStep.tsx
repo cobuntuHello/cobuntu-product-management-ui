@@ -12,6 +12,7 @@ import { MembersStep } from "./MembersStep";
 import type { MemberPricingRow, MemberPricingTierState } from "../member-pricing";
 import { PayoutsInEurosNote } from "../../PayoutsInEurosNote";
 
+import { useProductT } from "../../../i18n/productCopy";
 export interface BasicsStepProps {
   t: DraftTier;
   onUpdate: (patch: Partial<DraftTier>) => void;
@@ -55,6 +56,7 @@ export function BasicsStep({
   showToast,
   draftMode,
 }: BasicsStepProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const sym = getSymbol(t.currency);
   const locked = isTierLocked(t);
 
@@ -82,7 +84,7 @@ export function BasicsStep({
           the model before typing the amount. Locked once sales exist. */}
       <div>
         <Eyebrow help="Fixed price charges everyone the same. Pay-what-you-want lets each buyer choose their amount at checkout (with an optional minimum).">
-          Pricing model
+          {tp("basicsStep.pricingModel")}
         </Eyebrow>
         <div className="grid grid-cols-2 gap-2 mt-1.5">
           <button
@@ -90,17 +92,17 @@ export function BasicsStep({
             onClick={() => !locked && onUpdate({ priceMode: "fixed" })}
             disabled={locked}
             className={`px-3 py-2 text-[13px] rounded-lg border transition-colors ${t.priceMode === "fixed" ? "border-zinc-900 bg-zinc-50 text-zinc-900 font-medium" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"} ${locked ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
-          >Fixed price</button>
+          >{tp("common.fixedPrice")}</button>
           <button
             type="button"
             onClick={() => !locked && onUpdate({ priceMode: "pwyw" })}
             disabled={locked}
             className={`px-3 py-2 text-[13px] rounded-lg border transition-colors ${t.priceMode === "pwyw" ? "border-zinc-900 bg-zinc-50 text-zinc-900 font-medium" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"} ${locked ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
-          >Pay what you want</button>
+          >{tp("common.payWhatYouWant")}</button>
         </div>
         {t.priceMode === "pwyw" && (
           <p className="text-[11px] text-zinc-500 mt-1.5">
-            Buyers choose the amount at checkout. If you suggest a price, their amount starts there.
+            {tp("basicsStep.buyersChooseTheAmountAt")}
           </p>
         )}
       </div>
@@ -108,20 +110,20 @@ export function BasicsStep({
       {/* Price + Currency */}
       <div className="grid grid-cols-[1fr_120px] gap-2.5">
         <div>
-          <Eyebrow>{t.priceMode === "pwyw" ? "Suggested price (optional)" : t.vatCategory && t.vatCategory !== "EXEMPT" ? "Price before VAT" : "Price"}</Eyebrow>
+          <Eyebrow>{t.priceMode === "pwyw" ? tp("basicsStep.suggestedPriceOptional") : t.vatCategory && t.vatCategory !== "EXEMPT" ? tp("basicsStep.priceBeforeVat") : tp("common.price")}</Eyebrow>
           <div className="mt-1">
             <StepInput
               type="number" min="0" step="0.01" value={t.price}
               onChange={(e) => onUpdate({ price: e.target.value })}
-              placeholder={t.priceMode === "pwyw" ? "No suggestion" : "0.00"}
+              placeholder={t.priceMode === "pwyw" ? tp("basicsStep.noSuggestion") : "0.00"}
               locked={locked}
               prefix={sym}
-              title={locked ? "Refund all sales first to change price" : undefined}
+              title={locked ? tp("basicsStep.refundAllSalesFirstTo") : undefined}
             />
           </div>
         </div>
         <div>
-          <Eyebrow>Currency</Eyebrow>
+          <Eyebrow>{tp("common.currency")}</Eyebrow>
           <Select value={t.currency} onValueChange={(v) => onUpdate({ currency: v })} disabled={locked}>
             <SelectTrigger className={`h-[38px] mt-1 text-[13px] ${locked ? "text-zinc-400 bg-zinc-50 cursor-not-allowed" : ""}`}><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -139,12 +141,12 @@ export function BasicsStep({
       {/* PWYW minimum — the floor under the buyer-chosen amount. */}
       <Collapse open={t.priceMode === "pwyw"}>
         <div>
-          <Eyebrow>Minimum amount (optional)</Eyebrow>
+          <Eyebrow>{tp("basicsStep.minimumAmountOptional")}</Eyebrow>
           <div className="mt-1 max-w-[220px]">
             <StepInput
               type="number" min="0" step="0.01" value={t.pwywMin}
               onChange={(e) => onUpdate({ pwywMin: e.target.value })}
-              placeholder="No minimum"
+              placeholder={tp("common.noMinimum")}
               locked={locked}
               prefix={sym}
             />
@@ -158,7 +160,7 @@ export function BasicsStep({
           installment-plan are mutually exclusive. */}
       <div>
         <Eyebrow help="One-time charges the full price at checkout. Recurring is a Stripe subscription that renews automatically. Installment plan splits the total into equal monthly charges you configure below.">
-          Billing mode
+          {tp("basicsStep.billingMode")}
         </Eyebrow>
         <div className="mt-1.5">
           <BillingRadio
@@ -168,25 +170,25 @@ export function BasicsStep({
             options={[
               {
                 value: "ONE_TIME",
-                label: "One-time",
-                description: "Buyers pay the full price at checkout.",
+                label: tp("basicsStep.oneTime"),
+                description: tp("basicsStep.buyersPayTheFullPrice"),
               },
               {
                 value: "RECURRING",
-                label: "Recurring",
-                description: "Stripe subscription. Charges renew automatically.",
+                label: tp("common.recurring"),
+                description: tp("basicsStep.stripeSubscriptionChargesRenewAutomatically"),
               },
               {
                 value: "INSTALLMENT_PLAN",
-                label: "Installment plan",
-                description: "Buyers pay in equal monthly charges; configure the schedule + access duration below.",
+                label: tp("basicsStep.installmentPlan"),
+                description: tp("basicsStep.buyersPayInEqualMonthly"),
               },
             ]}
           />
         </div>
         {locked && (
           <p className="text-[11px] text-amber-600 mt-1.5">
-            Billing mode is locked while sales exist. Refund all sales first to change.
+            {tp("basicsStep.billingModeIsLockedWhile")}
           </p>
         )}
       </div>
@@ -196,7 +198,7 @@ export function BasicsStep({
           interval concept). */}
       <Collapse open={t.isRecurring}>
         <div className="grid grid-cols-[120px_1fr] gap-2.5 items-center">
-          <Eyebrow>Interval</Eyebrow>
+          <Eyebrow>{tp("basicsStep.interval")}</Eyebrow>
           <Select
             value={t.recurringInterval}
             onValueChange={(v) => onUpdate({ recurringInterval: v })}
@@ -204,9 +206,9 @@ export function BasicsStep({
           >
             <SelectTrigger className="h-[34px] text-[13px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="monthly">Monthly</SelectItem>
-              <SelectItem value="yearly">Yearly</SelectItem>
+              <SelectItem value="weekly">{tp("basicsStep.weekly")}</SelectItem>
+              <SelectItem value="monthly">{tp("common.monthly")}</SelectItem>
+              <SelectItem value="yearly">{tp("common.yearly")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -219,14 +221,14 @@ export function BasicsStep({
       <Collapse open={t.installmentEnabled}>
         <div className="space-y-2">
           <div>
-            <Eyebrow>Installment schedule</Eyebrow>
+            <Eyebrow>{tp("basicsStep.installmentSchedule")}</Eyebrow>
             <p className="text-[11px] text-zinc-500 mt-1">
-              The total below is charged in equal parts over the count and interval.
+              {tp("basicsStep.theTotalBelowIsCharged")}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <Eyebrow>Total ({sym})</Eyebrow>
+              <Eyebrow>{tp("basicsStep.totalWithSymbol", { symbol: sym })}</Eyebrow>
               <div className="mt-1">
                 <StepInput
                   type="number" min="0" step="0.01" value={t.installmentTotal}
@@ -237,7 +239,7 @@ export function BasicsStep({
               </div>
             </div>
             <div>
-              <Eyebrow>Charges</Eyebrow>
+              <Eyebrow>{tp("basicsStep.charges")}</Eyebrow>
               <div className="mt-1">
                 <StepInput
                   type="number" min="2" step="1" value={t.installmentCount}
@@ -248,7 +250,7 @@ export function BasicsStep({
               </div>
             </div>
             <div>
-              <Eyebrow>Every (months)</Eyebrow>
+              <Eyebrow>{tp("basicsStep.everyMonths")}</Eyebrow>
               <div className="mt-1">
                 <StepInput
                   type="number" min="1" step="1" value={t.installmentInterval}
@@ -259,7 +261,7 @@ export function BasicsStep({
               </div>
             </div>
             <div>
-              <Eyebrow>Access (months)</Eyebrow>
+              <Eyebrow>{tp("basicsStep.accessMonths")}</Eyebrow>
               <div className="mt-1">
                 <StepInput
                   type="number" min="1" step="1" value={t.installmentAccessMonths}
@@ -275,12 +277,12 @@ export function BasicsStep({
             && t.installmentCount
             && parseInt(t.installmentCount, 10) >= 2 && (
             <p className="text-[11px] text-zinc-500">
-              Buyer pays {sym}{(parseFloat(t.installmentTotal) / parseInt(t.installmentCount, 10)).toFixed(2)} every {t.installmentInterval || "1"} month{(t.installmentInterval || "1") !== "1" ? "s" : ""} for {t.installmentCount} charges{t.installmentAccessMonths ? `, ${t.installmentAccessMonths} month${t.installmentAccessMonths !== "1" ? "s" : ""} of access` : ""}.
+              {tp("basicsStep.installmentSummary", { amount: `${sym}${(parseFloat(t.installmentTotal) / parseInt(t.installmentCount, 10)).toFixed(2)}`, every: Number(t.installmentInterval || "1"), count: Number(t.installmentCount) })}{t.installmentAccessMonths ? tp("basicsStep.installmentAccess", { months: Number(t.installmentAccessMonths) }) : ""}.
             </p>
           )}
           {locked && (
             <p className="text-[10px] text-amber-600">
-              Installment plan is locked while sales exist.
+              {tp("basicsStep.installmentPlanIsLockedWhile")}
             </p>
           )}
         </div>

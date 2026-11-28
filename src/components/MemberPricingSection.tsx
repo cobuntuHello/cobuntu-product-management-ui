@@ -10,6 +10,7 @@ import {
   type RecurringScope,
 } from "./PriceEditModal/member-pricing";
 
+import { useProductT } from "../i18n/productCopy";
 /**
  * Presentational member-pricing editor for a single (community-owned)
  * marketplace product tier.
@@ -57,11 +58,12 @@ export function MemberPricingSection({
   currencySymbol,
   isRecurringTier,
 }: MemberPricingSectionProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const scope = useContext(MemberPricingScopeContext);
   if (state.loading) {
     return (
       <div className="pt-2 border-t border-zinc-100">
-        <p className="text-[11px] text-zinc-400">Loading member pricing…</p>
+        <p className="text-[11px] text-zinc-400">{tp("common.loadingMemberPricing")}</p>
       </div>
     );
   }
@@ -80,11 +82,11 @@ export function MemberPricingSection({
   if (rows.length === 0) {
     return (
       <div className="pt-2 border-t border-zinc-100">
-        <p className="text-[12px] font-medium text-zinc-700">Member pricing</p>
+        <p className="text-[12px] font-medium text-zinc-700">{tp("memberPricingSection.memberPricing")}</p>
         <p className="text-[11px] text-zinc-500 mt-1">
           {scope === "seller"
-            ? "This community hasn't published any membership tiers yet, so there is no member price to set."
-            : "No segments configured yet. Create a community segment first to offer member-only pricing on this tier."}
+            ? tp("memberPricingSection.thisCommunityHasnTPublished")
+            : tp("memberPricingSection.noSegmentsConfiguredYetCreate")}
         </p>
       </div>
     );
@@ -94,19 +96,19 @@ export function MemberPricingSection({
     <div className="pt-2 border-t border-zinc-100">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-[12px] font-medium text-zinc-700">Member pricing</p>
+          <p className="text-[12px] font-medium text-zinc-700">{tp("memberPricingSection.memberPricing")}</p>
           <p className="text-[11px] text-zinc-500 mt-0.5">
             {scope === "seller"
-              ? "Your own discount for this community's members. The community approves it with your listing, and changing it later sends the listing back to them for review."
-              : "Discount this tier for buyers in specific community segments."}
+              ? tp("memberPricingSection.yourOwnDiscountForThis")
+              : tp("memberPricingSection.discountThisTierForBuyers")}
           </p>
         </div>
         {dirtyCount > 0 && (
           <span
             className="text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full"
-            title="Unsaved member-pricing changes — commit by clicking Save on the outer modal."
+            title={tp("memberPricingSection.unsavedMemberPricingChangesCommit")}
           >
-            {dirtyCount} unsaved
+            {tp("memberPricingSection.unsavedCount", { count: dirtyCount })}
           </span>
         )}
       </div>
@@ -119,11 +121,11 @@ export function MemberPricingSection({
                 checked={r.enabled}
                 onChange={(e) => onRowChange(idx, { enabled: e.target.checked })}
                 className="w-3.5 h-3.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-400"
-                aria-label={`Offer member pricing for ${r.segmentName}`}
+                aria-label={tp("memberPricingSection.offerMemberPricingFor", { segmentName: r.segmentName })}
               />
               <span className="text-[12px] font-medium text-zinc-700">{r.segmentName}</span>
               {!r.enabled && (
-                <span className="text-[10px] text-zinc-400 ml-auto">No override</span>
+                <span className="text-[10px] text-zinc-400 ml-auto">{tp("memberPricingSection.noOverride")}</span>
               )}
               {r.enabled && (
                 <span className="text-[10px] uppercase tracking-wide text-zinc-400 ml-auto">
@@ -136,10 +138,10 @@ export function MemberPricingSection({
                 <Select value={r.mode} onValueChange={(v) => onRowChange(idx, { mode: v as MemberPricingMode })}>
                   <SelectTrigger className="h-[30px] text-[12px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="FREE">Free for these members</SelectItem>
-                    <SelectItem value="PERCENT_OFF">% off list price</SelectItem>
-                    <SelectItem value="FLAT_OFF">Flat amount off</SelectItem>
-                    <SelectItem value="FIXED_PRICE">Fixed price</SelectItem>
+                    <SelectItem value="FREE">{tp("memberPricingSection.freeForTheseMembers")}</SelectItem>
+                    <SelectItem value="PERCENT_OFF">{tp("memberPricingSection.offListPrice")}</SelectItem>
+                    <SelectItem value="FLAT_OFF">{tp("memberPricingSection.flatAmountOff")}</SelectItem>
+                    <SelectItem value="FIXED_PRICE">{tp("common.fixedPrice")}</SelectItem>
                   </SelectContent>
                 </Select>
                 <input
@@ -158,15 +160,15 @@ export function MemberPricingSection({
                   type="number" step="1" value={r.priority}
                   onChange={(e) => onRowChange(idx, { priority: e.target.value })}
                   placeholder="0"
-                  title="Higher priority wins when a buyer is in multiple matching segments"
+                  title={tp("memberPricingSection.higherPriorityWinsWhenA")}
                   className="px-3 py-2 text-[12px] text-zinc-900 placeholder:text-zinc-400 border border-zinc-200 rounded-lg focus:outline-none focus:border-zinc-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 {isRecurringTier && (
                   <Select value={r.recurringScope} onValueChange={(v) => onRowChange(idx, { recurringScope: v as RecurringScope })}>
-                    <SelectTrigger className="h-[30px] text-[12px]" title="Apply discount to every renewal (Always) or only the first invoice (First only)"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="h-[30px] text-[12px]" title={tp("memberPricingSection.applyDiscountToEveryRenewal")}><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ALWAYS">Every renewal</SelectItem>
-                      <SelectItem value="FIRST_ONLY">First invoice only</SelectItem>
+                      <SelectItem value="ALWAYS">{tp("memberPricingSection.everyRenewal")}</SelectItem>
+                      <SelectItem value="FIRST_ONLY">{tp("memberPricingSection.firstInvoiceOnly")}</SelectItem>
                     </SelectContent>
                   </Select>
                 )}

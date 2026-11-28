@@ -7,6 +7,7 @@ import { Icon } from "@iconify/react";
 import type { CategoryOption, CategoryIconFields } from "./CategoryPickerRow";
 import { useProductManagementConfig, useJsonHeaders } from "../config";
 
+import { useProductT } from "../i18n/productCopy";
 /**
  * Edit a product's category from its own row.
  *
@@ -37,6 +38,7 @@ export function CategoryEditModal({
   onSaved: () => void;
   showToast: (msg: string) => void;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const { apiBaseUrl } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
   const [draft, setDraft] = useState<{ categoryId: string | null; subCategoryId: string | null }>({
@@ -63,10 +65,10 @@ export function CategoryEditModal({
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Failed to update category");
       }
-      showToast("Category updated");
+      showToast(tp("categoryEditModal.categoryUpdated"));
       onSaved();
     } catch (e: any) {
-      showToast(e?.message || "Failed to update category");
+      showToast(e?.message || tp("categoryEditModal.failedToUpdateCategory"));
     } finally {
       setSaving(false);
     }
@@ -74,9 +76,9 @@ export function CategoryEditModal({
 
   return (
     <ModalShell onClose={onClose} width="w-full sm:w-[520px]">
-      <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">Category</h3>
+      <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">{tp("common.category")}</h3>
       <p className="text-[12px] text-zinc-500 mb-4">
-        Where this sits when someone browses the marketplace rather than searching it.
+        {tp("categoryEditModal.whereThisSitsWhenSomeone")}
       </p>
       {/*
         INLINE, NOT A SECOND MODAL.
@@ -96,14 +98,14 @@ export function CategoryEditModal({
       </div>
       <div className="flex justify-end gap-2">
         <button onClick={onClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">
-          Cancel
+          {tp("common.cancel")}
         </button>
         <button
           onClick={save}
           disabled={saving}
           className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer"
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? tp("common.saving") : tp("common.save")}
         </button>
       </div>
     </ModalShell>
@@ -155,6 +157,7 @@ function CategoryTree({
   subCategoryId: string | null;
   onChange: (next: { categoryId: string | null; subCategoryId: string | null }) => void;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   // Open the branch that holds the current selection, so reopening the modal
   // shows you where you already are rather than a collapsed list.
   const [openId, setOpenId] = useState<string | null>(categoryId);
@@ -255,7 +258,7 @@ function CategoryTree({
             onClick={() => { onChange({ categoryId: null, subCategoryId: null }); setOpenId(null); }}
             className="px-2 py-1.5 text-[12px] font-medium text-zinc-400 hover:text-zinc-900 transition-colors cursor-pointer bg-transparent border-0"
           >
-            Clear selection
+            {tp("categoryEditModal.clearSelection")}
           </button>
         </div>
       )}

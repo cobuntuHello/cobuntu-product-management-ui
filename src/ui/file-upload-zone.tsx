@@ -4,6 +4,7 @@ import * as React from "react";
 import { Upload, X, FileText, FileImage, FileVideo, FileArchive, FileCode, FileMusic } from "lucide-react";
 import { cn } from "./utils";
 
+import { useProductT } from "../i18n/productCopy";
 export interface UploadedFile {
   id: string;
   file?: File;
@@ -44,6 +45,7 @@ function getFileExtension(name: string): string {
 }
 
 export function FileUploadZone({ files, onChange, maxFiles = 10 }: FileUploadZoneProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [isDragOver, setIsDragOver] = React.useState(false);
 
@@ -97,8 +99,8 @@ export function FileUploadZone({ files, onChange, maxFiles = 10 }: FileUploadZon
             <Upload className="h-5 w-5" />
           </span>
           <div className="text-center">
-            <p className="text-sm font-medium opacity-90">Drop files here or click to browse</p>
-            <p className="text-[11px] opacity-50 mt-0.5">Up to {maxFiles} files. PDF, images, videos, documents, and more.</p>
+            <p className="text-sm font-medium opacity-90">{tp("fileUploadZone.dropFilesHereOrClick")}</p>
+            <p className="text-[11px] opacity-50 mt-0.5">{tp("fileUploadZone.upToFiles", { max: maxFiles })}</p>
           </div>
         </div>
       )}
@@ -136,7 +138,7 @@ export function FileUploadZone({ files, onChange, maxFiles = 10 }: FileUploadZon
       )}
 
       {files.length > 0 && (
-        <p className="text-[11px] opacity-50">{files.length}/{maxFiles} files. These will be available for download after purchase.</p>
+        <p className="text-[11px] opacity-50">{tp("fileUploadZone.filesCount", { count: files.length, max: maxFiles })}</p>
       )}
     </div>
   );

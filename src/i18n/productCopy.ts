@@ -54,17 +54,3 @@ export function useProductT(namespace: string): ProductT {
 export function getProductT(namespace: string): ProductT {
   return withFallback(getSharedT(namespace) as SharedLike, namespace);
 }
-
-/**
- * A currency's name in the host's language, from the browser's own data, so
- * "British Pound" reads "libra esterlina" in Portuguese without a key per
- * currency. Falls back to the English name it is given.
- */
-export function currencyDisplayName(code: string, english: string): string {
-  const locale = getProductT("marketplaceUi.productUi.common")("locale");
-  try {
-    const name = new Intl.DisplayNames([locale], { type: "currency" }).of(code);
-    if (name && name !== code) return name.charAt(0).toUpperCase() + name.slice(1);
-  } catch { /* unknown locale or no Intl.DisplayNames */ }
-  return english;
-}

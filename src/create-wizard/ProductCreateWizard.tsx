@@ -36,6 +36,7 @@ import type {
   ProductWizardTier,
 } from "./types";
 
+import { useProductT } from "../i18n/productCopy";
 /**
  * The member "sell a product" wizard, as a component any seller can render.
  *
@@ -168,6 +169,7 @@ function WizardInner({
   isLeader: isLeaderHere, drafts: myDrafts, draftId, draftStepFromUrl,
   syncStepToUrl = true, onLocalResume, sellerPremium,
 }: InnerProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const { tag: communityTag, id: communityId, name: communityName, memberFeeModel, memberRequireApproval, platformFeeRate } = community;
   const hrefs = navigation.hrefs;
   const navigate = navigation.navigate ?? browserNavigate;
@@ -865,9 +867,9 @@ function WizardInner({
           </p>
           <div className="flex shrink-0 items-center gap-2.5">
             {previousStep(steps, step) ? (
-              <WizardButton onClick={goBack} disabled={creating}>Back</WizardButton>
+              <WizardButton onClick={goBack} disabled={creating}>{tp("common.back")}</WizardButton>
             ) : (
-              <WizardButton onClick={cancel} disabled={creating}>Cancel</WizardButton>
+              <WizardButton onClick={cancel} disabled={creating}>{tp("common.cancel")}</WizardButton>
             )}
             {step === "resume" && (
               <WizardButton primary onClick={startSomethingNew} disabled={creating}>
@@ -875,7 +877,7 @@ function WizardInner({
               </WizardButton>
             )}
             {!onFinalStep && step !== "resume" && (
-              <WizardButton primary onClick={goNext} disabled={creating}>Next</WizardButton>
+              <WizardButton primary onClick={goNext} disabled={creating}>{tp("common.next")}</WizardButton>
             )}
             {onFinalStep && submitActions.map((a) => (
               <WizardButton
@@ -897,7 +899,7 @@ function WizardInner({
       >
         <div className="flex flex-col gap-2">
           {!onFinalStep && step !== "resume" && (
-            <WizardButton primary onClick={goNext} disabled={creating}>Next</WizardButton>
+            <WizardButton primary onClick={goNext} disabled={creating}>{tp("common.next")}</WizardButton>
           )}
           {onFinalStep && [...submitActions].sort((a, b) => Number(b.primary) - Number(a.primary)).map((a) => (
             <WizardButton
@@ -915,9 +917,9 @@ function WizardInner({
             </WizardButton>
           )}
           {previousStep(steps, step) ? (
-            <WizardButton onClick={goBack} disabled={creating}>Back</WizardButton>
+            <WizardButton onClick={goBack} disabled={creating}>{tp("common.back")}</WizardButton>
           ) : (
-            <WizardButton onClick={cancel} disabled={creating}>Cancel</WizardButton>
+            <WizardButton onClick={cancel} disabled={creating}>{tp("common.cancel")}</WizardButton>
           )}
         </div>
       </div>

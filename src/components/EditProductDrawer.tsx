@@ -10,6 +10,7 @@ import type { UploadedFile } from "../ui/file-upload-zone";
 import { uploadNewGalleryItems } from "../lib/productMediaUpload";
 import { sameValueLines } from "@cobuntu/management-ui-shared";
 
+import { useProductT } from "../i18n/productCopy";
 interface Props {
   /**
    * The community's product categories, loaded by the consumer — same contract
@@ -38,6 +39,7 @@ interface LinkDeliverable {
 const LINK_URL_RE = /^https?:\/\/\S+$/i;
 
 export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSaved, categories }: Props) {
+  const tp = useProductT("marketplaceUi.productUi");
   const { apiBaseUrl, authHeaders } = useProductManagementConfig();
   const jsonHeaders = useJsonHeaders();
   const formDataRef = useRef<ProductFormData | null>(null);
@@ -85,7 +87,7 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
   function addLinkDraft() {
     const url = linkUrlDraft.trim();
     if (!LINK_URL_RE.test(url)) {
-      setLinkError("Enter a valid http(s) link.");
+      setLinkError(tp("editProductDrawer.enterAValidHttpS"));
       return;
     }
     setNewLinks(prev => [...prev, { url, label: linkLabelDraft.trim() || url }]);
@@ -334,7 +336,7 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
       }
     } catch (err: any) {
       console.error("Save failed:", err.message);
-      setSaveError(err?.message || "Save failed. Please try again.");
+      setSaveError(err?.message || tp("editProductDrawer.saveFailedPleaseTryAgain"));
     } finally {
       setSaving(false);
     }
@@ -352,7 +354,7 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
               <polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/>
             </svg>
           </button>
-          <h2 className="text-[15px] font-semibold text-zinc-900">Edit Product</h2>
+          <h2 className="text-[15px] font-semibold text-zinc-900">{tp("editProductDrawer.editProduct")}</h2>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -382,9 +384,9 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
             */}
           {!isPhysical && (
             <div className="mt-6 pt-6 border-t border-zinc-100">
-              <h3 className="text-[13px] font-semibold text-zinc-900">Link deliverables</h3>
+              <h3 className="text-[13px] font-semibold text-zinc-900">{tp("editProductDrawer.linkDeliverables")}</h3>
               <p className="text-[12px] text-zinc-500 mt-0.5">
-                External links revealed to buyers after purchase. Anyone with the link can open it, so only paying buyers ever see the URL.
+                {tp("editProductDrawer.externalLinksRevealedToBuyers")}
               </p>
 
               {(existingLinks.length > 0 || newLinks.length > 0) && (
@@ -399,9 +401,9 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
                         type="button"
                         onClick={() => link.id && removeExistingLink(link.id)}
                         className="text-[12px] text-zinc-400 hover:text-red-500 cursor-pointer shrink-0"
-                        aria-label={`Remove ${link.label}`}
+                        aria-label={tp("editProductDrawer.remove", { label: link.label })}
                       >
-                        Remove
+                        {tp("common.remove")}
                       </button>
                     </li>
                   ))}
@@ -411,14 +413,14 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
                         <p className="text-[13px] text-zinc-800 truncate">{link.label}</p>
                         <p className="text-[11px] text-zinc-400 truncate">{link.url}</p>
                       </div>
-                      <span className="text-[11px] text-emerald-600 shrink-0">New</span>
+                      <span className="text-[11px] text-emerald-600 shrink-0">{tp("editProductDrawer.new")}</span>
                       <button
                         type="button"
                         onClick={() => removeNewLink(idx)}
                         className="text-[12px] text-zinc-400 hover:text-red-500 cursor-pointer shrink-0"
-                        aria-label={`Remove ${link.label}`}
+                        aria-label={tp("editProductDrawer.remove2", { label: link.label })}
                       >
-                        Remove
+                        {tp("common.remove")}
                       </button>
                     </li>
                   ))}
@@ -430,7 +432,7 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
                   type="text"
                   value={linkLabelDraft}
                   onChange={e => setLinkLabelDraft(e.target.value)}
-                  placeholder="Label (e.g. Download page)"
+                  placeholder={tp("editProductDrawer.labelEGDownloadPage")}
                   className="w-full px-3 py-2 text-[13px] rounded-lg border border-zinc-200 focus:outline-none focus:ring-1 focus:ring-zinc-300"
                 />
                 <div className="flex gap-2">
@@ -448,7 +450,7 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
                     disabled={!linkUrlDraft.trim()}
                     className="px-3 py-2 text-[13px] font-medium bg-zinc-100 text-zinc-700 rounded-lg hover:bg-zinc-200 disabled:opacity-40 cursor-pointer shrink-0"
                   >
-                    Add link
+                    {tp("editProductDrawer.addLink")}
                   </button>
                 </div>
                 {linkError && <p className="text-[12px] text-red-500">{linkError}</p>}
@@ -461,13 +463,13 @@ export function EditProductDrawer({ product, communityTag, isOpen, onClose, onSa
           {saveError && (
             <p className="mr-auto text-[12px] text-red-600 max-w-[60%]">{saveError}</p>
           )}
-          <button onClick={handleClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">Cancel</button>
+          <button onClick={handleClose} className="px-4 py-2 text-[13px] text-zinc-500 rounded-lg hover:bg-zinc-100 cursor-pointer">{tp("common.cancel")}</button>
           <button
             onClick={handleSave}
             disabled={saving}
             className="min-w-[100px] px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-30 cursor-pointer"
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? tp("common.saving") : tp("common.save")}
           </button>
         </div>
       </div>

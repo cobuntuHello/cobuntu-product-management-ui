@@ -14,6 +14,7 @@ import type { StepId } from "./steps";
 import { Eyebrow, StepInput, Switch } from "./_primitives";
 import { isTierLocked } from "./helpers";
 
+import { useProductT } from "../../i18n/productCopy";
 export interface StepViewProps {
   t: DraftTier;
   step: StepId;
@@ -105,6 +106,7 @@ function CapacityStep({
   t: DraftTier;
   onUpdate: (patch: Partial<DraftTier>) => void;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const locked = isTierLocked(t);
   const floor = locked ? t.salesCount : 0;
   const [limited, setLimited] = useState(!!t.capacity);
@@ -128,14 +130,14 @@ function CapacityStep({
     <div>
       <div className="flex items-center justify-between gap-3">
         <Eyebrow help="Unlimited means there is no cap on how many can be sold. Turn it off to set a maximum.">
-          Capacity
+          {tp("common.capacity")}
         </Eyebrow>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[11px] text-zinc-500">Unlimited</span>
+          <span className="text-[11px] text-zinc-500">{tp("common.unlimited")}</span>
           <Switch
             checked={!limited}
             onChange={(next) => toggleUnlimited(next)}
-            label="Unlimited capacity"
+            label={tp("stepView.unlimitedCapacity")}
           />
         </div>
       </div>
@@ -150,11 +152,11 @@ function CapacityStep({
               step="1"
               value={t.capacity}
               onChange={(e) => onUpdate({ capacity: e.target.value })}
-              placeholder="Maximum"
+              placeholder={tp("stepView.maximum")}
             />
           </div>
           {locked && (
-            <p className="text-[10px] text-zinc-400 mt-1">Min {t.salesCount} (already sold).</p>
+            <p className="text-[10px] text-zinc-400 mt-1">{tp("common.minAlreadySold", { count: t.salesCount })}</p>
           )}
         </>
       )}

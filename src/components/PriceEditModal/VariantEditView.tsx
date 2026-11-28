@@ -20,6 +20,7 @@ import {
 import { isTierLocked } from "./helpers";
 import type { MemberPricingRow, MemberPricingTierState } from "./member-pricing";
 
+import { useProductT } from "../../i18n/productCopy";
 /**
  * VariantEditView — the single-scroll variant editor body
  * (feat/product-variants-editor).
@@ -110,6 +111,7 @@ export function VariantEditView({
   publishToggling,
   onOpenStep,
 }: VariantEditViewProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const locked = isTierLocked(t);
 
   const attrs = t.attrs ?? [];
@@ -121,11 +123,11 @@ export function VariantEditView({
   const patchLinks = (next: string[]) => onUpdate({ links: next });
 
   // ── Advanced row values ──
-  const salesVal = t.autoScheduleEnabled ? "Scheduled" : "Always on";
+  const salesVal = t.autoScheduleEnabled ? tp("common.scheduled") : tp("common.alwaysOn");
   const formCount = t.id
     ? (t.hasForm ? t.formFieldCount : 0)
     : (t.draftForm?.fields?.length ?? 0);
-  const formVal = formCount > 0 ? `${formCount} question${formCount !== 1 ? "s" : ""}` : "None";
+  const formVal = formCount > 0 ? `${formCount} question${formCount !== 1 ? "s" : ""}` : tp("common.none");
 
   return (
     <div className="space-y-5">
@@ -143,12 +145,12 @@ export function VariantEditView({
       <div>
         <Eyebrow count={t.name.length} max={TIER_NAME_MAX}
           help="What distinguishes this variant, e.g. “Blue / M” for a physical option or “Personal” for a licence.">
-          Variant name
+          {tp("variantEditView.variantName")}
         </Eyebrow>
         <div className="mt-1">
           <StepInput type="text" value={t.name} maxLength={TIER_NAME_MAX}
             onChange={(e) => onUpdate({ name: e.target.value })}
-            placeholder="e.g. Blue / M — or Personal" />
+            placeholder={tp("variantEditView.eGBlueMOr")} />
         </div>
       </div>
 
@@ -156,12 +158,12 @@ export function VariantEditView({
       <div>
         <Eyebrow count={t.description.length} max={TIER_DESCRIPTION_MAX}
           help="What this variant is. Markdown supported — bold, lists, links.">
-          Description · Markdown · optional
+          {tp("variantEditView.descriptionMarkdownOptional")}
         </Eyebrow>
         <div className="mt-1">
           <StepTextarea value={t.description} maxLength={TIER_DESCRIPTION_MAX}
             onChange={(e) => onUpdate({ description: e.target.value })}
-            placeholder="What this variant is. **Bold**, lists, links supported." rows={3} />
+            placeholder={tp("variantEditView.whatThisVariantIsBold")} rows={3} />
         </div>
       </div>
 
@@ -173,15 +175,15 @@ export function VariantEditView({
           tier the floor is the already-sold count). */}
       <div>
         <Eyebrow help="How many can be sold before this variant is sold out. Leave empty for unlimited.">
-          {isDigital ? "Capacity" : "Stock"}
+          {isDigital ? tp("common.capacity") : tp("common.stock")}
         </Eyebrow>
         <div className="mt-1.5">
           <Stepper
             value={t.capacity}
             onChange={(v) => onUpdate({ capacity: v })}
-            placeholder="Unlimited"
+            placeholder={tp("common.unlimited")}
             min={isTierLocked(t) ? t.salesCount : 0}
-            ariaLabel={isDigital ? "Capacity" : "Stock"}
+            ariaLabel={isDigital ? tp("common.capacity") : tp("common.stock")}
           />
         </div>
       </div>
@@ -202,11 +204,11 @@ export function VariantEditView({
 
       {/* 4 · Other attributes */}
       <div>
-        <Eyebrow>Other attributes</Eyebrow>
+        <Eyebrow>{tp("variantEditView.otherAttributes")}</Eyebrow>
         <p className="text-[12px] text-zinc-500 mt-1 mb-2 leading-relaxed">
           {isDigital
-            ? "Beyond the deliverables above, attributes buyers pick by (e.g. Format), from a defined set — not freeform."
-            : "Beyond condition & parcel above, attributes buyers pick by (Colour, Size, Material…), from a defined set — not freeform."}
+            ? tp("variantEditView.beyondTheDeliverablesAboveAttributes")
+            : tp("variantEditView.beyondConditionParcelAboveAttributes")}
           {" Leave empty for a single-variant product."}
         </p>
         <div className="space-y-1.5">
@@ -218,7 +220,7 @@ export function VariantEditView({
                   onValueChange={(v) => patchAttrs(attrs.map((x, xi) => (xi === i ? { ...x, k: v } : x)))}
                 >
                   <SelectTrigger className="h-[38px] text-[13px]">
-                    <SelectValue placeholder="Attribute…" />
+                    <SelectValue placeholder={tp("variantEditView.attribute")} />
                   </SelectTrigger>
                   <SelectContent>
                     {VARIANT_ATTR_KEYS.map((k) => (
@@ -228,10 +230,10 @@ export function VariantEditView({
                 </Select>
               </div>
               <div className="flex-1 min-w-0">
-                <StepInput type="text" value={a.v} placeholder="Value (e.g. Blue)"
+                <StepInput type="text" value={a.v} placeholder={tp("variantEditView.valueEGBlue")}
                   onChange={(e) => patchAttrs(attrs.map((x, xi) => (xi === i ? { ...x, v: e.target.value } : x)))} />
               </div>
-              <button type="button" aria-label="Remove attribute"
+              <button type="button" aria-label={tp("variantEditView.removeAttribute")}
                 onClick={() => patchAttrs(attrs.filter((_, xi) => xi !== i))}
                 className="p-1 text-zinc-400 hover:text-red-500 cursor-pointer shrink-0">
                 <X className="h-4 w-4" />
@@ -239,12 +241,12 @@ export function VariantEditView({
             </div>
           ))}
         </div>
-        <AddButton label="Add attribute" onClick={() => patchAttrs([...attrs, { k: "", v: "" }])} />
+        <AddButton label={tp("variantEditView.addAttribute")} onClick={() => patchAttrs([...attrs, { k: "", v: "" }])} />
       </div>
 
       {/* 5 + 6 · Pricing + Billing mode — the existing pricing surface. */}
       <div>
-        <Eyebrow>Pricing</Eyebrow>
+        <Eyebrow>{tp("common.pricing")}</Eyebrow>
         <div className="mt-2">
           <BasicsStep
             t={t}
@@ -266,18 +268,18 @@ export function VariantEditView({
           rather than expanding inline. Capacity stays a stepper in the shape
           core (physical: Stock; digital: Capacity) — not a row here. */}
       <div>
-        <Eyebrow>Advanced</Eyebrow>
+        <Eyebrow>{tp("common.advanced")}</Eyebrow>
         <div className="mt-1.5 space-y-2">
           <AdvancedRow
             icon={<Calendar className="h-[17px] w-[17px]" />}
-            label="Sales window"
+            label={tp("common.salesWindow")}
             value={salesVal}
             onClick={() => onOpenStep("config")}
           />
 
           <AdvancedRow
             icon={<ClipboardList className="h-[17px] w-[17px]" />}
-            label="Registration form"
+            label={tp("common.registrationForm")}
             value={formVal}
             onClick={() => onOpenStep("form")}
           />
@@ -287,25 +289,25 @@ export function VariantEditView({
       {/* 8 · Availability — the Published card + info note. */}
       {onTogglePublish && (
         <div>
-          <Eyebrow>Availability</Eyebrow>
+          <Eyebrow>{tp("common.availability")}</Eyebrow>
           <div className="mt-1.5 rounded-xl border border-zinc-200 bg-white">
             <div className="flex items-center gap-3 px-4 py-3.5">
               <span className="text-zinc-500 shrink-0">
                 {t.publishedAt ? <Eye className="h-[18px] w-[18px]" /> : <EyeOff className="h-[18px] w-[18px]" />}
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-[14px] font-semibold text-zinc-900">{t.publishedAt ? "Published" : "Draft"}</p>
+                <p className="text-[14px] font-semibold text-zinc-900">{t.publishedAt ? tp("common.published") : tp("common.draft")}</p>
                 <p className="text-[12.5px] text-zinc-500 mt-0.5">
                   {t.publishedAt
-                    ? "Buyers can see and choose this variant."
-                    : "Hidden from buyers. Only you can see it."}
+                    ? tp("variantEditView.buyersCanSeeAndChoose")
+                    : tp("common.hiddenFromBuyers")}
                 </p>
               </div>
               <Switch
                 checked={!!t.publishedAt}
                 disabled={!!publishToggling}
                 onChange={() => onTogglePublish()}
-                label="Published"
+                label={tp("common.published")}
               />
             </div>
           </div>
@@ -319,8 +321,8 @@ export function VariantEditView({
             <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" style={{ color: "var(--brand-color, #71717a)" }} />
             <p className="text-[12.5px] text-zinc-600 leading-relaxed">
               {draftMode
-                ? <><span className="font-medium text-zinc-800">This choice is saved with the product</span> — nothing goes live until you create it.</>
-                : "Changes here take effect immediately."}
+                ? <><span className="font-medium text-zinc-800">{tp("variantEditView.thisChoiceIsSavedWith")}</span> {tp("variantEditView.nothingGoesLiveUntilYou")}</>
+                : tp("common.changesTakeEffectNow")}
             </p>
           </div>
         </div>
@@ -331,14 +333,15 @@ export function VariantEditView({
 
 /* ── Physical shape core ──────────────────────────────────────────────── */
 function PhysicalCore({ t, onUpdate }: { t: DraftTier; onUpdate: (p: Partial<DraftTier>) => void }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const condition = t.condition ?? "";
   return (
     <div className="space-y-3.5">
       <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">
-        The item · every physical product has these
+        {tp("variantEditView.theItemEveryPhysicalProduct")}
       </p>
       <div>
-        <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">Condition</label>
+        <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">{tp("common.condition")}</label>
         <Select
           value={condition ? condition : NONE}
           onValueChange={(v) => onUpdate({ condition: v === NONE ? "" : v })}
@@ -352,7 +355,7 @@ function PhysicalCore({ t, onUpdate }: { t: DraftTier; onUpdate: (p: Partial<Dra
         </Select>
       </div>
       <div>
-        <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">Parcel size</label>
+        <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">{tp("common.parcelSize")}</label>
         <Select
           value={t.parcelSize || "STANDARD"}
           onValueChange={(v) => onUpdate({ parcelSize: v })}
@@ -380,6 +383,7 @@ function DigitalCore({
   patchFiles: (next: TierFile[]) => void;
   patchLinks: (next: string[]) => void;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const [dragActive, setDragActive] = useState(false);
   // Append picked/dropped files as TierFile rows carrying the live File object.
   const addFiles = (picked: File[]) => {
@@ -393,7 +397,7 @@ function DigitalCore({
           Existing files (edit mode) come through as {id,name,url} rows with no
           `file` — shown but not re-uploaded. */}
       <div>
-        <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">Files</label>
+        <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">{tp("common.files")}</label>
         {files.length > 0 && (
           <div className="space-y-1.5 mb-2.5">
             {files.map((f, i) => (
@@ -401,7 +405,7 @@ function DigitalCore({
                 <FileIcon className="h-[18px] w-[18px] shrink-0" style={{ color: "var(--brand-color, #71717a)" }} />
                 <input
                   value={f.name}
-                  placeholder="Name this file"
+                  placeholder={tp("variantEditView.nameThisFile")}
                   onChange={(e) => patchFiles(files.map((x, xi) => (xi === i ? { ...x, name: e.target.value } : x)))}
                   className="flex-1 min-w-0 bg-transparent border-none outline-none text-[13px] text-zinc-900 placeholder:text-zinc-400 py-0.5"
                 />
@@ -410,7 +414,7 @@ function DigitalCore({
                     {(f.file.size / 1024 / 1024).toFixed(1)} MB
                   </span>
                 )}
-                <button type="button" aria-label="Remove file"
+                <button type="button" aria-label={tp("variantEditView.removeFile")}
                   onClick={() => patchFiles(files.filter((_, xi) => xi !== i))}
                   className="p-1 text-zinc-400 hover:text-red-500 cursor-pointer shrink-0">
                   <X className="h-3.5 w-3.5" />
@@ -439,15 +443,15 @@ function DigitalCore({
             <Upload className="h-[18px] w-[18px]" />
           </span>
           <span className="flex flex-col leading-tight">
-            <span className="text-[13px] font-semibold text-zinc-700">Drag files here or browse</span>
-            <span className="text-[11.5px] text-zinc-400">PDF, ZIP, MP4, images — this is what buyers download</span>
+            <span className="text-[13px] font-semibold text-zinc-700">{tp("variantEditView.dragFilesHereOrBrowse")}</span>
+            <span className="text-[11.5px] text-zinc-400">{tp("variantEditView.pdfZipMp4ImagesThis")}</span>
           </span>
         </label>
       </div>
 
       {/* External links */}
       <div>
-        <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">External links</label>
+        <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">{tp("variantEditView.externalLinks")}</label>
         <div className="space-y-1.5">
           {links.map((l, i) => (
             <div key={i} className="flex items-center gap-2.5">
@@ -456,7 +460,7 @@ function DigitalCore({
                 <StepInput type="url" value={l} placeholder="https://…"
                   onChange={(e) => patchLinks(links.map((x, xi) => (xi === i ? e.target.value : x)))} />
               </div>
-              <button type="button" aria-label="Remove link"
+              <button type="button" aria-label={tp("common.removeLink")}
                 onClick={() => patchLinks(links.filter((_, xi) => xi !== i))}
                 className="p-1 text-zinc-400 hover:text-red-500 cursor-pointer shrink-0">
                 <X className="h-3.5 w-3.5" />
@@ -464,35 +468,33 @@ function DigitalCore({
             </div>
           ))}
         </div>
-        <AddButton label="Add link" onClick={() => patchLinks([...links, ""])} />
+        <AddButton label={tp("common.addLink")} onClick={() => patchLinks([...links, ""])} />
         <p className="text-[11.5px] text-zinc-400 mt-1.5 leading-relaxed">
-          Anything hosted elsewhere the buyer should reach, like a Notion doc, a video, or a Drive folder. Handed over as-is
-          after purchase; accesses aren't tracked or limited.
+          {tp("variantEditView.anythingHostedElsewhereTheBuyer")}
         </p>
       </div>
 
       {/* Licence → licenseTerms */}
       <div>
-        <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">Licence</label>
+        <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">{tp("common.licence")}</label>
         <StepInput type="text" value={t.licenseTerms} maxLength={TIER_LICENSE_TERMS_MAX}
           onChange={(e) => onUpdate({ licenseTerms: e.target.value })}
-          placeholder="e.g. Personal use" />
+          placeholder={tp("variantEditView.eGPersonalUse")} />
       </div>
 
       {/* Downloads per file → maxDownloads — only when >=1 file exists. */}
       {files.length > 0 && (
         <div>
-          <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">Downloads per file, per buyer</label>
+          <label className="block text-[12.5px] font-medium text-zinc-500 mb-1.5">{tp("variantEditView.downloadsPerFilePerBuyer")}</label>
           <Stepper
             value={t.maxDownloads}
             onChange={(v) => onUpdate({ maxDownloads: v })}
-            placeholder="Unlimited"
+            placeholder={tp("common.unlimited")}
             min={0}
             ariaLabel="Downloads per file, per buyer"
           />
           <p className="text-[11.5px] text-zinc-400 mt-2 leading-relaxed">
-            Counted separately for each file. How many times a buyer can re-download a given file after purchase. Leave empty
-            for unlimited. (External links can't be limited.)
+            {tp("variantEditView.countedSeparatelyForEachFile")}
           </p>
         </div>
       )}

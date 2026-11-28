@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { StepInput } from "../_primitives";
 
+import { useProductT } from "../../../i18n/productCopy";
 export interface EditPageBreakFlowProps {
   /** Existing label when editing; empty when creating. */
   initialLabel: string;
@@ -27,6 +28,7 @@ export function EditPageBreakFlow({
   onDelete,
   onBack,
 }: EditPageBreakFlowProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   const [label, setLabel] = useState(initialLabel);
 
   return (
@@ -36,27 +38,27 @@ export function EditPageBreakFlow({
           type="button"
           onClick={onBack}
           className="p-1 -ml-1 text-zinc-500 hover:text-zinc-900 cursor-pointer rounded"
-          aria-label="Back to form fields"
+          aria-label={tp("common.backToFormFields")}
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
         <div className="flex-1 min-w-0">
           <h5 className="text-[13px] font-semibold text-zinc-900">
-            {isEdit ? "Edit page break" : "Add page break"}
+            {isEdit ? tp("editPageBreakFlow.editPageBreak") : tp("common.addPageBreak")}
           </h5>
           <p className="text-[11px] text-zinc-400">
-            Split the form into multiple pages.
+            {tp("editPageBreakFlow.splitTheFormIntoMultiple")}
           </p>
         </div>
       </div>
 
       <div>
-        <label className="block text-[11px] font-medium text-zinc-600 mb-1">Page title (optional)</label>
+        <label className="block text-[11px] font-medium text-zinc-600 mb-1">{tp("common.pageTitleOptional")}</label>
         <StepInput
           type="text"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
-          placeholder="e.g. Tell us about your business"
+          placeholder={tp("editPageBreakFlow.eGTellUsAbout")}
           autoFocus
         />
       </div>
@@ -68,7 +70,7 @@ export function EditPageBreakFlow({
             onClick={onDelete}
             className="px-3 py-1.5 text-[12px] font-medium text-red-500 hover:bg-red-50 rounded-lg cursor-pointer"
           >
-            Remove page break
+            {tp("editPageBreakFlow.removePageBreak")}
           </button>
         ) : <span />}
         <button
@@ -76,7 +78,7 @@ export function EditPageBreakFlow({
           onClick={() => onSave(label)}
           className="px-3 py-1.5 text-[12px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
         >
-          {isEdit ? "Done" : "Add page break"}
+          {isEdit ? tp("common.done") : tp("common.addPageBreak")}
         </button>
       </div>
     </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ModalShell } from "../ui/modal-shell";
 
+import { useProductT } from "../i18n/productCopy";
 /**
  * What the host app gets to draw the link as a QR code.
  *
@@ -74,9 +75,10 @@ export function productShareImage(product: any): string | null {
  * The copy is English, like the rest of this package's manage surface.
  */
 export function ShareModal({ productId, communityTag, productName, onClose, product, publicUrlBase = "/marketplace/", renderQr }: Props) {
+  const tp = useProductT("marketplaceUi.productUi");
   const [copied, setCopied] = useState(false);
   const url = `https://${communityTag}.cobuntu.com${publicUrlBase}${productId}`;
-  const message = `Check out ${productName}: ${url}`;
+  const message = tp("shareModal.checkOut", { productName: productName, url: url });
   const imageUrl = productShareImage(product);
 
   // A "Copied!" left over from another link must not claim this one is copied.
@@ -93,16 +95,16 @@ export function ShareModal({ productId, communityTag, productName, onClose, prod
   const targets: ShareTargetProps[] = [
     { label: "WhatsApp", tone: "#25D366", href: `https://wa.me/?text=${encodeURIComponent(message)}`, icon: <WhatsAppIcon /> },
     { label: "Facebook", tone: "#1877F2", href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, icon: <FacebookIcon /> },
-    { label: "X", tone: "#000000", href: `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(`Check out ${productName}`)}`, icon: <XIcon /> },
+    { label: "X", tone: "#000000", href: `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(tp("shareModal.checkOut2", { productName: productName }))}`, icon: <XIcon /> },
     { label: "LinkedIn", tone: "#0A66C2", href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`, icon: <LinkedInIcon /> },
-    { label: "Email", tone: "#5b6470", href: `mailto:?subject=${encodeURIComponent(productName)}&body=${encodeURIComponent(message)}`, icon: <EmailIcon />, isMailto: true },
+    { label: tp("shareModal.email"), tone: "#5b6470", href: `mailto:?subject=${encodeURIComponent(productName)}&body=${encodeURIComponent(message)}`, icon: <EmailIcon />, isMailto: true },
   ];
 
   return (
     <ModalShell onClose={onClose} width="w-[420px]">
       {/* No visible title (the product is the headline, as on the profile
           sheet), so screen readers still hear what it is. */}
-      <h3 className="sr-only">Share</h3>
+      <h3 className="sr-only">{tp("shareModal.share")}</h3>
       <CloseButton onClick={onClose} />
 
       {renderQr ? (
@@ -122,14 +124,14 @@ export function ShareModal({ productId, communityTag, productName, onClose, prod
 
       <div className="-mx-6 my-4" style={{ borderTop: DIVIDER }} />
 
-      <p className="text-[10px] font-semibold uppercase tracking-wider opacity-50 mb-3">Share via</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wider opacity-50 mb-3">{tp("shareModal.shareVia")}</p>
       <div className="grid grid-cols-5 gap-1.5">
         {targets.map((s) => <ShareTarget key={s.label} {...s} />)}
       </div>
 
       <div className="-mx-6 my-4" style={{ borderTop: DIVIDER }} />
 
-      <p className="text-[10px] font-semibold uppercase tracking-wider opacity-50 mb-2">Or copy link</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wider opacity-50 mb-2">{tp("shareModal.orCopyLink")}</p>
       <div className="flex items-center gap-2 px-3 py-2" style={{ background: FIELD_BG, borderRadius: "var(--card-radius, 8px)" }}>
         <span className="text-[12px] flex-1 min-w-0 truncate font-mono opacity-80" title={url}>{url}</span>
         <button
@@ -142,7 +144,7 @@ export function ShareModal({ productId, communityTag, productName, onClose, prod
             color: copied ? "rgb(34,197,94)" : "inherit",
           }}
         >
-          {copied ? "Copied!" : "Copy"}
+          {copied ? tp("shareModal.copied") : tp("shareModal.copy")}
         </button>
       </div>
     </ModalShell>
@@ -150,11 +152,12 @@ export function ShareModal({ productId, communityTag, productName, onClose, prod
 }
 
 function CloseButton({ onClick }: { onClick: () => void }) {
+  const tp = useProductT("marketplaceUi.productUi");
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label="Close"
+      aria-label={tp("common.close")}
       className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer opacity-60 hover:opacity-100 transition-opacity"
       style={{ background: FIELD_BG, color: "inherit" }}
     >
