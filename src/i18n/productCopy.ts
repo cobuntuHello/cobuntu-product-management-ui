@@ -44,7 +44,7 @@ function withFallback(shared: SharedLike, namespace: string): ProductT {
   };
 }
 
-/** `const tp = useProductT("marketplaceUi.productUi.productForm")`, then `tp("addVariant")`. */
+/** `const tp = useProductT("marketplaceUi.productUi")`, then `tp("common.addVariant")`. */
 export function useProductT(namespace: string): ProductT {
   const shared = useSharedT(namespace);
   return useMemo(() => withFallback(shared as SharedLike, namespace), [shared, namespace]);
