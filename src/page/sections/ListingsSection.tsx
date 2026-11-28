@@ -92,7 +92,7 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
       const res = await fetch(`${API}/api/listings/self-list`, {
         method: "POST", headers: jsonHeaders(), body: JSON.stringify({ productId, communityTag: c.communityTag }),
       });
-      if (res.ok) { showToast(tp("listingsSection.listedIn") + c.communityName); handleRefresh(); setShowAddModal(false); }
+      if (res.ok) { showToast(tp("listingsSection.listedIn", { name: c.communityName })); handleRefresh(); setShowAddModal(false); }
       else { const err = await res.json().catch(() => ({})); showToast(err.error || tp("common.failedToList")); }
     } catch { showToast(tp("common.failedToList")); }
     finally { setSaving(false); }
@@ -104,7 +104,7 @@ export function ListingsSection({ productId, communityTag, isOpen, onClose, onSh
       const res = await fetch(`${API}/api/listings/request`, {
         method: "POST", headers: jsonHeaders(), body: JSON.stringify({ productId, communityTag: c.communityTag }),
       });
-      if (res.ok) { showToast(tp("listingsSection.listingRequestSentTo") + c.communityName); handleRefresh(); setShowAddModal(false); }
+      if (res.ok) { showToast(tp("listingsSection.listingRequestSentTo", { name: c.communityName })); handleRefresh(); setShowAddModal(false); }
       else { const err = await res.json().catch(() => ({})); showToast(err.error || tp("common.failedToRequest")); }
     } catch { showToast(tp("common.failedToRequest")); }
     finally { setSaving(false); }

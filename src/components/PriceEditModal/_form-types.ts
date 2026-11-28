@@ -3,6 +3,8 @@
  * the standalone /form page that the redesign retires.
  */
 
+import { getProductT } from "../../i18n/productCopy";
+
 export interface FormFieldOption {
   id: string;
   label: string;
@@ -127,12 +129,12 @@ export function makeBlankField(type: FieldType): FormField {
   return {
     id: `field-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     type,
-    label: fieldTypeMeta(type)?.label || "Field",
+    label: fieldTypeMeta(type) ? getProductT("marketplaceUi.productUi")(`formFieldTypes.${type}.label`) : getProductT("marketplaceUi.productUi")("formFieldTypes.field"),
     required: type === "EMAIL",
     options: fieldHasOptions(type)
       ? [
-          { id: "opt-1", label: "Option 1" },
-          { id: "opt-2", label: "Option 2" },
+          { id: "opt-1", label: getProductT("marketplaceUi.productUi")("formFieldTypes.optionN", { n: 1 }) },
+          { id: "opt-2", label: getProductT("marketplaceUi.productUi")("formFieldTypes.optionN", { n: 2 }) },
         ]
       : undefined,
   };

@@ -19,6 +19,7 @@ import {
   type DraftTier,
 } from "./types";
 
+import { getProductT } from "../../i18n/productCopy";
 export function getSymbol(code: string): string {
   return SUPPORTED_CURRENCIES.find((c) => c.code === code)?.symbol || code;
 }
@@ -94,7 +95,7 @@ export function blankTier(seed: BlankTierSeed = {}): DraftTier {
   const indexHint = seed.indexHint ?? 1;
   return {
     localId: newLocalId(),
-    name: indexHint === 1 ? "Standard" : `Variant ${indexHint}`,
+    name: indexHint === 1 ? getProductT("marketplaceUi.productUi")("productTiersAndDonations.standard") : getProductT("marketplaceUi.productUi")("priceEditModal.variantN", { n: indexHint }),
     description: "",
     licenseTerms: "",
     maxDownloads: "",
@@ -170,24 +171,24 @@ export function loadDonationFromProduct(product: { donationConfig?: unknown; cur
  *  length + auto-schedule rules with the product's four-of-none
  *  installment + pwyw-min rules. */
 export function validateTier(t: DraftTier): string | null {
-  if (!t.name.trim()) return "Tier name is required";
+  if (!t.name.trim()) return getProductT("marketplaceUi.productUi")("common.tierNameIsRequired");
   if (t.name.length > TIER_NAME_MAX) {
-    return `Tier name must be ${TIER_NAME_MAX} characters or fewer.`;
+    return getProductT("marketplaceUi.productUi")("validation.tierNameTooLong", { max: TIER_NAME_MAX });
   }
   // `?? ""` on each of these: validation must never be the thing that throws.
   // It runs inside the Save handler, so a TypeError here does not surface as a
   // validation message - it kills the save outright and the button goes dead.
   // normalizeDraftTier fills these at the seam; this is the belt to that brace.
   if ((t.description ?? "").length > TIER_DESCRIPTION_MAX) {
-    return `Description for "${t.name}" must be ${TIER_DESCRIPTION_MAX} characters or fewer.`;
+    return getProductT("marketplaceUi.productUi")("validation.descriptionTooLong", { name: t.name, max: TIER_DESCRIPTION_MAX });
   }
   if ((t.licenseTerms ?? "").length > TIER_LICENSE_TERMS_MAX) {
-    return `License terms for "${t.name}" must be ${TIER_LICENSE_TERMS_MAX} characters or fewer.`;
+    return getProductT("marketplaceUi.productUi")("validation.licenseTooLong", { name: t.name, max: TIER_LICENSE_TERMS_MAX });
   }
   if ((t.maxDownloads ?? "").trim()) {
     const n = Number(t.maxDownloads);
     if (!Number.isInteger(n) || n < 1) {
-      return `Max downloads for "${t.name}" must be a whole number of 1 or more, or blank for unlimited.`;
+      return getProductT("marketplaceUi.productUi")("validation.maxDownloads", { name: t.name });
     }
   }
   // Pay what you want takes no price: the buyer names it. The seller MAY
@@ -197,21 +198,21 @@ export function validateTier(t: DraftTier): string | null {
   if (t.priceMode === "pwyw") {
     const suggested = (t.price ?? "").trim();
     if (suggested && (isNaN(parseFloat(suggested)) || parseFloat(suggested) < 0)) {
-      return `Suggested price for "${t.name}" must be a non-negative number, or blank for none.`;
+      return getProductT("marketplaceUi.productUi")("validation.suggestedPrice", { name: t.name });
     }
     if (t.pwywMin.trim()) {
       const min = parseFloat(t.pwywMin);
       if (isNaN(min) || min < 0) {
-        return `Minimum amount for "${t.name}" must be a non-negative number.`;
+        return getProductT("marketplaceUi.productUi")("validation.minimumAmount", { name: t.name });
       }
       // The buyer's amount starts at the suggestion, so one under the floor
       // would open checkout on an amount it then refuses.
       if (suggested && parseFloat(suggested) > 0 && parseFloat(suggested) < min) {
-        return `Suggested price for "${t.name}" can't be below its minimum amount.`;
+        return getProductT("marketplaceUi.productUi")("validation.suggestedBelowMinimum", { name: t.name });
       }
     }
   } else if (t.price === "" || isNaN(parseFloat(t.price))) {
-    return `Price required for "${t.name}"`;
+    return getProductT("marketplaceUi.productUi")("validation.priceRequired", { name: t.name });
   }
   if (t.installmentEnabled) {
     const total = parseFloat(t.installmentTotal);
@@ -219,16 +220,16 @@ export function validateTier(t: DraftTier): string | null {
     const interval = parseInt(t.installmentInterval, 10);
     const access = parseInt(t.installmentAccessMonths, 10);
     if (isNaN(total) || total <= 0) {
-      return `Installment total for "${t.name}" must be a positive number.`;
+      return getProductT("marketplaceUi.productUi")("validation.installmentTotal", { name: t.name });
     }
     if (isNaN(count) || count < 2) {
-      return `Installment count for "${t.name}" must be at least 2.`;
+      return getProductT("marketplaceUi.productUi")("validation.installmentCount", { name: t.name });
     }
     if (isNaN(interval) || interval < 1) {
-      return `Installment interval for "${t.name}" must be at least 1 month.`;
+      return getProductT("marketplaceUi.productUi")("validation.installmentInterval", { name: t.name });
     }
     if (isNaN(access) || access < 1) {
-      return `Access duration for "${t.name}" must be at least 1 month.`;
+      return getProductT("marketplaceUi.productUi")("validation.accessDuration", { name: t.name });
     }
   }
   // Auto-schedule sales window. Enabling it with no bounds at all is a
@@ -237,13 +238,13 @@ export function validateTier(t: DraftTier): string | null {
   // close must be strictly after open.
   if (t.autoScheduleEnabled) {
     if (!t.salesStartAt && !t.salesEndAt) {
-      return `Set a sales-open or sales-close date for "${t.name}", or turn off auto-schedule.`;
+      return getProductT("marketplaceUi.productUi")("validation.scheduleDates", { name: t.name });
     }
     if (t.salesStartAt && t.salesEndAt) {
       const start = new Date(t.salesStartAt).getTime();
       const end = new Date(t.salesEndAt).getTime();
       if (Number.isFinite(start) && Number.isFinite(end) && end <= start) {
-        return `Sales close must be after sales open for "${t.name}".`;
+        return getProductT("marketplaceUi.productUi")("validation.scheduleOrder", { name: t.name });
       }
     }
   }
@@ -255,22 +256,22 @@ export function validateDonation(d: DonationDraft): string | null {
   if (d.mode === "fixed") {
     const trimmed = d.amounts.map((a) => a.trim());
     const hasBlank = trimmed.some((a) => a === "");
-    if (hasBlank) return "Fill in or remove blank donation amounts.";
+    if (hasBlank) return getProductT("marketplaceUi.productUi")("validation.blankDonationAmounts");
     const invalid = trimmed.find((a) => {
       const n = parseFloat(a);
       return isNaN(n) || n <= 0;
     });
     if (invalid !== undefined) {
-      return `Donation amount "${invalid}" must be a positive number.`;
+      return getProductT("marketplaceUi.productUi")("validation.donationAmount", { amount: invalid });
     }
     if (trimmed.length === 0) {
-      return "At least one donation amount is required when fixed mode is enabled.";
+      return getProductT("marketplaceUi.productUi")("validation.donationAmountsRequired");
     }
   }
   if (d.mode === "pwyw" && d.minAmount.trim()) {
     const n = parseFloat(d.minAmount);
     if (isNaN(n) || n < 0) {
-      return "Minimum donation must be a non-negative number.";
+      return getProductT("marketplaceUi.productUi")("validation.minimumDonation");
     }
   }
   return null;

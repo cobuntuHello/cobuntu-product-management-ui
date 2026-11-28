@@ -586,7 +586,7 @@ export function BuyersView({
                                         <p className="text-[13px] text-zinc-900 truncate">{p.name || p.email}</p>
                                     )}
                                     <p className="text-[11px] text-zinc-400 truncate">
-                                        {p.saleId ? tp("buyersView.boughtAsAGift") : p.kind === "ADD" ? tp("buyersView.added") : tp("buyersView.gift")}{p.name ? `${p.email} · ` : ""}{tp("buyersView.noAccountYet")}
+                                        {p.saleId ? tp("common.boughtAsGift") : p.kind === "ADD" ? tp("common.added") : tp("common.gift")}{" · "}{p.name ? `${p.email} · ` : ""}{tp("buyersView.noAccountYet")}
                                         {` · Emailed ${shortDate(p.lastSentAt || p.createdAt)}`}
                                     </p>
                                 </div>

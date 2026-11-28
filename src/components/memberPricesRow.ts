@@ -13,6 +13,7 @@ import { formatMoney } from "@cobuntu/management-ui-shared";
 import type { DraftTier } from "./PriceEditModal/types";
 import type { CommunitySegment, MemberPricingUpsert } from "./PriceEditModal/member-pricing";
 
+import { getProductT } from "../i18n/productCopy";
 /**
  * A variant a member price means something on: one that charges, including
  * pay-what-you-want, and a "Paid" variant whose price is still blank (the
@@ -29,11 +30,11 @@ export function variantTakesMemberPricing(t: Pick<DraftTier, "price" | "priceMod
 function describe(row: MemberPricingUpsert, currency: string): string {
   switch (row.mode) {
     case "FREE":
-      return "free";
+      return getProductT("marketplaceUi.productUi")("memberPrices.free");
     case "PERCENT_OFF":
-      return `${row.value ?? 0}% off`;
+      return getProductT("marketplaceUi.productUi")("memberPrices.percentOff", { value: row.value ?? 0 });
     case "FLAT_OFF":
-      return `${formatMoney(row.value ?? 0, currency.toUpperCase())} off`;
+      return getProductT("marketplaceUi.productUi")("memberPrices.amountOff", { amount: formatMoney(row.value ?? 0, currency.toUpperCase()) });
     case "FIXED_PRICE":
     default:
       return formatMoney(row.value ?? 0, currency.toUpperCase());
@@ -51,6 +52,6 @@ export function memberPricingSummary(
 ): string | null {
   const rows = (t.draftMemberPricing ?? []).filter((r) => !!r?.segmentId);
   if (rows.length === 0) return null;
-  const nameOf = (id: string) => segments.find((s) => s.id === id)?.name || "A tier";
+  const nameOf = (id: string) => segments.find((s) => s.id === id)?.name || getProductT("marketplaceUi.productUi")("memberPrices.aTier");
   return rows.map((r) => `${nameOf(r.segmentId)} ${describe(r, t.currency || "EUR")}`).join(" · ");
 }
