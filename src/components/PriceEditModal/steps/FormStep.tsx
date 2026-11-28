@@ -526,7 +526,7 @@ function SortableFieldRow({
           )}
         </div>
         <p className="text-[10px] text-zinc-400 truncate">
-          {meta?.label || field.type}
+          {meta ? tp(`formFieldTypes.${meta.type}.label`) : field.type}
           {field.description ? ` · ${field.description}` : ""}
         </p>
       </div>

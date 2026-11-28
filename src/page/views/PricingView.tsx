@@ -16,6 +16,7 @@ import { useProductManagementConfig, useJsonHeaders } from "../../config";
 import { useCanEdit } from "../../lib/manageAccess";
 import type { MemberPricingScope } from "../../components/MemberPricingSection";
 
+import { useProductT, getProductT } from "../../i18n/productCopy";
 /**
  * PRICING TAB — the variant list, as the create wizard shows it.
  *
@@ -103,9 +104,9 @@ function Fact({ k, v, color }: { k: string; v: string; color?: string }) {
  */
 function priceLabel(t: any): string {
   const cur = t?.products?.currency || "EUR";
-  if (t?.priceMode === "pwyw") return "Pay what you want";
+  if (t?.priceMode === "pwyw") return getProductT("marketplaceUi.productUi")("common.payWhatYouWant");
   const minor = Number(t?.products?.price ?? 0);
-  if (!minor || minor <= 0) return "Free";
+  if (!minor || minor <= 0) return getProductT("marketplaceUi.productUi")("common.free");
   const base = `${getSymbol(cur)}${toDisplay(minor, cur).toFixed(2)}`;
   return t?.products?.isRecurring
     ? `${base}/${t.products.recurringInterval === "yearly" ? "yr" : "mo"}`
@@ -122,6 +123,7 @@ export function PricingView({
   showMemberPricing,
   memberPricingScope,
 }: PricingViewProps) {
+  const tp = useProductT("marketplaceUi.productUi");
   /** A tier id, "__new__", or null. */
   const [editingTier, setEditingTier] = useState<string | null>(null);
 
@@ -186,10 +188,10 @@ export function PricingView({
         throw new Error(e.error || "Failed to save donation settings");
       }
       setDonationDirty(false);
-      showToast("Donations updated");
+      showToast(tp("pricingView.donationsUpdated"));
       onUpdate();
     } catch (e: any) {
-      showToast(e?.message || "Failed to save donation settings");
+      showToast(e?.message || tp("pricingView.failedToSaveDonationSettings"));
     } finally {
       setSavingDonation(false);
     }
@@ -214,8 +216,8 @@ export function PricingView({
       <div>
         {/* The one heading style every Pricing section shares (approved redesign, 2026-11-16). */}
         <PricingSectionHeading
-          title="Variants"
-          description={`Each variant is a version buyers can purchase, with its own price, capacity and${isPhysical ? " stock" : " downloadable content"}. Open one to edit it.`}
+          title={tp("pricingView.variants")}
+          description={tp("pricingView.eachVariantIsAVersion", { kind: isPhysical ? "physical" : "digital" })}
         />
 
         {tiers.length > 0 && (
@@ -240,7 +242,7 @@ export function PricingView({
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[14px] font-semibold text-zinc-800 truncate">
-                        {t?.name?.trim() || "Unnamed variant"}
+                        {t?.name?.trim() || tp("common.unnamedVariant")}
                       </p>
                       <p className="text-[12px] text-zinc-400 mt-0.5 truncate">{priceLabel(t)}</p>
                     </div>
@@ -251,17 +253,17 @@ export function PricingView({
                       "Licence: Not set" on a boxed item would mislead rather
                       than teach. */}
                   <div className="flex flex-wrap border-t border-zinc-100">
-                    <Fact k="Capacity" v={cap != null && cap > 0 ? String(cap) : "Unlimited"} />
+                    <Fact k="Capacity" v={cap != null && cap > 0 ? String(cap) : tp("common.unlimited")} />
                     {!isPhysical && (
                       <Fact
                         k="Licence"
-                        v={t?.licenseTerms && String(t.licenseTerms).trim() ? "Set" : "Not set"}
+                        v={t?.licenseTerms && String(t.licenseTerms).trim() ? tp("common.set") : tp("common.notSet")}
                       />
                     )}
-                    <Fact k="Sign-up form" v={hasForm ? "Linked" : "Not set"} />
+                    <Fact k="Sign-up form" v={hasForm ? tp("common.linked") : tp("common.notSet")} />
                     <Fact
                       k="Status"
-                      v={published ? "Published" : "Draft"}
+                      v={published ? tp("common.published") : tp("common.draft")}
                       color={published ? "#15803d" : "#a16207"}
                     />
                   </div>
@@ -298,7 +300,7 @@ export function PricingView({
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            Add variant
+            {tp("common.addVariant")}
           </button>
         )}
       </div>
@@ -340,7 +342,7 @@ export function PricingView({
               disabled={savingDonation}
               className="px-4 py-2 text-[13px] font-medium rounded-lg bg-zinc-900 text-white cursor-pointer disabled:opacity-40"
             >
-              {savingDonation ? "Saving..." : "Save donations"}
+              {savingDonation ? tp("common.saving") : tp("pricingView.saveDonations")}
             </button>
           </div>
         )}

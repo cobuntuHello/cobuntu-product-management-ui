@@ -2,6 +2,7 @@
 
 import * as React from "react";
 
+import { getProductT } from "../i18n/productCopy";
 /**
  * The product manage tabs.
  *
@@ -228,7 +229,7 @@ export function ProductSectionsNav({
                   : "text-zinc-400 hover:text-zinc-700 border-transparent"
               }`}
             >
-              {s.label}
+              {getProductT("marketplaceUi.productUi")(`productSectionsNav.${s.key}`)}
             </button>
           );
         })}

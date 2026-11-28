@@ -65,7 +65,7 @@ export function EditFieldFlow({
           <h5 className="text-[13px] font-semibold text-zinc-900">
             {isNew ? tp("editFieldFlow.newQuestion") : tp("editFieldFlow.editQuestion")}
           </h5>
-          <p className="text-[11px] text-zinc-400">{meta?.label || draft.type}</p>
+          <p className="text-[11px] text-zinc-400">{meta ? tp(`formFieldTypes.${meta.type}.label`) : draft.type}</p>
         </div>
       </div>
 

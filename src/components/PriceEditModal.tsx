@@ -1048,7 +1048,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
   const tierName = activeDraft?.name?.trim() || tp("priceEditModal.untitledVariant");
   const title =
     activeDraft && activeStep
-      ? STEP_TITLES[activeStep]
+      ? tp(`priceEditModal.steps.${activeStep}.title`)
       : activeDraft
         ? tierName
         : isEmpty
@@ -1058,7 +1058,7 @@ export function PriceEditModal({ product, communityTag, productId, onClose, onSa
             : tp("priceEditModal.pricingTiers");
   const subtitle =
     activeDraft && activeStep
-      ? STEP_SUBTITLES[activeStep]
+      ? tp(`priceEditModal.steps.${activeStep}.subtitle`)
       : activeDraft
         ? tp("priceEditModal.buyersPickOneAtCheckout")
         : tp("priceEditModal.tiersDonationsAndPerTier");

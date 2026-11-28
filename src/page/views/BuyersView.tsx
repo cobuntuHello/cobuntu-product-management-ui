@@ -13,6 +13,7 @@ import {
 import { buyersExportTable } from "./buyersExport";
 import { ModalShell } from "../helpers";
 
+import { useProductT } from "../../i18n/productCopy";
 /**
  * Who has this product, and who was asked to buy it.
  *
@@ -128,6 +129,7 @@ export function BuyersView({
     communityTag?: string | null;
     currentUserId?: string | null;
 }) {
+  const tp = useProductT("marketplaceUi.productUi");
     const { apiBaseUrl, authHeaders, UserAvatar: ConfigAvatar, undoSeconds: configUndo } = useProductManagementConfig();
     /* Seconds to change their mind before anyone is emailed (add-vs-gift.md phase 5). */
     const undoSeconds = configUndo ?? 8;
@@ -260,22 +262,22 @@ export function BuyersView({
             soldOut: typeof t.remaining === "number" && t.remaining <= 0,
         })),
         copy: {
-            stepLabel: "Choose a variant",
-            subtitle: "Which one are you giving away? This uses up that variant's stock.",
+            stepLabel: tp("buyersView.chooseAVariant"),
+            subtitle: tp("buyersView.whichOneAreYouGiving"),
             remaining: (n) => `${n} left`,
-            unlimited: "No limit",
-            soldOut: "Out of stock",
-            allFull: "Every variant is out of stock. Add stock to give one away.",
+            unlimited: tp("buyersView.noLimit"),
+            soldOut: tp("buyersView.outOfStock"),
+            allFull: tp("buyersView.everyVariantIsOutOf"),
             summary: (n, name) => `${n} going to ${name}`,
             overBy: (n, name) => `${n} more than ${name} has left.`,
-            importPreviewTitle: "Check this import",
+            importPreviewTitle: tp("buyersView.checkThisImport"),
             importReady: (n) => `${n} ${n === 1 ? "row" : "rows"} will be added.`,
             importProblems: (n) => `${n} ${n === 1 ? "row" : "rows"} cannot be added.`,
-            problemUnknownTier: (name) => `No variant called "${name}"`,
-            problemNoTier: "No variant chosen",
-            problemTierFull: "That variant is out of stock",
-            importConfirm: "Give these",
-            importCancel: "Discard import",
+            problemUnknownTier: (name) => tp("buyersView.noVariantCalled", { name: name }),
+            problemNoTier: tp("buyersView.noVariantChosen"),
+            problemTierFull: tp("buyersView.thatVariantIsOutOf"),
+            importConfirm: tp("buyersView.giveThese"),
+            importCancel: tp("buyersView.discardImport"),
         },
     } : undefined;
 
@@ -372,12 +374,12 @@ export function BuyersView({
                 headers: jsonHeaders(),
                 body: JSON.stringify({ name }),
             });
-            if (!res.ok) { showToast("Could not save the name"); return; }
+            if (!res.ok) { showToast(tp("common.couldNotSaveName")); return; }
             setPendingGrants((prev) => prev.map((x) => (x.id === p.id ? { ...x, name } : x)));
             setRenamingId(null);
-            showToast("Name saved");
+            showToast(tp("buyersView.nameSaved"));
         } catch {
-            showToast("Could not save the name");
+            showToast(tp("common.couldNotSaveName"));
         }
     }
 
@@ -394,9 +396,9 @@ export function BuyersView({
                 // At most once a day: a second press the same day sends nothing.
                 const body = await res.json().catch(() => ({}));
                 await load();
-                showToast(body?.alreadySentToday ? "Already sent today" : "Gift email sent again");
+                showToast(body?.alreadySentToday ? tp("buyersView.alreadySentToday") : tp("buyersView.giftEmailSentAgain"));
             } else {
-                setError("Could not send the gift email again");
+                setError(tp("buyersView.couldNotSendTheGift"));
             }
         } finally {
             setResendingId(null);
@@ -413,10 +415,10 @@ export function BuyersView({
             });
             if (res.ok || res.status === 404) {
                 await load();
-                showToast("Gift taken back");
+                showToast(tp("common.giftTakenBack"));
                 setConfirmRevokePending(null);
             } else {
-                setError("Could not remove that access");
+                setError(tp("common.couldNotRemoveAccess"));
             }
         } finally {
             setBusy(false);
@@ -434,10 +436,10 @@ export function BuyersView({
             if (res.ok) {
                 await load();
                 await onUpdate();
-                showToast("Gift taken back");
+                showToast(tp("common.giftTakenBack"));
                 setConfirmRevoke(null);
             } else {
-                setError("Could not remove that access");
+                setError(tp("common.couldNotRemoveAccess"));
             }
         } finally {
             setBusy(false);
@@ -461,7 +463,7 @@ export function BuyersView({
             {hasPeople && (
                 <div className="flex justify-end mb-3">
                     <ExportMenu
-                        label="Export"
+                        label={tp("buyersView.export")}
                         onExport={exportBuyers}
                         data-testid="buyers-export"
                         className="px-3 py-1.5 text-[12px] font-medium text-zinc-600 border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer"
@@ -474,14 +476,14 @@ export function BuyersView({
                 title of the section it actually acts on, rather than grouped
                 together above all three sections where neither read as
                 belonging to one in particular. */}
-            <Section title="Customers" count={customers?.length} subtitle="One row per checkout, free or paid. The same person can appear more than once.">
+            <Section title={tp("buyersView.customers")} count={customers?.length} subtitle={tp("buyersView.oneRowPerCheckoutFree")}>
                 {customers === null ? (
-                    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
+                    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">{tp("common.loading")}</p></div>
                 ) : customers.length === 0 ? (
                     <CompactEmptyRow
                         icon={<PeopleIcon />}
-                        title="Nobody has bought this yet"
-                        hint="Free or paid checkouts show up here."
+                        title={tp("buyersView.nobodyHasBoughtThisYet")}
+                        hint={tp("buyersView.freeOrPaidCheckoutsShow")}
                     />
                 ) : (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
@@ -497,7 +499,7 @@ export function BuyersView({
                                 >
                                     <UserAvatar user={c.user ?? { id: c.guestEmail ?? c.id }} className="w-8 h-8 shrink-0" />
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-[13px] text-zinc-900 truncate">{c.user?.name || c.guestEmail || "Unknown"}</p>
+                                        <p className="text-[13px] text-zinc-900 truncate">{c.user?.name || c.guestEmail || tp("common.unknown")}</p>
                                         {c.user?.usertag ? (
                                             <p className="text-[11px] text-zinc-400 truncate">@{c.user.usertag}</p>
                                         ) : c.user?.name && c.guestEmail ? (
@@ -523,36 +525,36 @@ export function BuyersView({
 
             <div className="mt-5">
             <Section
-                title="Added and gifted"
+                title={tp("buyersView.addedAndGifted")}
                 count={grants === null ? undefined : grants.length + pendingGrants.length}
-                subtitle="Given free by you or your team. Not a sale."
+                subtitle={tp("buyersView.givenFreeByYouOr")}
                 action={mayEdit ? (
                     <div className="flex items-center gap-2 shrink-0">
                         <button
                             onClick={() => setMode("add")}
                             className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-zinc-100 text-zinc-900 rounded-lg hover:bg-zinc-200 cursor-pointer"
                         >
-                            Add people
+                            {tp("common.addPeople")}
                         </button>
                         <button
                             onClick={() => setMode("grant")}
                             className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 cursor-pointer"
                         >
                             <GiftIcon />
-                            Send a gift
+                            {tp("common.sendAGift")}
                         </button>
                     </div>
                 ) : undefined}
             >
                 {grants === null ? (
-                    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
+                    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">{tp("common.loading")}</p></div>
                 ) : grants.length === 0 && pendingGrants.length === 0 ? (
                     <CompactEmptyRow
                         icon={<PeopleIcon />}
-                        title="Nobody added yet"
+                        title={tp("buyersView.nobodyAddedYet")}
                         hint={isCourse
-                            ? "Add somebody to this course, or give it as a gift with your note."
-                            : "Add somebody to this product, or give it as a gift with your note."}
+                            ? tp("buyersView.addSomebodyToThisCourse")
+                            : tp("buyersView.addSomebodyToThisProduct")}
                     />
                 ) : (
                     <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
@@ -573,18 +575,18 @@ export function BuyersView({
                                                 value={nameDraft}
                                                 onChange={(e) => setNameDraft(e.target.value)}
                                                 maxLength={120}
-                                                aria-label="Their name"
-                                                placeholder="Their name"
+                                                aria-label={tp("common.theirName")}
+                                                placeholder={tp("common.theirName")}
                                                 className="min-w-0 flex-1 border border-zinc-200 rounded-lg px-2 py-1 text-[16px] sm:text-[13px] text-zinc-900 focus:outline-none focus:border-zinc-400"
                                             />
-                                            <button type="submit" disabled={!nameDraft.trim()} className="px-2.5 py-1 text-[12px] font-medium bg-zinc-900 text-white rounded-lg cursor-pointer disabled:opacity-40">Save</button>
-                                            <button type="button" onClick={() => setRenamingId(null)} className="px-2.5 py-1 text-[12px] rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200">Cancel</button>
+                                            <button type="submit" disabled={!nameDraft.trim()} className="px-2.5 py-1 text-[12px] font-medium bg-zinc-900 text-white rounded-lg cursor-pointer disabled:opacity-40">{tp("common.save")}</button>
+                                            <button type="button" onClick={() => setRenamingId(null)} className="px-2.5 py-1 text-[12px] rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200">{tp("common.cancel")}</button>
                                         </form>
                                     ) : (
                                         <p className="text-[13px] text-zinc-900 truncate">{p.name || p.email}</p>
                                     )}
                                     <p className="text-[11px] text-zinc-400 truncate">
-                                        {p.saleId ? "Bought as a gift · " : p.kind === "ADD" ? "Added · " : "Gift · "}{p.name ? `${p.email} · ` : ""}No account yet
+                                        {p.saleId ? tp("buyersView.boughtAsAGift") : p.kind === "ADD" ? tp("buyersView.added") : tp("buyersView.gift")}{p.name ? `${p.email} · ` : ""}{tp("buyersView.noAccountYet")}
                                         {` · Emailed ${shortDate(p.lastSentAt || p.createdAt)}`}
                                     </p>
                                 </div>
@@ -593,7 +595,7 @@ export function BuyersView({
                                         onClick={() => { setNameDraft(p.name ?? ""); setRenamingId(p.id); }}
                                         className="px-3 py-1.5 text-[12px] rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200 shrink-0"
                                     >
-                                        {p.name ? "Edit name" : "Add name"}
+                                        {p.name ? tp("buyersView.editName") : tp("buyersView.addName")}
                                     </button>
                                 )}
                                 {mayEdit && (
@@ -602,7 +604,7 @@ export function BuyersView({
                                         disabled={resendingId === p.id}
                                         className="px-3 py-1.5 text-[12px] rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200 disabled:opacity-50 shrink-0"
                                     >
-                                        {resendingId === p.id ? "Sending…" : "Send again"}
+                                        {resendingId === p.id ? tp("common.sending") : tp("buyersView.sendAgain")}
                                     </button>
                                 )}
                                 {mayEdit && (
@@ -610,7 +612,7 @@ export function BuyersView({
                                         onClick={() => setConfirmRevokePending(p)}
                                         className="px-3 py-1.5 text-[12px] rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200 shrink-0"
                                     >
-                                        Remove
+                                        {tp("common.remove")}
                                     </button>
                                 )}
                             </li>
@@ -619,7 +621,7 @@ export function BuyersView({
                             <li key={g.id} className="flex items-center gap-3 px-5 py-3">
                                 <UserAvatar user={g.users ?? { id: g.userId }} className="w-8 h-8 shrink-0" />
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-[13px] text-zinc-900 truncate">{g.users?.name || "Unknown"}</p>
+                                    <p className="text-[13px] text-zinc-900 truncate">{g.users?.name || tp("common.unknown")}</p>
                                     {g.users?.usertag && (
                                         <p className="text-[11px] text-zinc-400 truncate">@{g.users.usertag}</p>
                                     )}
@@ -627,14 +629,14 @@ export function BuyersView({
                                 {/* Did the gift land? A muted word, not a coloured pill. */}
                                 <span className="text-[11.5px] text-zinc-400 shrink-0">
                                     {/* A gift someone PAID for is a sale, not the host's gift. */}
-                                    {g.kind === "ADD" ? "Added" : `${g.saleId ? "Bought as a gift" : "Gift"} · ${g.openedAt ? `opened ${shortDate(g.openedAt)}` : "not opened yet"}`}
+                                    {g.kind === "ADD" ? tp("common.added") : `${g.saleId ? tp("common.boughtAsGift") : tp("common.gift")} · ${g.openedAt ? `opened ${shortDate(g.openedAt)}` : "not opened yet"}`}
                                 </span>
                                 {mayEdit && (
                                     <button
                                         onClick={() => setConfirmRevoke(g)}
                                         className="px-3 py-1.5 text-[12px] rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200 shrink-0"
                                     >
-                                        Remove
+                                        {tp("common.remove")}
                                     </button>
                                 )}
                             </li>
@@ -647,25 +649,25 @@ export function BuyersView({
 
             <div className="mt-5">
                 <Section
-                    title="Invited"
+                    title={tp("buyersView.invited")}
                     count={invites?.length}
-                    subtitle="Asked to buy it. They still pay."
+                    subtitle={tp("buyersView.askedToBuyItThey")}
                     action={mayEdit ? (
                         <button
                             onClick={() => setMode("invite")}
                             className="shrink-0 px-3 py-1.5 text-[12px] font-medium rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
                         >
-                            Invite to buy
+                            {tp("common.inviteToBuy")}
                         </button>
                     ) : undefined}
                 >
                     {invites === null ? (
-                        <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">Loading…</p></div>
+                        <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden"><p className="px-6 py-10 text-center text-[12px] text-zinc-400">{tp("common.loading")}</p></div>
                     ) : invites.length === 0 ? (
                         <CompactEmptyRow
                             icon={<PeopleIcon />}
-                            title="No invitations sent"
-                            hint="They get an email with your note, and still pay."
+                            title={tp("buyersView.noInvitationsSent")}
+                            hint={tp("buyersView.theyGetAnEmailWith")}
                         />
                     ) : (
                         <div className="rounded-2xl bg-white shadow-sm ring-1 ring-zinc-100 overflow-hidden">
@@ -682,7 +684,7 @@ export function BuyersView({
                                     </div>
                                     {/* Status as a muted word, not a coloured pill. */}
                                     <span className="text-[11.5px] text-zinc-400 shrink-0">
-                                        {i.status === "ACCEPTED" ? "Accepted" : i.status === "CANCELLED" ? "Cancelled" : "Pending"}
+                                        {i.status === "ACCEPTED" ? tp("buyersView.accepted") : i.status === "CANCELLED" ? tp("buyersView.cancelled") : tp("buyersView.pending")}
                                     </span>
                                 </li>
                             ))}
@@ -715,7 +717,7 @@ export function BuyersView({
                             />
                             <div className="min-w-0">
                                 <p className="truncate text-[15px] font-semibold text-zinc-900">
-                                    {detailCustomer.user?.name || detailCustomer.guestEmail || "Customer"}
+                                    {detailCustomer.user?.name || detailCustomer.guestEmail || tp("common.customer")}
                                 </p>
                                 {detailCustomer.user?.usertag && (
                                     <p className="truncate text-[11px] font-normal text-zinc-400">@{detailCustomer.user.usertag}</p>
@@ -758,20 +760,20 @@ export function BuyersView({
                      * address.
                      */
                     emails={{
-                        addRow: (a) => `Send to ${a}`,
-                        importCsv: "Import CSV",
-                        imported: (n) => `Imported ${n} ${n === 1 ? "address" : "addresses"}.`,
-                        importedNothing: "No email addresses in the first column of that file.",
-                        importFailed: "That file could not be read.",
+                        addRow: (a) => tp("buyersView.sendTo", { a: a }),
+                        importCsv: tp("common.importCsv"),
+                        imported: (n) => tp("common.importedAddresses", { count: n }),
+                        importedNothing: tp("common.noEmailsInFile"),
+                        importFailed: tp("common.fileCouldNotBeRead"),
                         noMatchesHint: isCourse
-                            ? "Not a member yet? Type their @usertag, or their full email address. The course is theirs as soon as they join."
-                            : "Not a member yet? Type their @usertag, or their full email address. They can download it from the email, no account needed.",
+                            ? tp("buyersView.notAMemberYetType")
+                            : tp("buyersView.notAMemberYetType2"),
                         /* A name per address, and a nudge when one is empty: a
                            guest otherwise appears as their address
                            (add-vs-gift.md phase 5). */
                         guestName: {
-                            label: "Their names (only you and your team see them)",
-                            placeholder: "Their name",
+                            label: tp("buyersView.theirNamesOnlyYouAnd"),
+                            placeholder: tp("common.theirName"),
                             missing: (n) => `${n} ${n === 1 ? "person has" : "people have"} no name yet. Add it, or send anyway.`,
                         },
                     }}
@@ -779,41 +781,41 @@ export function BuyersView({
                     undo={undoSeconds > 0 ? {
                         seconds: undoSeconds,
                         counting: (n, sec) => mode === "add"
-                            ? `Adding ${n} ${n === 1 ? "person" : "people"} in ${sec}s`
-                            : `Sending ${n} ${n === 1 ? "gift" : "gifts"} in ${sec}s`,
-                        undo: "Undo",
-                        undone: "Nothing was sent. Change anything you need, then send again.",
+                            ? tp("buyersView.addingCountdown", { count: n, sec })
+                            : tp("buyersView.sendingCountdown", { count: n, sec }),
+                        undo: tp("common.undo"),
+                        undone: tp("buyersView.nothingWasSentChangeAnything"),
                     } : undefined}
                     outsiders={awaitingToOffer.length > 0 ? {
-                        label: "Approved, not joined yet",
-                        note: "Hasn't joined yet",
+                        label: tp("buyersView.approvedNotJoinedYet"),
+                        note: tp("buyersView.hasnTJoinedYet"),
                         people: awaitingToOffer,
                     } : undefined}
                     copy={mode === "add" ? {
-                        ...BASE_COPY,
-                        title: "Add people",
-                        pickedSubtitle: "They get it free, with a short email. This is not a sale and not a gift.",
-                        stepTwo: "Review",
-                        confirm: "Add",
-                        confirming: "Adding…",
-                        messageLabel: "Private note (optional)",
-                        messagePlaceholder: "Only you and your team see this, for example \"Paid by transfer\".",
+                        ...baseCopy(tp),
+                        title: tp("common.addPeople"),
+                        pickedSubtitle: tp("buyersView.theyGetItFreeWith"),
+                        stepTwo: tp("common.review"),
+                        confirm: tp("common.add"),
+                        confirming: tp("common.adding"),
+                        messageLabel: tp("buyersView.privateNoteOptional"),
+                        messagePlaceholder: tp("buyersView.onlyYouAndYourTeam"),
                     } : {
-                        ...BASE_COPY,
-                        title: "Send a gift",
-                        pickedSubtitle: "They get it free, with your note. This is not a sale.",
-                        stepTwo: "Write and preview",
-                        confirm: "Send gift",
-                        confirming: "Sending…",
-                        messageLabel: "Your note",
-                        messagePlaceholder: "Add a note. It's in the gift email and stays with the gift.",
+                        ...baseCopy(tp),
+                        title: tp("common.sendAGift"),
+                        pickedSubtitle: tp("buyersView.theyGetItFreeWith2"),
+                        stepTwo: tp("common.writeAndPreview"),
+                        confirm: tp("buyersView.sendGift"),
+                        confirming: tp("common.sending"),
+                        messageLabel: tp("buyersView.yourNote"),
+                        messagePlaceholder: tp("buyersView.addANoteItS"),
                     }}
                     stepTwo={{
                         kind: "compose",
                         maxLength: 1000,
                         preview: (message) => mode === "add" ? (
                             <div className="rounded-xl bg-zinc-50 border border-zinc-100 p-3 text-[12px] text-zinc-600 leading-relaxed">
-                                Each gets a short email saying {product?.name ?? (isCourse ? "the course" : "the product")} is theirs, with a button to open it. Your note stays with your team.
+                                {tp("buyersView.addPreview", { name: product?.name ?? tp(isCourse ? "buyersView.theCourse" : "buyersView.theProduct") })}
                             </div>
                         ) : (
                             <GiftPreview
@@ -829,7 +831,7 @@ export function BuyersView({
                         setMode(null);
                         await load();
                         await onUpdate();
-                        showToast(wasAdd ? "Added" : "Gift sent");
+                        showToast(wasAdd ? tp("common.added") : tp("buyersView.giftSent"));
                     }}
                 />
             )}
@@ -851,31 +853,31 @@ export function BuyersView({
                      * equivalent: a grant writes a row against an account.
                      */
                     emails={{
-                        addRow: (a) => `Invite ${a}`,
-                        importCsv: "Import CSV",
-                        imported: (n) => `Imported ${n} ${n === 1 ? "address" : "addresses"}.`,
-                        importedNothing: "No email addresses in the first column of that file.",
-                        importFailed: "That file could not be read.",
+                        addRow: (a) => tp("buyersView.invite", { a: a }),
+                        importCsv: tp("common.importCsv"),
+                        imported: (n) => tp("common.importedAddresses", { count: n }),
+                        importedNothing: tp("common.noEmailsInFile"),
+                        importFailed: tp("common.fileCouldNotBeRead"),
                     }}
                     copy={{
-                        ...BASE_COPY,
-                        title: "Invite to buy",
-                        pickedSubtitle: "Write your note, then see exactly what lands in their inbox.",
-                        stepTwo: "Write and preview",
-                        confirm: "Send invitations",
-                        confirming: "Sending…",
-                        messageLabel: "Message to everyone",
-                        messagePlaceholder: "Add a note. Anyone you write to individually gets theirs instead.",
+                        ...baseCopy(tp),
+                        title: tp("common.inviteToBuy"),
+                        pickedSubtitle: tp("buyersView.writeYourNoteThenSee"),
+                        stepTwo: tp("common.writeAndPreview"),
+                        confirm: tp("buyersView.sendInvitations"),
+                        confirming: tp("common.sending"),
+                        messageLabel: tp("buyersView.messageToEveryone"),
+                        messagePlaceholder: tp("buyersView.addANoteAnyoneYou"),
                     }}
                     stepTwo={{
                         kind: "compose",
                         maxLength: 500,
                         perRecipient: {
-                            personalize: "Write to them",
-                            personalized: "Has their own message",
-                            save: "Save",
-                            cancel: "Discard",
-                            placeholder: (name) => `Write to ${name} instead of the shared message`,
+                            personalize: tp("buyersView.writeToThem"),
+                            personalized: tp("buyersView.hasTheirOwnMessage"),
+                            save: tp("common.save"),
+                            cancel: tp("common.discard"),
+                            placeholder: (name) => tp("buyersView.writeToInsteadOfThe", { name: name }),
                         },
                         preview: (message) => (
                             <EmailPreview
@@ -891,34 +893,33 @@ export function BuyersView({
                         setMode(null);
                         await load();
                         await onUpdate();
-                        showToast("Invitations sent");
+                        showToast(tp("buyersView.invitationsSent"));
                     }}
                 />
             )}
 
             {confirmRevoke && (
                 <ModalShell onClose={() => setConfirmRevoke(null)}>
-                    <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">Take the gift back?</h3>
+                    <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">{tp("common.takeGiftBack")}</h3>
                     <p className="text-[12px] text-zinc-500 mb-4">
-                        {confirmRevoke.users?.name || "This person"} will no longer be able to open{" "}
-                        {product?.name ?? "this product"}.
+                        {tp("buyersView.revokeBody", { who: confirmRevoke.users?.name || tp("buyersView.thisPerson"), name: product?.name ?? tp("buyersView.thisProduct") })}
                         {" "}
                         {/* The thing an operator cannot know from the button alone. */}
-                        If they also BOUGHT it, they keep it — removing a gift does not undo a sale.
+                        {tp("buyersView.ifTheyAlsoBoughtIt")}
                     </p>
                     <div className="flex justify-end gap-2">
                         <button
                             onClick={() => setConfirmRevoke(null)}
                             className="px-4 py-2 text-[13px] rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
                         >
-                            Cancel
+                            {tp("common.cancel")}
                         </button>
                         <button
                             onClick={() => revoke(confirmRevoke)}
                             disabled={busy}
                             className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-40 cursor-pointer"
                         >
-                            {busy ? "Removing…" : "Take it back"}
+                            {busy ? tp("common.removing") : tp("common.takeItBack")}
                         </button>
                     </div>
                 </ModalShell>
@@ -926,24 +927,23 @@ export function BuyersView({
 
             {confirmRevokePending && (
                 <ModalShell onClose={() => setConfirmRevokePending(null)}>
-                    <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">Take the gift back?</h3>
+                    <h3 className="text-[15px] font-semibold text-zinc-900 mb-1">{tp("common.takeGiftBack")}</h3>
                     <p className="text-[12px] text-zinc-500 mb-4">
-                        {confirmRevokePending.name || confirmRevokePending.email} will not get{" "}
-                        {product?.name ?? "this product"} when they join, and the download link in their email stops working.
+                        {tp("buyersView.revokePendingBody", { who: confirmRevokePending.name || confirmRevokePending.email, name: product?.name ?? tp("buyersView.thisProduct") })}
                     </p>
                     <div className="flex justify-end gap-2">
                         <button
                             onClick={() => setConfirmRevokePending(null)}
                             className="px-4 py-2 text-[13px] rounded-lg cursor-pointer bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
                         >
-                            Cancel
+                            {tp("common.cancel")}
                         </button>
                         <button
                             onClick={() => revokePending(confirmRevokePending)}
                             disabled={busy}
                             className="px-4 py-2 text-[13px] font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-40 cursor-pointer"
                         >
-                            {busy ? "Removing…" : "Take it back"}
+                            {busy ? tp("common.removing") : tp("common.takeItBack")}
                         </button>
                     </div>
                 </ModalShell>
@@ -952,26 +952,28 @@ export function BuyersView({
     );
 }
 
-/** Shared between both pickers so the two flows cannot drift in wording. */
-const BASE_COPY = {
-    searchSubtitle: "Search members of this community, or by email.",
-    searchPlaceholder: "Search by name, @usertag or email",
-    emptyHint: "No members to show.",
-    searching: "Searching…",
-    noMatches: "No matches.",
-    unknown: "Unknown",
-    consequencesTitle: "What happens next",
-    stepOne: "Choose people",
-    cancel: "Cancel",
-    back: "Back",
-    membersLabel: "Members",
-    showingLabel: "Showing",
-    allMembersLabel: "All members",
-    selectedLabel: (n: number) => `${n} selected`,
-    selectedTitle: "Selected",
-    clearAll: "Clear all",
-    remove: (name: string) => `Remove ${name}`,
-};
+/** Shared between both pickers so the two flows cannot drift in wording; in the host's language. */
+function baseCopy(tp: (key: string, values?: Record<string, string | number | Date>) => string) {
+    return {
+        searchSubtitle: tp("buyersView.searchSubtitle"),
+        searchPlaceholder: tp("buyersView.searchPlaceholder"),
+        emptyHint: tp("common.noMembersToShow"),
+        searching: tp("common.searching"),
+        noMatches: tp("common.noMatches"),
+        unknown: tp("common.unknown"),
+        consequencesTitle: tp("common.whatHappensNext"),
+        stepOne: tp("buyersView.choosePeople"),
+        cancel: tp("common.cancel"),
+        back: tp("common.back"),
+        membersLabel: tp("common.members"),
+        showingLabel: tp("common.showing"),
+        allMembersLabel: tp("common.allMembers"),
+        selectedLabel: (n: number) => tp("common.selectedCount", { count: n }),
+        selectedTitle: tp("common.selected"),
+        clearAll: tp("common.clearAll"),
+        remove: (name: string) => tp("common.removeName", { name }),
+    };
+}
 
 function Section({
     title, count, subtitle, action, children,
@@ -1070,6 +1072,7 @@ function formatCustomerAmount(grossAmount: number, currency: string): string {
 function EmailPreview({
     productName, price, currency, message,
 }: { productName: string; price: number; currency: string; message: string }) {
+  const tp = useProductT("marketplaceUi.productUi");
     // Cents, like everywhere else on the platform. Always a real currency
     // amount — zero included — never the word "Free".
     let priceLabel: string;
@@ -1082,7 +1085,7 @@ function EmailPreview({
     return (
         <div className="rounded-xl border border-zinc-200 overflow-hidden">
             <div className="px-3 py-1.5 border-b border-zinc-100 bg-zinc-50 text-[11px] text-zinc-400">
-                Email preview
+                {tp("common.emailPreview")}
             </div>
             <div className="p-3.5">
                 <div className="h-10 rounded-md bg-gradient-to-r from-zinc-700 to-zinc-500 mb-2.5" />
@@ -1094,7 +1097,7 @@ function EmailPreview({
                     </p>
                 )}
                 <span className="inline-block mt-3 px-3 py-1.5 rounded-md bg-zinc-900 text-white text-[11.5px] font-medium">
-                    View product
+                    {tp("buyersView.viewProduct")}
                 </span>
             </div>
         </div>
@@ -1116,17 +1119,18 @@ function shortDate(iso: string): string {
  * leave the price tag on a present. Then what happens, in plain words.
  */
 function GiftPreview({ productName, isCourse, message }: { productName: string; isCourse: boolean; message: string }) {
+  const tp = useProductT("marketplaceUi.productUi");
     return (
         <div className="flex flex-col gap-3">
             <div className="rounded-xl border border-zinc-200 overflow-hidden">
                 <div className="px-3 py-1.5 border-b border-zinc-100 bg-zinc-50 text-[11px] text-zinc-400">
-                    Email preview
+                    {tp("common.emailPreview")}
                 </div>
                 <div className="p-3.5 flex flex-col items-center text-center">
                     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-white">
                         <GiftIcon size={16} />
                     </span>
-                    <p className="m-0 mt-2 text-[10.5px] font-bold uppercase tracking-[0.12em] text-zinc-500">A gift for you</p>
+                    <p className="m-0 mt-2 text-[10.5px] font-bold uppercase tracking-[0.12em] text-zinc-500">{tp("buyersView.aGiftForYou")}</p>
                     <p className="m-0 mt-0.5 text-[13px] font-semibold text-zinc-900">{productName}</p>
                     {message.trim() && (
                         <p className="m-0 mt-2.5 w-full rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-2.5 py-2 text-left text-[12px] italic text-zinc-700 whitespace-pre-line">
@@ -1134,17 +1138,17 @@ function GiftPreview({ productName, isCourse, message }: { productName: string; 
                         </p>
                     )}
                     <span className="mt-3 inline-block rounded-md bg-zinc-900 px-3 py-1.5 text-[11.5px] font-medium text-white">
-                        {isCourse ? "Start the course" : "Open your gift"}
+                        {isCourse ? tp("buyersView.startTheCourse") : tp("buyersView.openYourGift")}
                     </span>
                 </div>
             </div>
             <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[12px] text-zinc-600">
-                <li>They get it right away, free. No payment is taken.</li>
+                <li>{tp("buyersView.theyGetItRightAway")}</li>
                 <li>{isCourse
-                    ? "Someone without an account gets it as soon as they join with that address."
-                    : "Someone without an account can download it straight from the email, or join to keep it in their library."}</li>
-                <li>Not a sale: no commission, nothing in the ledger.</li>
-                <li>You can take the gift back later.</li>
+                    ? tp("buyersView.someoneWithoutAnAccountGets")
+                    : tp("buyersView.someoneWithoutAnAccountCan")}</li>
+                <li>{tp("buyersView.notASaleNoCommission")}</li>
+                <li>{tp("buyersView.youCanTakeTheGift")}</li>
             </ul>
         </div>
     );
@@ -1193,6 +1197,7 @@ function ChevronRightIcon({ className = "" }: { className?: string }) {
 function CustomerDownloadDetailPanel({
     customer, detail, loading, failed,
 }: { customer: Customer; detail?: CustomerDetail; loading: boolean; failed: boolean }) {
+  const tp = useProductT("marketplaceUi.productUi");
     const purchasedAt = new Date(customer.createdAt).toLocaleDateString("en-GB", {
         day: "numeric", month: "short", year: "numeric",
     });
@@ -1212,7 +1217,7 @@ function CustomerDownloadDetailPanel({
 
             <div>
                 <div className="mb-3 flex items-baseline gap-1.5">
-                    <h4 className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Downloads</h4>
+                    <h4 className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">{tp("buyersView.downloads")}</h4>
                     {detail && (detail.downloads.length + detail.linkOpens.length) > 0 && (
                         <span className="text-[11px] font-medium tabular-nums text-zinc-300">
                             · {detail.downloads.length + detail.linkOpens.length}
@@ -1223,9 +1228,9 @@ function CustomerDownloadDetailPanel({
                 {loading ? (
                     <div className="h-20 animate-pulse rounded-lg bg-zinc-50" />
                 ) : failed ? (
-                    <p className="text-[12.5px] text-red-600">Could not load this customer's download detail.</p>
+                    <p className="text-[12.5px] text-red-600">{tp("buyersView.couldNotLoadThisCustomer")}</p>
                 ) : nothing ? (
-                    <p className="text-[12.5px] text-zinc-400">No downloadable content on this sale.</p>
+                    <p className="text-[12.5px] text-zinc-400">{tp("buyersView.noDownloadableContentOnThis")}</p>
                 ) : (
                     <div className="flex flex-col gap-2">
                         {detail!.downloads.map((d, i) => (
@@ -1267,7 +1272,7 @@ function CustomerDownloadDetailPanel({
 
             {detail?.licenseTerms && (
                 <p className="rounded-lg bg-zinc-50 px-3 py-2 text-[11.5px] leading-relaxed text-zinc-500">
-                    <span className="font-medium text-zinc-600">Licence: </span>{detail.licenseTerms}
+                    <span className="font-medium text-zinc-600">{tp("buyersView.licence")} </span>{detail.licenseTerms}
                 </p>
             )}
         </div>
@@ -1301,6 +1306,7 @@ function CustomerDownloadDetailPanel({
 function AssetRow({
     icon, name, used, max, countLabel,
 }: { icon: React.ReactNode; name: string; used: number; max: number | null; countLabel: string }) {
+  const tp = useProductT("marketplaceUi.productUi");
     const exhausted = max != null && used >= max;
     const pct = max != null && max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
 
@@ -1331,7 +1337,7 @@ function AssetRow({
                     </div>
                     {exhausted && (
                         <span className="shrink-0 text-[10.5px] font-medium uppercase tracking-wide text-amber-700">
-                            Limit reached
+                            {tp("buyersView.limitReached")}
                         </span>
                     )}
                 </div>

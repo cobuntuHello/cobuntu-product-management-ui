@@ -16,6 +16,7 @@ import { UserAvatarFallback } from "../ui/user-avatar-fallback";
 import type { MemberPricingScope } from "../components/MemberPricingSection";
 import type { RenderProductShareQr } from "../components/ShareModal";
 
+import { useProductT } from "../i18n/productCopy";
 /**
  * THE product manage page. One implementation, both apps.
  *
@@ -556,6 +557,7 @@ export function ProductManagePage({
  * decides what it is.
  */
 export function ReadOnlyNotice({ product }: { product: any }) {
+  const tp = useProductT("marketplaceUi.productUi");
   const seller = product?.owner ?? product?.creator ?? null;
   const sellerName: string | null = seller?.name || null;
   const firstName = sellerName ? sellerName.split(/\s+/)[0] : null;
@@ -585,11 +587,10 @@ export function ReadOnlyNotice({ product }: { product: any }) {
       )}
       <div className="min-w-0 text-[13.5px] leading-relaxed text-zinc-600">
         <p className="font-semibold text-zinc-900">
-          {sellerName ? `${sellerName} sells this` : "This product belongs to its seller"}
+          {sellerName ? tp("productManagePage.sellsThis", { name: sellerName }) : tp("productManagePage.thisProductBelongsToIts")}
         </p>
         <p className="mt-0.5">
-          Your community carries it, so you manage the listing: its terms, its commission and whether it
-          stays on your shelf. To change the product itself, ask {firstName ?? "the seller"} in the listing conversation.
+          {tp("productManagePage.readOnlyBody", { name: firstName ?? tp("productManagePage.theSeller") })}
         </p>
       </div>
     </div>

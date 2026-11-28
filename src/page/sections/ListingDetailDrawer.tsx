@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { API, authHeaders, jsonHeaders, LISTING_STATUS } from "../helpers";
 
+import { useProductT } from "../../i18n/productCopy";
 /**
  * Resolve the community-app URL where the listing conversation lives.
  * Admin runs at `admin.<community-host>` in prod; strip the leading
@@ -28,6 +29,7 @@ interface Props {
 }
 
 export function ListingDetailDrawer({ listing, communityTag, onClose, onRefresh }: Props) {
+  const tp = useProductT("marketplaceUi.productUi");
   const [stats, setStats] = useState<{ views: number; sales: number } | null>(null);
   const [loadingStats, setLoadingStats] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -119,7 +121,8 @@ export function ListingDetailDrawer({ listing, communityTag, onClose, onRefresh 
     }
   }
 
-  const sc = listing ? (LISTING_STATUS[listing.status] || LISTING_STATUS.CANCELLED) : null;
+  const scStatus = listing && LISTING_STATUS[listing.status] ? listing.status : "CANCELLED";
+  const sc = listing ? { ...LISTING_STATUS[scStatus], label: tp(`listingStatus.${scStatus}`) } : null;
   const commissionRate = listing?.commissionRate ?? listing?.productListing?.commissionRate ?? 0;
 
   if (!visible) return null;
@@ -145,7 +148,7 @@ export function ListingDetailDrawer({ listing, communityTag, onClose, onRefresh 
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-semibold text-zinc-900 truncate">{listing.community?.name || "Community"}</p>
+                <p className="text-[15px] font-semibold text-zinc-900 truncate">{listing.community?.name || tp("common.community")}</p>
                 <p className="text-[12px] text-zinc-400">{listing.community?.communityTag || communityTag}</p>
               </div>
             </div>
@@ -155,11 +158,11 @@ export function ListingDetailDrawer({ listing, communityTag, onClose, onRefresh 
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-zinc-50 p-4 text-center">
                   <p className="text-2xl font-semibold text-zinc-900 tabular-nums">{loadingStats ? "-" : (stats?.views ?? 0)}</p>
-                  <p className="text-[11px] text-zinc-400 mt-1">Views</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">{tp("listingDetailDrawer.views")}</p>
                 </div>
                 <div className="rounded-xl bg-zinc-50 p-4 text-center">
                   <p className="text-2xl font-semibold text-zinc-900 tabular-nums">{loadingStats ? "-" : (stats?.sales ?? 0)}</p>
-                  <p className="text-[11px] text-zinc-400 mt-1">Sales</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">{tp("listingDetailDrawer.sales")}</p>
                 </div>
               </div>
             </div>
@@ -167,26 +170,26 @@ export function ListingDetailDrawer({ listing, communityTag, onClose, onRefresh 
             {/* Info */}
             <div className="px-6 py-4 border-t border-zinc-100 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-[13px] text-zinc-500">Status</span>
+                <span className="text-[13px] text-zinc-500">{tp("listingDetailDrawer.status")}</span>
                 <span className="flex items-center gap-1.5 text-[13px] text-zinc-700">
                   <span className={`w-1.5 h-1.5 rounded-full ${sc?.dot}`} />
                   {sc?.label}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[13px] text-zinc-500">Commission</span>
+                <span className="text-[13px] text-zinc-500">{tp("listingDetailDrawer.commission")}</span>
                 <span className="text-[13px] text-zinc-700">
-                  {commissionRate === 0 ? "Self-listed (0%)" : `${commissionRate}%`}
+                  {commissionRate === 0 ? tp("listingDetailDrawer.selfListed0") : `${commissionRate}%`}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[13px] text-zinc-500">Visibility</span>
+                <span className="text-[13px] text-zinc-500">{tp("common.visibility")}</span>
                 <span className="text-[13px] text-zinc-700">
-                  {listing.isHidden ? "Hidden" : "Visible"}
+                  {listing.isHidden ? tp("common.hidden") : tp("listingDetailDrawer.visible")}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[13px] text-zinc-500">Created</span>
+                <span className="text-[13px] text-zinc-500">{tp("listingDetailDrawer.created")}</span>
                 <span className="text-[13px] text-zinc-700">
                   {new Date(listing.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                 </span>
@@ -205,28 +208,28 @@ export function ListingDetailDrawer({ listing, communityTag, onClose, onRefresh 
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
-                  Open conversation
+                  {tp("listingDetailDrawer.openConversation")}
                 </button>
               )}
               {listing.status === "ACTIVE" && (
                 <button onClick={() => updateStatus("PAUSED")} disabled={actionLoading}
                   className="w-full px-4 py-2.5 text-[13px] font-medium border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer disabled:opacity-40">
-                  Pause
+                  {tp("listingDetailDrawer.pause")}
                 </button>
               )}
               {listing.status === "PAUSED" && (
                 <button onClick={() => updateStatus("ACTIVE")} disabled={actionLoading}
                   className="w-full px-4 py-2.5 text-[13px] font-medium border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer disabled:opacity-40">
-                  Resume
+                  {tp("listingDetailDrawer.resume")}
                 </button>
               )}
               <button onClick={toggleVisibility} disabled={actionLoading}
                 className="w-full px-4 py-2.5 text-[13px] font-medium border border-zinc-200 rounded-lg hover:bg-zinc-50 cursor-pointer disabled:opacity-40">
-                {listing.isHidden ? "Show" : "Hide"}
+                {listing.isHidden ? tp("listingDetailDrawer.show") : tp("listingDetailDrawer.hide")}
               </button>
               <button onClick={() => updateStatus("CANCELLED")} disabled={actionLoading}
                 className="w-full px-4 py-2.5 text-[13px] font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 cursor-pointer disabled:opacity-40">
-                Remove
+                {tp("common.remove")}
               </button>
             </div>
           </div>
